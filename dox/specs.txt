@@ -1,0 +1,11 @@
+[Kontekst: Acoustic HDD Sentinel]
+
+    Tech: Android (Java), API 26+, MVVM z Repository.
+
+    Audio: Mikrofon (AudioRecord), 44.1 kHz, 16-bit PCM, Mono. Nagrywanie 5-30s, podział na sztywne 5-sekundowe okna -> konwersja do Mel-spektrogramu.
+
+    ML: PyTorch Mobile (.ptl). Własna płytka sieć CNN. Wejście: 1-kanałowy spektrogram (5s). Wyjście: binarnie (0=zdrowy, 1=anomalia). Wykrycie w 1 oknie = dysk uszkodzony.
+
+    DB: SQLite. Tabela Diagnostics: id (PK), hdd_name (TEXT), timestamp (INT, ms), has_anomaly (INT, 0/1), spectrogram_path (TEXT).
+
+    Pliki: Spektrogramy zapisywane w Internal Storage (np. PNG). Baza przechowuje tylko absolutną ścieżkę do pliku.

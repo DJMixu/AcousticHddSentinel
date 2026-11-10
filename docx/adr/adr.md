@@ -137,7 +137,7 @@ Przyjmujemy następującą architekturę pipeline'u przetwarzania danych (zaimpl
     
       
     
-- **Wymiar wyjściowego tensora:** `(128, 259, 3)` w konwencji _Channel-Last_ (TensorFlow/Keras) lub `(3, 128, 259)` w konwencji _Channel-First_ (PyTorch), serializowany do plików `.npy` (`float32`).
+- **Wymiar wyjściowego tensora:** `(128, 259, 3)` w konwencji _Channel-Last_ na dysku oraz `(3, 128, 259)` w konwencji _Channel-First_ (PyTorch), serializowany do plików `.npy` (`float32`).
     
       
     
@@ -165,7 +165,7 @@ Przyjmujemy następującą architekturę pipeline'u przetwarzania danych (zaimpl
     
       
     
-- **Elastyczność modelowania:** Kształt `(128, 259, 3)` pozwala zarówno na budowę własnej lekkiej sieci 2D CNN od zera, jak i na szybkie podpięcie gotowych modeli z `tf.keras.applications` lub `torchvision.models`.
+- **Elastyczność modelowania:** Kształt `(128, 259, 3)` / `(3, 128, 259)` pozwala zarówno na budowę własnej lekkiej sieci 2D CNN w PyTorch od zera, jak i na szybkie podpięcie gotowych modeli z `torchvision.models`.
     
       
     

@@ -15,33 +15,33 @@
     "dc_offset_mean_abs": 0.03392370417714119
   },
   "encoded_tensors_profile": {
-    "total_tensors": 837,
+    "total_tensors": 1050,
     "nan_tensors": 0,
     "inf_tensors": 0,
     "channel_0_log_mel": {
-      "mean_of_means": -3.5732595371909333e-09,
-      "std_of_means": 1.624411338851848e-07,
-      "mean_of_stds": 0.9999999040059007,
-      "std_of_stds": 5.2969653482005676e-08,
-      "min_global": -7.467644691467285,
-      "max_global": 8.699585914611816
+      "mean_of_means": 3.64356538971679e-09,
+      "std_of_means": 1.6106134704005106e-07,
+      "mean_of_stds": 0.9999998965717497,
+      "std_of_stds": 5.151731170433566e-08,
+      "min_global": -7.46762228012085,
+      "max_global": 8.70011043548584
     },
     "channel_1_delta": {
-      "mean_of_means": -2.587114597248588e-10,
-      "std_of_means": 6.2078672480670244e-09,
-      "mean_of_stds": 0.9999986651265635,
-      "std_of_stds": 4.852991000469345e-07,
-      "min_global": -12.601819038391113,
-      "max_global": 12.501738548278809
+      "mean_of_means": -2.5301022328814783e-11,
+      "std_of_means": 5.9641645956979205e-09,
+      "mean_of_stds": 0.9999986410708654,
+      "std_of_stds": 5.210992153251632e-07,
+      "min_global": -12.418219566345215,
+      "max_global": 12.325632095336914
     },
     "channel_2_delta_delta": {
-      "mean_of_means": -1.7608875003371862e-10,
-      "std_of_means": 6.365093412366996e-09,
-      "mean_of_stds": 0.9999981250529363,
-      "std_of_stds": 5.042646764767536e-07,
-      "min_global": -12.414013862609863,
-      "max_global": 11.987079620361328
+      "mean_of_means": -2.5399301523451734e-10,
+      "std_of_means": 6.666933574642109e-09,
+      "mean_of_stds": 0.9999980452514831,
+      "std_of_stds": 5.581022935259883e-07,
+      "min_global": -12.715740203857422,
+      "max_global": 13.225836753845215
     },
-    "mean_3sigma_outlier_pct": 1.1766314605696326
+    "mean_3sigma_outlier_pct": 1.184122579211865
   }
 }

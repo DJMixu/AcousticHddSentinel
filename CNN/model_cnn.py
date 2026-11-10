@@ -1,270 +1,329 @@
 """
-HDD Acoustic Fault Detection - 2D CNN Model Architecture
+HDD Acoustic Fault Detection - 2D CNN Model Architecture (Pure PyTorch)
 Single Source of Truth: ADR-001 & AGENTS.md
 
-Moduł definiujący architekturę sieci 2D CNN w TensorFlow / Keras przystosowaną
+Moduł definiujący architekturę sieci 2D CNN w PyTorch przystosowaną
 do przetwarzania 3-kanałowych reprezentacji czasowo-częstotliwościowych [Log-Mel, Delta, Delta-Delta]
-wycinków audio dysków HDD o stałym kształcie (128, 259, 3).
+wycinków audio dysków HDD.
+Obsługuje tensory (128, 259, 3) oraz (3, 128, 259).
 """
 
-from typing import Tuple, Optional
-import tensorflow as tf
-from tensorflow.keras import layers, models, regularizers, optimizers
-
+from typing import Tuple, Optional, Union
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 # Stałe DSP / wejściowe zgodne z ADR-001
-INPUT_SHAPE: Tuple[int, int, int] = (128, 259, 3)  # (n_mels, time_frames, channels)
-DEFAULT_NUM_CLASSES: int = 4                       # np. clicking, beeping, scratching, normal
+INPUT_SHAPE: Tuple[int, int, int] = (128, 259, 3)       # Channel-Last (H, W, C) - format dyskowy .npy
+INPUT_SHAPE_PT: Tuple[int, int, int] = (3, 128, 259)    # Channel-First (C, H, W) - format wewnętrzny PyTorch
+DEFAULT_NUM_CLASSES: int = 4                            # np. clicking, beeping, scratching, normal
 
 
-def build_hdd_cnn_model(
-    input_shape: Tuple[int, int, int] = INPUT_SHAPE,
-    num_classes: int = DEFAULT_NUM_CLASSES,
-    dropout_rate: float = 0.3,
-    l2_reg: float = 1e-4,
-    model_name: str = "AcousticHddSentinelCNN"
-) -> tf.keras.Model:
+class AcousticHddSentinelCNN(nn.Module):
     """
-    Tworzy model 2D CNN dedykowany do akustycznej detekcji i klasyfikacji uszkodzeń HDD.
-
-    Architektura oparta na 4 blokach konwolucyjnych z Batch Normalization,
+    Model 2D CNN w PyTorch dedykowany do akustycznej detekcji i klasyfikacji uszkodzeń HDD.
+    Architektura oparta na 4 blokach konwolucyjnych z Batch Normalization (eps=1e-3),
     warstwami poolingowymi oraz Global Average Pooling, co zapobiega przeuczeniu
     (overfitting) na małych i średnich zbiorach akustycznych, zachowując wysoką
     czułość na impulsowe transjenty (kanał Delta) oraz wąskopasmowe piski (Log-Mel).
-
-    Parametry:
-        input_shape: Kształt tensora wejściowego (128, 259, 3) - Channel-Last.
-        num_classes: Liczba klas wyjściowych (>= 2 dla softmax, 1 dla binarnego sigmoid).
-        dropout_rate: Bazowy współczynnik regularyzacji dropout.
-        l2_reg: Współczynnik regularyzacji wag L2.
-        model_name: Nazwa modelu Keras.
-
-    Zwraca:
-        tf.keras.Model: Nieskompilowany lub gotowy do kompilacji model Keras.
     """
-    # Niezmiennik techniczny ADR-001 / .agents/rules/adr-001-audio-pipeline.md:
-    # Zawsze jawnie definiuj layers.Input(shape=(128, 259, 3))
-    inputs = layers.Input(shape=input_shape, name="audio_spectrogram_input")
 
-    reg = regularizers.l2(l2_reg) if l2_reg > 0 else None
+    def __init__(
+        self,
+        num_classes: int = DEFAULT_NUM_CLASSES,
+        dropout_rate: float = 0.3,
+        input_shape: Tuple[int, int, int] = INPUT_SHAPE_PT
+    ):
+        super().__init__()
+        self.num_classes = num_classes
+        self.dropout_rate = dropout_rate
+        self.input_shape = input_shape
 
-    # =========================================================================
-    # BLOK 1: Niskopoziomowa ekstrakcja cech widmowych i transjentów
-    # Wejście: (128, 259, 3) -> Wyjście po poolingu: (64, 129, 32)
-    # =========================================================================
-    x = layers.Conv2D(32, kernel_size=(3, 3), padding="same", use_bias=False, kernel_regularizer=reg, name="conv1_1")(inputs)
-    x = layers.BatchNormalization(name="bn1_1")(x)
-    x = layers.Activation("relu", name="relu1_1")(x)
+        # =========================================================================
+        # BLOK 1: Niskopoziomowa ekstrakcja cech widmowych i transjentów
+        # Wejście: (B, 3, 128, 259) -> Wyjście po poolingu: (B, 32, 64, 129)
+        # =========================================================================
+        self.conv1_1 = nn.Conv2d(3, 32, kernel_size=3, padding=1, bias=False)
+        self.bn1_1 = nn.BatchNorm2d(32, eps=1e-3, momentum=0.01)
+        self.relu1_1 = nn.ReLU(inplace=False)
 
-    x = layers.Conv2D(32, kernel_size=(3, 3), padding="same", use_bias=False, kernel_regularizer=reg, name="conv1_2")(x)
-    x = layers.BatchNormalization(name="bn1_2")(x)
-    x = layers.Activation("relu", name="relu1_2")(x)
+        self.conv1_2 = nn.Conv2d(32, 32, kernel_size=3, padding=1, bias=False)
+        self.bn1_2 = nn.BatchNorm2d(32, eps=1e-3, momentum=0.01)
+        self.relu1_2 = nn.ReLU(inplace=False)
 
-    x = layers.MaxPooling2D(pool_size=(2, 2), name="pool1")(x)
-    x = layers.SpatialDropout2D(dropout_rate * 0.5, name="s_dropout1")(x)
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.s_dropout1 = nn.Dropout2d(p=dropout_rate * 0.5)
 
-    # =========================================================================
-    # BLOK 2: Średniopoziomowe wzorce czasowo-częstotliwościowe (np. klikanie głowicy)
-    # Wejście: (64, 129, 32) -> Wyjście po poolingu: (32, 64, 64)
-    # =========================================================================
-    x = layers.Conv2D(64, kernel_size=(3, 3), padding="same", use_bias=False, kernel_regularizer=reg, name="conv2_1")(x)
-    x = layers.BatchNormalization(name="bn2_1")(x)
-    x = layers.Activation("relu", name="relu2_1")(x)
+        # =========================================================================
+        # BLOK 2: Średniopoziomowe wzorce czasowo-częstotliwościowe (klikanie głowicy)
+        # Wejście: (B, 32, 64, 129) -> Wyjście po poolingu: (B, 64, 32, 64)
+        # =========================================================================
+        self.conv2_1 = nn.Conv2d(32, 64, kernel_size=3, padding=1, bias=False)
+        self.bn2_1 = nn.BatchNorm2d(64, eps=1e-3, momentum=0.01)
+        self.relu2_1 = nn.ReLU(inplace=False)
 
-    x = layers.Conv2D(64, kernel_size=(3, 3), padding="same", use_bias=False, kernel_regularizer=reg, name="conv2_2")(x)
-    x = layers.BatchNormalization(name="bn2_2")(x)
-    x = layers.Activation("relu", name="relu2_2")(x)
+        self.conv2_2 = nn.Conv2d(64, 64, kernel_size=3, padding=1, bias=False)
+        self.bn2_2 = nn.BatchNorm2d(64, eps=1e-3, momentum=0.01)
+        self.relu2_2 = nn.ReLU(inplace=False)
 
-    x = layers.MaxPooling2D(pool_size=(2, 2), name="pool2")(x)
-    x = layers.SpatialDropout2D(dropout_rate * 0.75, name="s_dropout2")(x)
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.s_dropout2 = nn.Dropout2d(p=dropout_rate * 0.75)
 
-    # =========================================================================
-    # BLOK 3: Wysokopoziomowa dynamika zmian (zatarte łożyska, rezonanse, zarysowania)
-    # Wejście: (32, 64, 64) -> Wyjście po poolingu: (16, 32, 128)
-    # =========================================================================
-    x = layers.Conv2D(128, kernel_size=(3, 3), padding="same", use_bias=False, kernel_regularizer=reg, name="conv3_1")(x)
-    x = layers.BatchNormalization(name="bn3_1")(x)
-    x = layers.Activation("relu", name="relu3_1")(x)
+        # =========================================================================
+        # BLOK 3: Wysokopoziomowa dynamika zmian (zatarte łożyska, rezonanse)
+        # Wejście: (B, 64, 32, 64) -> Wyjście po poolingu: (B, 128, 16, 32)
+        # =========================================================================
+        self.conv3_1 = nn.Conv2d(64, 128, kernel_size=3, padding=1, bias=False)
+        self.bn3_1 = nn.BatchNorm2d(128, eps=1e-3, momentum=0.01)
+        self.relu3_1 = nn.ReLU(inplace=False)
 
-    x = layers.Conv2D(128, kernel_size=(3, 3), padding="same", use_bias=False, kernel_regularizer=reg, name="conv3_2")(x)
-    x = layers.BatchNormalization(name="bn3_2")(x)
-    x = layers.Activation("relu", name="relu3_2")(x)
+        self.conv3_2 = nn.Conv2d(128, 128, kernel_size=3, padding=1, bias=False)
+        self.bn3_2 = nn.BatchNorm2d(128, eps=1e-3, momentum=0.01)
+        self.relu3_2 = nn.ReLU(inplace=False)
 
-    x = layers.MaxPooling2D(pool_size=(2, 2), name="pool3")(x)
-    x = layers.SpatialDropout2D(dropout_rate, name="s_dropout3")(x)
+        self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.s_dropout3 = nn.Dropout2d(p=dropout_rate)
 
-    # =========================================================================
-    # BLOK 4: Semantyczna reprezentacja akustyczna
-    # Wejście: (16, 32, 128) -> Wyjście po poolingu: (8, 16, 256)
-    # =========================================================================
-    x = layers.Conv2D(256, kernel_size=(3, 3), padding="same", use_bias=False, kernel_regularizer=reg, name="conv4_1")(x)
-    x = layers.BatchNormalization(name="bn4_1")(x)
-    x = layers.Activation("relu", name="relu4_1")(x)
+        # =========================================================================
+        # BLOK 4: Semantyczna reprezentacja akustyczna
+        # Wejście: (B, 128, 16, 32) -> Wyjście po poolingu: (B, 256, 8, 16)
+        # =========================================================================
+        self.conv4_1 = nn.Conv2d(128, 256, kernel_size=3, padding=1, bias=False)
+        self.bn4_1 = nn.BatchNorm2d(256, eps=1e-3, momentum=0.01)
+        self.relu4_1 = nn.ReLU(inplace=False)
 
-    x = layers.Conv2D(256, kernel_size=(3, 3), padding="same", use_bias=False, kernel_regularizer=reg, name="conv4_2")(x)
-    x = layers.BatchNormalization(name="bn4_2")(x)
-    x = layers.Activation("relu", name="relu4_2")(x)
+        self.conv4_2 = nn.Conv2d(256, 256, kernel_size=3, padding=1, bias=False)
+        self.bn4_2 = nn.BatchNorm2d(256, eps=1e-3, momentum=0.01)
+        self.relu4_2 = nn.ReLU(inplace=False)
 
-    x = layers.MaxPooling2D(pool_size=(2, 2), name="pool4")(x)
-    x = layers.Dropout(dropout_rate, name="dropout4")(x)
+        self.pool4 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.dropout4 = nn.Dropout(p=dropout_rate)
 
-    # =========================================================================
-    # AGREGACJA PRZESTRZENNO-CZASOWA (Global Average Pooling)
-    # Zastępuje gigantyczną warstwę Flatten, redukuje liczbę parametrów z milionów
-    # do bezpiecznego zakresu, eliminując ryzyko przeuczenia.
-    # Wyjście: wektor 256-elementowy
-    # =========================================================================
-    x = layers.GlobalAveragePooling2D(name="global_avg_pool")(x)
+        # =========================================================================
+        # AGREGACJA PRZESTRZENNO-CZASOWA (Global Average Pooling) -> (B, 256)
+        # =========================================================================
+        self.global_avg_pool = nn.AdaptiveAvgPool2d((1, 1))
 
-    # Gęsta warstwa projekcyjna (Dense Projection Layer)
-    x = layers.Dense(128, use_bias=False, kernel_regularizer=reg, name="dense_features")(x)
-    x = layers.BatchNormalization(name="bn_dense")(x)
-    x = layers.Activation("relu", name="relu_dense")(x)
-    x = layers.Dropout(dropout_rate, name="dense_dropout")(x)
+        # Gęsta warstwa projekcyjna (Dense Projection Layer)
+        self.dense_features = nn.Linear(256, 128, bias=False)
+        self.bn_dense = nn.BatchNorm1d(128, eps=1e-3, momentum=0.01)
+        self.relu_dense = nn.ReLU(inplace=False)
+        self.dense_dropout = nn.Dropout(p=dropout_rate)
 
-    # =========================================================================
-    # WARSTWA WYJŚCIOWA (Klasyfikator)
-    # =========================================================================
-    if num_classes == 1:
-        outputs = layers.Dense(1, activation="sigmoid", name="predictions")(x)
-    else:
-        outputs = layers.Dense(num_classes, activation="softmax", name="predictions")(x)
+        # =========================================================================
+        # WARSTWA WYJŚCIOWA (Klasyfikator)
+        # =========================================================================
+        self.predictions = nn.Linear(128, num_classes)
 
-    model = models.Model(inputs=inputs, outputs=outputs, name=model_name)
-    return model
+    def forward(self, x: torch.Tensor, return_logits: bool = False) -> torch.Tensor:
+        """
+        Forward pass sieci.
+        Obsługuje przezroczyście tensory wejściowe:
+        - Channel-First (B, 3, 128, 259) - natywny PyTorch
+        - Channel-Last (B, 128, 259, 3) - zgodny z plikami .npy (automatyczna transpozycja)
+        """
+        if x.ndim == 4 and x.shape[-1] == 3 and x.shape[1] != 3:
+            x = x.permute(0, 3, 1, 2)
+        elif x.ndim == 3 and x.shape[-1] == 3:
+            x = x.permute(2, 0, 1).unsqueeze(0)
+        elif x.ndim == 3 and x.shape[0] == 3:
+            x = x.unsqueeze(0)
+
+        # BLOK 1
+        x = self.conv1_1(x)
+        x = self.bn1_1(x)
+        x = self.relu1_1(x)
+
+        x = self.conv1_2(x)
+        x = self.bn1_2(x)
+        x = self.relu1_2(x)
+
+        x = self.pool1(x)
+        x = self.s_dropout1(x)
+
+        # BLOK 2
+        x = self.conv2_1(x)
+        x = self.bn2_1(x)
+        x = self.relu2_1(x)
+
+        x = self.conv2_2(x)
+        x = self.bn2_2(x)
+        x = self.relu2_2(x)
+
+        x = self.pool2(x)
+        x = self.s_dropout2(x)
+
+        # BLOK 3
+        x = self.conv3_1(x)
+        x = self.bn3_1(x)
+        x = self.relu3_1(x)
+
+        x = self.conv3_2(x)
+        x = self.bn3_2(x)
+        x = self.relu3_2(x)
+
+        x = self.pool3(x)
+        x = self.s_dropout3(x)
+
+        # BLOK 4
+        x = self.conv4_1(x)
+        x = self.bn4_1(x)
+        x = self.relu4_1(x)
+
+        x = self.conv4_2(x)
+        x = self.bn4_2(x)
+        x = self.relu4_2(x)
+
+        x = self.pool4(x)
+        x = self.dropout4(x)
+
+        # GAP & Flatten
+        x = self.global_avg_pool(x)
+        x = torch.flatten(x, 1)
+
+        # Dense projection
+        x = self.dense_features(x)
+        x = self.bn_dense(x)
+        x = self.relu_dense(x)
+        x = self.dense_dropout(x)
+
+        # Klasyfikator
+        logits = self.predictions(x)
+
+        if return_logits:
+            return logits
+
+        if self.num_classes == 1:
+            return torch.sigmoid(logits)
+        return F.softmax(logits, dim=-1)
+
+    @torch.no_grad()
+    def predict_proba(self, x: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
+        """
+        Pomocnicza metoda inferencyjna zwracająca prawdopodobieństwa (Softmax) jako np.ndarray.
+        """
+        was_training = self.training
+        self.eval()
+
+        device = next(self.parameters()).device
+        if isinstance(x, np.ndarray):
+            x_t = torch.from_numpy(x).float().to(device)
+        else:
+            x_t = x.to(device)
+
+        probs = self.forward(x_t, return_logits=False)
+        result = probs.detach().cpu().numpy()
+
+        if was_training:
+            self.train()
+        return result
+
+    @torch.no_grad()
+    def predict(self, x: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
+        """
+        Zwraca indeksy klas z najwyższym prawdopodobieństwem (argmax).
+        """
+        probs = self.predict_proba(x)
+        if self.num_classes == 1:
+            return (probs > 0.5).astype(np.int64)
+        return np.argmax(probs, axis=-1)
+
+
+def build_hdd_cnn_model(
+    input_shape: Tuple[int, int, int] = INPUT_SHAPE_PT,
+    num_classes: int = DEFAULT_NUM_CLASSES,
+    dropout_rate: float = 0.3,
+    **kwargs
+) -> AcousticHddSentinelCNN:
+    """
+    Główna funkcja fabryczna tworząca model 2D CNN w PyTorch.
+    """
+    return AcousticHddSentinelCNN(
+        num_classes=num_classes,
+        dropout_rate=dropout_rate,
+        input_shape=input_shape
+    )
+
+
+class TransferLearningMobileNetV2(nn.Module):
+    """
+    Model transfer learningu oparty na architekturze MobileNetV2 w PyTorch.
+    """
+    def __init__(
+        self,
+        num_classes: int = DEFAULT_NUM_CLASSES,
+        pretrained: bool = False,
+        freeze_backbone: bool = True,
+        dropout_rate: float = 0.3
+    ):
+        super().__init__()
+        self.num_classes = num_classes
+        try:
+            import torchvision.models as tv_models
+            weights = tv_models.MobileNet_V2_Weights.DEFAULT if pretrained else None
+            backbone = tv_models.mobilenet_v2(weights=weights)
+        except Exception:
+            import torchvision.models as tv_models
+            backbone = tv_models.mobilenet_v2(pretrained=pretrained)
+
+        self.features = backbone.features
+        if freeze_backbone:
+            for param in self.features.parameters():
+                param.requires_grad = False
+
+        self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.bn_gap = nn.BatchNorm1d(1280, eps=1e-3, momentum=0.01)
+        self.dropout1 = nn.Dropout(dropout_rate)
+        self.dense = nn.Linear(1280, 128)
+        self.relu = nn.ReLU()
+        self.dropout2 = nn.Dropout(dropout_rate)
+        self.classifier = nn.Linear(128, num_classes)
+
+    def forward(self, x: torch.Tensor, return_logits: bool = False) -> torch.Tensor:
+        if x.ndim == 4 and x.shape[-1] == 3 and x.shape[1] != 3:
+            x = x.permute(0, 3, 1, 2)
+        x = self.features(x)
+        x = self.global_pool(x)
+        x = torch.flatten(x, 1)
+        x = self.bn_gap(x)
+        x = self.dropout1(x)
+        x = self.relu(self.dense(x))
+        x = self.dropout2(x)
+        logits = self.classifier(x)
+        if return_logits:
+            return logits
+        return F.softmax(logits, dim=-1)
 
 
 def build_transfer_learning_model(
     backbone_name: str = "mobilenetv2",
-    input_shape: Tuple[int, int, int] = INPUT_SHAPE,
     num_classes: int = DEFAULT_NUM_CLASSES,
     freeze_backbone: bool = True,
     dropout_rate: float = 0.3,
-    weights: Optional[str] = "imagenet",
-    model_name: Optional[str] = None
-) -> tf.keras.Model:
+    **kwargs
+) -> nn.Module:
     """
-    Buduje model transfer learningu wykorzystując 3-kanałowy format tensora
-    (Log-Mel, Delta, Delta-Delta) jako wejście do sieci pretrenowanej na ImageNet
-    (zgodnie z sekcją 2 i 4 ADR-001).
-
-    Parametry:
-        backbone_name: Wybór szkieletu ('mobilenetv2', 'efficientnetb0', 'resnet50').
-        input_shape: (128, 259, 3).
-        num_classes: Liczba klas wyjściowych.
-        freeze_backbone: Czy zablokować wagi bazowe podczas wstępnego treningu.
-        dropout_rate: Stopień dropoutu w głowicy klasyfikatora.
-        weights: Wagi ('imagenet' lub None).
-        model_name: Opcjonalna nazwa modelu.
+    Tworzy model transfer learningu w PyTorch.
     """
-    inputs = layers.Input(shape=input_shape, name="audio_spectrogram_input")
-
-    backbone_name_lower = backbone_name.lower()
-    
-    def _create_backbone(w_target):
-        if backbone_name_lower == "mobilenetv2":
-            return tf.keras.applications.MobileNetV2(
-                input_tensor=inputs,
-                include_top=False,
-                weights=w_target
-            )
-        elif backbone_name_lower == "efficientnetb0":
-            try:
-                return tf.keras.applications.EfficientNetB0(
-                    input_tensor=inputs,
-                    include_top=False,
-                    weights=w_target,
-                    include_preprocessing=False
-                )
-            except TypeError:
-                return tf.keras.applications.EfficientNetB0(
-                    input_tensor=inputs,
-                    include_top=False,
-                    weights=w_target
-                )
-        elif backbone_name_lower == "resnet50":
-            return tf.keras.applications.ResNet50(
-                input_tensor=inputs,
-                include_top=False,
-                weights=w_target
-            )
-        else:
-            raise ValueError(f"Nieobsługiwany szkielet: {backbone_name}. Wybierz: mobilenetv2, efficientnetb0, resnet50.")
-
-    try:
-        base_model = _create_backbone(weights)
-    except Exception:
-        # Fallback offline w przypadku braku połączenia sieciowego
-        base_model = _create_backbone(None)
-
-    base_model.trainable = not freeze_backbone
-
-    x = base_model.output
-    x = layers.GlobalAveragePooling2D(name="transfer_gap")(x)
-    x = layers.BatchNormalization(name="transfer_bn")(x)
-    x = layers.Dropout(dropout_rate, name="transfer_dropout")(x)
-    x = layers.Dense(128, activation="relu", name="transfer_dense")(x)
-    x = layers.Dropout(dropout_rate, name="transfer_dense_dropout")(x)
-
-    if num_classes == 1:
-        outputs = layers.Dense(1, activation="sigmoid", name="predictions")(x)
-    else:
-        outputs = layers.Dense(num_classes, activation="softmax", name="predictions")(x)
-
-    name = model_name or f"HddSentinel_{backbone_name}"
-    model = models.Model(inputs=inputs, outputs=outputs, name=name)
-    return model
-
-
-def compile_cnn_model(
-    model: tf.keras.Model,
-    learning_rate: float = 1e-3,
-    label_mode: str = "categorical"
-) -> tf.keras.Model:
-    """
-    Kompiluje model Keras z optymalizatorem Adam, odpowiednią funkcją straty i metrykami.
-
-    Parametry:
-        model: Model zwrócony przez `build_hdd_cnn_model` lub `build_transfer_learning_model`.
-        learning_rate: Początkowy współczynnik uczenia (Learning Rate).
-        label_mode: 'categorical' (dla wektorów one-hot), 'sparse' (dla indeksów int)
-                    lub 'binary' (dla klasyfikacji 1-wyjściowej).
-    """
-    optimizer = optimizers.Adam(learning_rate=learning_rate)
-
-    if label_mode == "sparse":
-        loss = tf.keras.losses.SparseCategoricalCrossentropy()
-        metrics = [
-            tf.keras.metrics.SparseCategoricalAccuracy(name="accuracy"),
-            tf.keras.metrics.SparseTopKCategoricalAccuracy(k=2, name="top2_accuracy")
-        ]
-    elif label_mode == "binary":
-        loss = tf.keras.losses.BinaryCrossentropy()
-        metrics = [
-            tf.keras.metrics.BinaryAccuracy(name="accuracy"),
-            tf.keras.metrics.Precision(name="precision"),
-            tf.keras.metrics.Recall(name="recall"),
-            tf.keras.metrics.AUC(name="auc")
-        ]
-    else:  # categorical (one-hot)
-        loss = tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.02)
-        metrics = [
-            tf.keras.metrics.CategoricalAccuracy(name="accuracy"),
-            tf.keras.metrics.TopKCategoricalAccuracy(k=2, name="top2_accuracy")
-        ]
-
-    model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
-    return model
+    if backbone_name.lower() == "mobilenetv2":
+        return TransferLearningMobileNetV2(
+            num_classes=num_classes,
+            pretrained=False,
+            freeze_backbone=freeze_backbone,
+            dropout_rate=dropout_rate
+        )
+    raise ValueError(f"Nieobsługiwany szkielet: {backbone_name}. Wybierz: mobilenetv2.")
 
 
 if __name__ == "__main__":
     print("=" * 70)
-    print("AKUSTYCZNA DETEKCJA AWARII HDD - ARCHITEKTURA 2D CNN")
+    print("AKUSTYCZNA DETEKCJA AWARII HDD - ARCHITEKTURA 2D CNN (PyTorch)")
     print("=" * 70)
-    
-    # Przykładowa budowa modelu dla 4 klas awarii
-    model = build_hdd_cnn_model(input_shape=(128, 259, 3), num_classes=4)
-    model = compile_cnn_model(model, learning_rate=1e-3, label_mode="categorical")
-    
-    model.summary()
-    print("\n[OK] Model 2D CNN utworzony i skompilowany pomyślnie z tensorem wejściowym (128, 259, 3).")
+    model = build_hdd_cnn_model(num_classes=4)
+    total_params = sum(p.numel() for p in model.parameters())
+    print(f"Liczba parametrów: {total_params:,}")
+    dummy = torch.randn(2, 3, 128, 259)
+    out = model(dummy)
+    print(f"Wyjście Forward pass: {out.shape}")
+    print("[OK] Model PyTorch działa poprawnie.")

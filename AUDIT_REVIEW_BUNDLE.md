@@ -1,5 +1,10 @@
 # KOMPLEKSOWY PAKIET AUDYTOWY: Acoustic HDD Sentinel (2D CNN Audio Fault Detection)
 
+> [!NOTE]
+> Projekt został w 100% zmigrowany z TensorFlow/Keras na **PyTorch**.
+> Główny model 2D CNN znajduje się w `model_cnn.py` (PyTorch `AcousticHddSentinelCNN`), potok danych w `dataset_pytorch.py`, a pipeline treningowy w `train_cnn.py`.
+> Poniższa treść stanowi historyczny zapis stanu projektu z fazy ewaluacji architektury Keras.
+
 > ### INSTRUKCJA DLA MODELU LLM PROWADZĄCEGO AUDYT (System Prompt / Context):
 >
 > Działasz jako **Główny Architekt Systemów Uczenia Maszynowego, Ekspert DSP (Digital Signal Processing) oraz Senior ML Engineer (TensorFlow/Keras)**.

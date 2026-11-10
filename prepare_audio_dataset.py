@@ -88,6 +88,10 @@ def categorize_existing_files():
     - beeping (zatarte wrzeciono, piski, melodie)
     - scratching (tarcie głowicy o talerz, zgrzytanie)
     """
+    # Usunięcie starych kategoryzacji, aby zapobiec duplikatom
+    if CATEGORIZED_DIR.exists():
+        shutil.rmtree(CATEGORIZED_DIR)
+
     for cls in ["clicking", "beeping", "scratching", "normal"]:
         (CATEGORIZED_DIR / cls).mkdir(parents=True, exist_ok=True)
 

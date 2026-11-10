@@ -1,5 +1,6 @@
-# Zależności projektu Acoustic HDD Sentinel (TensorFlow / Keras 2D CNN)
-tensorflow>=2.15.0
+# Zależności projektu Acoustic HDD Sentinel (PyTorch 2D CNN)
+torch>=2.0.0
+torchvision>=0.15.0
 numpy>=1.26.0
 librosa>=0.10.0
 soundfile>=0.12.0

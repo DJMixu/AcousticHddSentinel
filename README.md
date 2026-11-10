@@ -1,8 +1,8 @@
 # Acoustic HDD Sentinel 🛡️💽
-> **System akustycznej detekcji i klasyfikacji awarii mechanicznych dysków twardych (HDD) przy użyciu głębokich sieci konwolucyjnych (2D CNN w TensorFlow / Keras).**
+> **System akustycznej detekcji i klasyfikacji awarii mechanicznych dysków twardych (HDD) przy użyciu głębokich sieci konwolucyjnych (2D CNN w PyTorch).**
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![TensorFlow 2.x](https://img.shields.io/badge/TensorFlow-2.x-orange.svg)](https://tensorflow.org/)
+[![PyTorch 2.x](https://img.shields.io/badge/PyTorch-2.x-red.svg)](https://pytorch.org/)
 [![Status](https://img.shields.io/badge/Status-Model%20Trained%20%26%20Verified-brightgreen.svg)]()
 
 ---
@@ -42,10 +42,10 @@ Zgodnie z decyzją architektoniczną **ADR-001** (`docx/adr/adr.md`), każde 3-s
 
 ## 🧠 Architektura sieci 2D CNN
 Model w `model_cnn.py` został zaprojektowany z myślą o specyfice danych akustycznych:
-- **Wejście:** `layers.Input(shape=(128, 259, 3))`
-- **4 Bloki splotowe:** `Conv2D` (32 -> 64 -> 128 -> 256 filtrów $3 \times 3$), `BatchNormalization`, `ReLU`, `MaxPooling2D(2, 2)`, `SpatialDropout2D` oraz regularyzacja $L_2$.
-- **Agregacja:** `GlobalAveragePooling2D` (redukcja do wektora 256 bez eksplozji parametrów, całkowita liczba wag: **1.21 mln**).
-- **Klasyfikator:** `Dense(128)` + `BatchNormalization` + `Dropout(0.4)` + `Dense(num_classes, activation="softmax")`.
+- **Format tensora:** Natywny `(B, 3, 128, 259)` (Channel-First) z przezroczystą obsługą `(B, 128, 259, 3)` (Channel-Last).
+- **4 Bloki splotowe:** `Conv2D` (32 -> 64 -> 128 -> 256 filtrów $3 \times 3$), `BatchNorm2d`, `ReLU`, `MaxPool2d(2, 2)`, `Dropout2d` oraz regularyzacja wag.
+- **Agregacja:** `AdaptiveAvgPool2d((1, 1))` (Global Average Pooling redukujący wymiar do 256 bez eksplozji parametrów, całkowita liczba wag: **1.21 mln**).
+- **Klasyfikator:** `Linear(256, 128, bias=False)` + `BatchNorm1d` + `Dropout(0.3)` + `Linear(128, num_classes)`.
 
 ---
 
@@ -67,7 +67,7 @@ pip install -r requirements.txt
 ## 🚀 Szybki start i instrukcja obsługi
 
 ### 1. Weryfikacja działania modelu
-Sprawdź poprawność grafu Keras, przejście w przód, przepływ gradientów i zapis wag:
+Sprawdź poprawność modelu PyTorch, przejście w przód, przepływ gradientów i zapis wag:
 ```bash
 python verify_cnn_model.py
 ```
@@ -94,28 +94,28 @@ python train_cnn.py --epochs 30 --batch-size 32 --output-dir ./training_output
 ```
 W trakcie treningu automatycznie działają:
 - `EarlyStopping` (przywraca najlepsze wagi)
-- `ModelCheckpoint` (zapisuje `best_hdd_cnn_model.keras`)
+- `ModelCheckpoint` (zapisuje `best_hdd_cnn_model.pt`)
 - `ReduceLROnPlateau` (dynamicznie redukuje LR o 50%)
-- Obsługa `class_weight` (wyrównuje rzadkie awarie)
+- Obsługa wag klas (`CrossEntropyLoss(weight=...)`)
 
 ---
 
 ## 📊 Wyniki treningu i ewaluacja testowa
 
-Ewaluacja najlepszego modelu na niezależnym zbiorze testowym (`TEST` – 73 tensory z niewidzianych wcześniej dysków):
+Ewaluacja najlepszego modelu na niezależnym zbiorze testowym (`TEST` – 92 tensory z niewidzianych wcześniej dysków):
 
 | Klasa awarii | Precyzja (Precision) | Czułość (Recall) | F1-Score | Próbki testowe |
 | :--- | :---: | :---: | :---: | :---: |
-| **`normal` (sprawny dysk)** | **100.0%** | **100.0%** | **1.0000** | 11 |
-| **`clicking` (stukanie głowic)** | **90.9%** | **44.4%** | **0.5970** | 45 |
-| **`beeping` (zatarte wrzeciono)** | **22.9%** | **72.7%** | **0.3478** | 11 |
-| **`scratching` (tarcie talerza)** | **0.0%** | **0.0%** | **0.0000** | 6 |
-| **Średnia ważona (Weighted Avg)** | **74.55%** | **53.42%** | **0.5711** | **73** |
+| **`normal` (sprawny dysk)** | **96.0%** | **100.0%** | **0.9796** | 24 |
+| **`clicking` (stukanie głowic)** | **77.4%** | **87.2%** | **0.8200** | 47 |
+| **`beeping` (zatarte wrzeciono)** | **80.0%** | **57.1%** | **0.6667** | 7 |
+| **`scratching` (tarcie talerza)** | **44.4%** | **28.6%** | **0.3478** | 14 |
+| **Dokładność (Accuracy)** | — | — | **79.35%** | **92** |
 
 Wygenerowane pliki i wizualizacje znajdują się w katalogu [training_output/](training_output/):
 - `confusion_matrix.png` – macierz pomyłek z wartościami liczbowymi i procentami
 - `training_curves.png` – wykresy straty i dokładności z procesu uczenia
-- `best_hdd_cnn_model.keras` – zapisany, sprawdzony model do inferencji
+- `best_hdd_cnn_model.pt` – zapisany, sprawdzony model do inferencji w PyTorch
 
 ---
 

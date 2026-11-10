@@ -20,5 +20,7 @@ CNN/dataset_categorized/
 Thumbs.db
 *.swp
 *~
+# Artefakty testów obciążeniowych i tymczasowe
+stress_test_output/
 .idea/
 .vscode/

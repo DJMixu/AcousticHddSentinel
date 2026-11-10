@@ -183,12 +183,12 @@ def run_tests():
     print("\n[TEST 5/5] Weryfikacja artefaktów treningowych...")
     out_dir = Path("training_output")
     classes_json_path = out_dir / "classes.json"
-    model_path = out_dir / "best_hdd_cnn_model.keras"
+    model_path = out_dir / "best_hdd_cnn_model.pt"
     cm_path = out_dir / "confusion_matrix.png"
     curves_path = out_dir / "training_curves.png"
 
     assert classes_json_path.exists(), "Brak classes.json!"
-    assert model_path.exists(), "Brak pliku wag modelu best_hdd_cnn_model.keras!"
+    assert model_path.exists(), "Brak pliku wag modelu best_hdd_cnn_model.pt!"
     assert model_path.stat().st_size > 1_000_000, "Plik modelu jest zbyt mały!"
     assert cm_path.exists(), "Brak confusion_matrix.png!"
     assert curves_path.exists(), "Brak training_curves.png!"

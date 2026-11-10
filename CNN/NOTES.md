@@ -24,8 +24,8 @@ Przy stosunkowo niedużych zbiorach danych audio (np. 854 próbki treningowe) i 
    - **Wyższa pewność predykcji:** Wartość prawdopodobieństwa odzwierciedla realny konsensus kilku niezależnych modeli.
    - **Podniesienie metryk F1:** W praktyce zespoły modeli niemal zawsze przewyższają pojedyncze modele o 1–4 punkty procentowe F1-Score.
 
-### Plan wdrożenia (Do zrobienia):
-- [ ] Utworzenie modułu treningowego `train_ensemble.py` trenującego $N$ modeli i zapisującego je w katalogu `models_ensemble/` (`model_seed_42.keras`, `model_seed_123.keras`, ...).
-- [ ] Rozszerzenie pipeline'u ewaluacyjnego o inferencję komitetową (uśrednianie predykcji na zbiorze testowym).
-- [ ] Porównanie macierzy pomyłek pojedynczego modelu vs komitetu 3 i 5 modeli.
-- [ ] Opcjonalnie: fuzja modeli w pojedynczy graf Keras (`tf.keras.layers.Average()([m1.output, m2.output, m3.output])`) w celu eksportu do jednego pliku TFLite.
+### Plan wdrożenia:
+- [x] Utworzenie modułu treningowego `train_ensemble.py` trenującego $N$ modeli w PyTorch i zapisującego je w katalogu `models/` (`ensemble_model_seed_42.pt`, `ensemble_model_seed_123.pt`, ...).
+- [x] Rozszerzenie pipeline'u ewaluacyjnego o inferencję komitetową (uśrednianie predykcji na zbiorze testowym w PyTorch).
+- [x] Porównanie macierzy pomyłek pojedynczego modelu vs komitetu modeli.
+- [x] Fuzja modeli w pojedynczy moduł PyTorch (`FusedEnsemblePyTorch`) w celu bezpośredniej inferencji komitetowej.

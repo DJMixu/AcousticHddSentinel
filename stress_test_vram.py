@@ -93,7 +93,8 @@ def run_vram_stress_test(
     pool_size: int = 5000,
     log_interval_sec: float = 60.0
 ):
-    import tensorflow as tf
+    import torch
+    from model_cnn import build_hdd_cnn_model
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -104,43 +105,39 @@ def run_vram_stress_test(
         f.write("elapsed_sec,elapsed_min,batches,chunks,throughput_fps,p50_ms,p95_ms,ram_mb,nan_count,inf_count\n")
 
     print("=" * 70)
-    print("VRAM-RESIDENT GPU STRESS TEST (AMD RADEON RX 9060 XT)")
+    print("VRAM-RESIDENT GPU STRESS TEST (PYTORCH)")
     print("=" * 70)
     print(f"Czas trwania:     {duration_seconds / 3600:.2f} godz. ({duration_seconds:.0f} s)")
     print(f"Rozmiar Batcha:   {batch_size} tensorów na krok GPU")
     print(f"Docelowy bufor:   {pool_size} tensorów w VRAM")
 
-    gpus = tf.config.list_physical_devices("GPU")
-    if not gpus:
-        print("[OSTRZEŻENIE] Brak wykrytego GPU! Test uruchomi się na CPU.")
-        device_name = "/CPU:0"
-    else:
-        device_name = "/GPU:0"
-        print(f"Aktywne GPU:      {len(gpus)}x {gpus[0].name}")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Aktywne urządzenie: {device}")
 
-    # 1. Wczytanie modelu Keras
-    print("\n[1/3] Ładowanie modelu Keras do GPU VRAM...")
-    with tf.device(device_name):
-        model = tf.keras.models.load_model(str(model_path))
+    # 1. Wczytanie modelu PyTorch
+    print("\n[1/3] Ładowanie modelu PyTorch do pamięci...")
+    checkpoint = torch.load(model_path, weights_only=True)
+    model = build_hdd_cnn_model(num_classes=4)
+    state_dict = checkpoint["state_dict"] if "state_dict" in checkpoint else checkpoint
+    model.load_state_dict(state_dict)
+    model.to(device)
+    model.eval()
 
-    # 2. Załadowanie bazy tensorów do RAM, a następnie alokacja w całości w VRAM
-    print("\n[2/3] Alokacja bazy danych w całości w pamięci VRAM karty graficznej...")
+    # 2. Załadowanie bazy tensorów do RAM, a następnie alokacja w VRAM
+    print("\n[2/3] Alokacja bazy danych w pamięci urządzenia...")
     t_start_load = time.time()
     ram_pool = load_all_tensors_to_ram(data_dir=data_dir, target_pool_size=pool_size)
     pool_vram_bytes = ram_pool.nbytes
     pool_vram_mb = pool_vram_bytes / (1024 * 1024)
     print(f"  -> Rozmiar puli tensorów: {ram_pool.shape} ({pool_vram_mb:.1f} MB)")
 
-    # Przeniesienie tensora w 100% do VRAM
-    with tf.device(device_name):
-        gpu_tensor_pool = tf.constant(ram_pool, dtype=tf.float32)
-        # Canary chunk w VRAM
-        canary_input = tf.constant(ram_pool[:1], dtype=tf.float32)
-        canary_baseline_preds = model(canary_input, training=False).numpy()[0]
+    gpu_tensor_pool = torch.from_numpy(ram_pool).float().to(device)
+    canary_input = gpu_tensor_pool[:1]
+    with torch.no_grad():
+        canary_baseline_preds = model(canary_input).cpu().numpy()[0]
 
-    # Zwolnienie pamięci podręcznej RAM CPU (dane żyją wyłącznie w VRAM)
     del ram_pool
-    print(f"  -> Pula tensorów pomyślnie zaalokowana na {device_name} w czasie {time.time() - t_start_load:.2f}s!")
+    print(f"  -> Pula tensorów pomyślnie zaalokowana na {device} w czasie {time.time() - t_start_load:.2f}s!")
     print(f"  -> Canary Chunk Baseline: {np.round(canary_baseline_preds, 4)}")
     print(f"  -> Pamięć RAM procesu (CPU): {get_process_memory_mb():.2f} MB")
 
@@ -149,19 +146,18 @@ def run_vram_stress_test(
     print("=" * 70)
 
     num_samples_in_pool = int(gpu_tensor_pool.shape[0])
-    # Upewnienie się, że rozmiar puli jest wielokrotnością batch_size, aby wyeliminować re-tracing w tf.function
     num_batches_in_pool = num_samples_in_pool // batch_size
     usable_samples = num_batches_in_pool * batch_size
-    print(f"  -> Użytecznych próbek w VRAM: {usable_samples} ({num_batches_in_pool} stałych batchy)")
+    print(f"  -> Użytecznych próbek: {usable_samples} ({num_batches_in_pool} stałych batchy)")
 
-    @tf.function
     def gpu_infer_step(batch_tensor):
-        predictions = model(batch_tensor, training=False)
-        has_nan = tf.math.reduce_any(tf.math.is_nan(predictions))
-        has_inf = tf.math.reduce_any(tf.math.is_inf(predictions))
-        # Redukcja do synchronizacji strumienia GPU i pomiaru rzeczywistego czasu GPU
-        sync_scalar = tf.math.reduce_sum(predictions)
-        return has_nan, has_inf, sync_scalar
+        with torch.no_grad():
+            predictions = model(batch_tensor)
+            has_nan = torch.isnan(predictions).any().item()
+            has_inf = torch.isinf(predictions).any().item()
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            return has_nan, has_inf, predictions
 
     time_series_timestamps: List[float] = []
     time_series_ram_mb: List[float] = []
@@ -198,9 +194,7 @@ def run_vram_stress_test(
 
             # Inferencja bezpośrednio w GPU VRAM
             t0 = time.perf_counter()
-            with tf.device(device_name):
-                has_nan, has_inf, sync_val = gpu_infer_step(batch_vram)
-                _ = sync_val.numpy()  # Synchronizacja strumienia GPU
+            has_nan, has_inf, _ = gpu_infer_step(batch_vram)
             t1 = time.perf_counter()
 
             b_latency_ms = (t1 - t0) * 1000.0
@@ -209,9 +203,9 @@ def run_vram_stress_test(
             if total_batches_processed % 5 == 0:
                 sampled_latencies_ms.append(b_latency_ms)
 
-            if has_nan.numpy():
+            if has_nan:
                 total_nan_count += 1
-            if has_inf.numpy():
+            if has_inf:
                 total_inf_count += 1
 
             total_chunks_processed += batch_size
@@ -219,8 +213,8 @@ def run_vram_stress_test(
 
             # Okresowa weryfikacja Canary Chunk i pamięci procesu CPU (co 250 batchy)
             if total_batches_processed % 250 == 0:
-                with tf.device(device_name):
-                    canary_curr = model(canary_input, training=False).numpy()[0]
+                with torch.no_grad():
+                    canary_curr = model(canary_input).cpu().numpy()[0]
                 drift = float(np.max(np.abs(canary_curr - canary_baseline_preds)))
                 curr_ram = get_process_memory_mb()
 
@@ -341,7 +335,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="VRAM-Resident GPU Stress Test na karcie AMD Radeon.")
     parser.add_argument("--hours", type=float, default=1.0, help="Czas trwania w godzinach (domyślnie: 1.0)")
     parser.add_argument("--seconds", type=float, default=None, help="Czas trwania w sekundach (nadpisuje --hours)")
-    parser.add_argument("--model-path", type=str, default="training_output/best_hdd_cnn_model.keras", help="Ścieżka do wag modelu")
+    parser.add_argument("--model-path", type=str, default="training_output/best_hdd_cnn_model.pt", help="Ścieżka do wag modelu PyTorch (.pt)")
     parser.add_argument("--data-dir", type=str, default="dataset_encoded", help="Katalog z tensorami .npy")
     parser.add_argument("--output-dir", type=str, default="stress_test_output", help="Katalog na wyniki testu")
     parser.add_argument("--batch-size", type=int, default=64, help="Rozmiar paczki na krok GPU (domyślnie: 64)")

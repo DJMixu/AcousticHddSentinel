@@ -80,7 +80,8 @@ def run_stress_test(
     output_dir: Path,
     log_interval_sec: float = 60.0
 ):
-    import tensorflow as tf
+    import torch
+    from model_cnn import build_hdd_cnn_model
     from hdd_audio_encoder import (
         encode_audio_chunk,
         normalize_waveform_peak,
@@ -95,22 +96,26 @@ def run_stress_test(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print("=" * 70)
-    print("ROZPOCZĘCIE TESTU STRESU / CIĄGŁEGO OBCIĄŻENIA (STRESS TEST)")
+    print("ROZPOCZĘCIE TESTU STRESU / CIĄGŁEGO OBCIĄŻENIA (STRESS TEST - PYTORCH)")
     print("=" * 70)
     print(f"Czas trwania:     {duration_seconds / 3600:.2f} godz. ({duration_seconds:.0f} s)")
     print(f"Model:            {model_path}")
     print(f"Katalog wyników:  {output_dir}")
-    gpus = tf.config.list_physical_devices('GPU')
-    gpu_desc = f"{len(gpus)}x GPU: {[g.name for g in gpus]}" if gpus else "Brak (CPU)"
-    print(f"Urządzenia GPU:   {gpu_desc}")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Urządzenie:       {device}")
     print(f"Pamięć startowa:  {get_process_memory_mb():.2f} MB")
 
     # Wczytanie modelu
     if not model_path.exists():
         raise FileNotFoundError(f"Nie znaleziono pliku wag modelu: {model_path}")
 
-    print("\nŁadowanie modelu Keras...")
-    model = tf.keras.models.load_model(str(model_path))
+    print("\nŁadowanie modelu PyTorch...")
+    checkpoint = torch.load(model_path, weights_only=True)
+    model = build_hdd_cnn_model(num_classes=4)
+    state_dict = checkpoint["state_dict"] if "state_dict" in checkpoint else checkpoint
+    model.load_state_dict(state_dict)
+    model.to(device)
+    model.eval()
 
     # Wczytanie listy plików audio
     wav_files = sorted(list(dataset_dir.glob("*.wav"))) if dataset_dir.exists() else []
@@ -133,8 +138,9 @@ def run_stress_test(
         tensor_norm_fn=normalize_tensor_zscore,
         tensor_format="tf"
     )
-    canary_batch = tf.constant(np.expand_dims(canary_tensor, axis=0))
-    canary_baseline_preds = model(canary_batch, training=False).numpy()[0]
+    canary_batch = torch.from_numpy(canary_tensor).unsqueeze(0).to(device)
+    with torch.no_grad():
+        canary_baseline_preds = model(canary_batch).cpu().numpy()[0]
     print(f"Predykcja bazowa Canary Chunk: {np.round(canary_baseline_preds, 4)}")
 
     # Metryki profilowania
@@ -164,7 +170,8 @@ def run_stress_test(
 
     # Rozgrzewka (Warmup)
     for _ in range(10):
-        _ = model(canary_batch, training=False)
+        with torch.no_grad():
+            _ = model(canary_batch)
 
     print("\n" + "=" * 70)
     print("START PĘTLI TESTU STRESU")
@@ -227,9 +234,9 @@ def run_stress_test(
             t1 = time.perf_counter()
 
             # 2. Pomiar czasu inferencji CNN
-            # Wywołanie modelu przez model(..., training=False) zapobiega wyciekom pamięci Keras
-            batch_tf = tf.constant(np.expand_dims(tensor, axis=0))
-            preds = model(batch_tf, training=False).numpy()[0]
+            batch_t = torch.from_numpy(tensor).unsqueeze(0).to(device)
+            with torch.no_grad():
+                preds = model(batch_t).cpu().numpy()[0]
             t2 = time.perf_counter()
 
             dsp_ms = (t1 - t0) * 1000.0
@@ -253,7 +260,8 @@ def run_stress_test(
 
             # Okresowy test Canary Chunk (co 50 chunks)
             if total_chunks_processed % 50 == 0:
-                canary_curr_preds = model(canary_batch, training=False).numpy()[0]
+                with torch.no_grad():
+                    canary_curr_preds = model(canary_batch).cpu().numpy()[0]
                 drift = float(np.max(np.abs(canary_curr_preds - canary_baseline_preds)))
                 current_ram = get_process_memory_mb()
 
@@ -366,7 +374,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Test obciążeniowy modelu HDD Acoustic Sentinel.")
     parser.add_argument("--hours", type=float, default=1.0, help="Czas trwania w godzinach (domyślnie: 1.0)")
     parser.add_argument("--seconds", type=float, default=None, help="Opcjonalny czas trwania w sekundach (nadpisuje --hours)")
-    parser.add_argument("--model-path", type=str, default="training_output/best_hdd_cnn_model.keras", help="Ścieżka do modelu Keras")
+    parser.add_argument("--model-path", type=str, default="training_output/best_hdd_cnn_model.pt", help="Ścieżka do modelu PyTorch (.pt)")
     parser.add_argument("--dataset-dir", type=str, default="CNN/dataset", help="Katalog z surowymi plikami WAV")
     parser.add_argument("--output-dir", type=str, default="stress_test_output", help="Katalog na wyniki testu")
     parser.add_argument("--log-interval", type=float, default=60.0, help="Interwał logowania w konsoli (sekundy)")

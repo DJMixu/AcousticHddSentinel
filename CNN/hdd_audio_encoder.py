@@ -20,7 +20,7 @@ OUTPUT_DIR = "./dataset_encoded"      # Katalog wyjściowy (utworzy podkatalogi 
 SPLIT_RATIOS = (0.70, 0.15, 0.15)     # (train, validate, test)
 RANDOM_SEED = 42
 
-# Format wyjściowy tensorów: "tf" -> (128, 259, 3) dla TensorFlow/Keras | "pytorch" -> (3, 128, 259) dla PyTorch
+# Format wyjściowy tensorów: "tf" -> (128, 259, 3) Channel-Last | "pytorch" -> (3, 128, 259) Channel-First
 TENSOR_FORMAT = "tf"
 
 # Parametry akustyczne (dobrane na podstawie analizy pliku audio_dataset_profile.csv)
@@ -141,13 +141,13 @@ def encode_audio_chunk(
     delta = librosa.feature.delta(log_mel, width=9, order=1, mode="nearest")
     delta2 = librosa.feature.delta(log_mel, width=9, order=2, mode="nearest")
 
-    # Krok 4: Złożenie kanałów w odpowiednim formacie (TensorFlow vs PyTorch)
+    # Krok 4: Złożenie kanałów w odpowiednim formacie (Channel-First vs Channel-Last)
     if tensor_format.lower() == "pytorch":
         # Kształt: (3, 128, 259)
         tensor = np.stack([log_mel, delta, delta2], axis=0).astype(np.float32)
         ch_axis = 0
     else:
-        # Kształt dla TensorFlow / Keras: (128, 259, 3)
+        # Kształt Channel-Last: (128, 259, 3)
         tensor = np.stack([log_mel, delta, delta2], axis=-1).astype(np.float32)
         ch_axis = -1
 

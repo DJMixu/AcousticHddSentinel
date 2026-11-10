@@ -38,6 +38,9 @@ Każdy agent AGY modyfikujący lub rozwijający projekt **MUSI bezwzględnie** p
 ```
 AcousticHddSentinel/
 ├── AGENTS.md                          # Główny przewodnik i Single Source of Truth dla agentów AGY
+├── kontekst.md                        # Całościowe podsumowanie dotychczasowych etapów i rozmów
+├── fineTuning.md                      # Dokumentacja prac optymalizacyjnych i wyników w CNN/TESTY/
+├── local_llm_bridge.py                # Most orkiestrujący lokalne modele Ollama (27B + Coder 14B)
 ├── README.md                          # Dokumentacja repozytorium dla ludzi i developerów
 ├── requirements.txt                   # Zależności Python (PyTorch, Librosa, Scikit-learn, etc.)
 ├── .gitignore                         # Wykluczenia git (duże zbiory .npy, venv, cache)
@@ -63,10 +66,11 @@ AcousticHddSentinel/
 │   ├── test_evaluation_summary.json   # Podsumowanie metryk testowych
 │   └── classes.json                   # Mapowanie indeksów klas
 │
-├── CNN/                               # Podkatalog modułów DSP i bazy audio
-│   ├── dataset/                       # 91 surowych plików WAV (Northwind + Aesonlabs)
-│   ├── audio_dataset_profile.csv      # Profil akustyczny zebranych próbek
-│   └── ...                            # Kopie modułów zgodne ze ścieżkami podkatalogu
+├── CNN/TESTY/                         # Zoptymalizowane środowisko (F1 >= 0.70 dla wszystkich klas)
+│   ├── training_output/best_hdd_cnn_model.pt # Model z F1: beeping 86.4%, clicking 78.5%, scratching 73.7%
+│   ├── encoder_testy.py               # Enkoder audio z filtracją ciszy i zbalansowaną augmentacją
+│   ├── train_testy.py                 # Pipeline treningowy PyTorch z akceleracją ROCm
+│   └── ...
 │
 └── docx/adr/
     └── adr.md                         # ADR-001: Architektura przetwarzania sygnału i enkodowania
@@ -120,3 +124,20 @@ Projekt wspiera natywnie akcelerację GPU na architekturze RDNA 4 (`gfx1200`) po
 2. **Augmentacja spektrogramów w locie:** Dodanie warstwy SpecAugment (TimeMasking / FreqMasking) bezpośrednio do `train_cnn.py` w celu poprawy czułości na rzadsze klasy.
 3. **Zwiększenie bazy dla klasy `scratching`:** Klasa zarysowania talerza miała tylko 6 próbek testowych – warto wyodrębnić więcej fragmentów z nagrań tarcia głowic.
 4. **Seed Ensembling (Komitet modeli):** Wdrożenie zespołu 3–5 modeli trenowanych na różnych ziarnach losowości (`seed = 42, 123, 777...`) z uśrednianiem prawdopodobieństw Softmax (Soft Voting) w celu redukcji wariancji błędu i podniesienia F1-score (szczegóły w [NOTES.md](file:///home/DJMixu/Pulpit/AcousticHddSentinel/NOTES.md)).
+
+---
+
+## 7. Automatyczna Integracja z Lokalnymi Modelami LLM (Ollama & RX 9060 XT)
+W systemie użytkownika działa lokalna instalacja Ollama (`http://localhost:11434` oraz Open WebUI na `http://localhost:8080`) z dwoma modelami open-weights:
+1. **Architekt / Planista (128k kontekstu, 12 GB VRAM):** `hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ3_S`
+2. **Programista Wykonawczy / Coder (9 GB VRAM):** `qwen2.5-coder:14b`
+
+### Zasady automatycznego wykorzystania przez każdego agenta:
+- **Automatyczne delegowanie zadań programistycznych:**
+  Gdy użytkownik zleca projektowanie nowych modułów, implementację zaawansowanych algorytmów (np. eksport ONNX, skrypty Android/Kotlin, testy jednostkowe), agent powinien **automatycznie** wykorzystać tandem modeli za pomocą skryptu:
+  ```bash
+  python local_llm_bridge.py --task "<opis zadania>" [--context <plik_kontekstu>] [--output <plik_wyjścia>]
+  ```
+- **Niezmiennik VRAM (16 GB):**
+  Modele 27B i 14B nie mogą znajdować się w VRAM równocześnie. Skrypt `local_llm_bridge.py` automatycznie wyładowuje modele (`keep_alive=0`). Przed rozpoczęciem jakiegokolwiek treningu PyTorch na GPU agent **MUSI** upewnić się, że VRAM jest zwolniony (`ollama ps` puste).
+

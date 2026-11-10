@@ -122,8 +122,8 @@ def train_one_epoch(
     total = 0
 
     for x_batch, y_batch in loader:
-        x_batch = x_batch.to(device)
-        y_batch = y_batch.to(device)
+        x_batch = x_batch.to(device, non_blocking=True)
+        y_batch = y_batch.to(device, non_blocking=True)
 
         optimizer.zero_grad()
         logits = model(x_batch, return_logits=True)
@@ -154,8 +154,8 @@ def evaluate_epoch(
     all_targets = []
 
     for x_batch, y_batch in loader:
-        x_batch = x_batch.to(device)
-        y_batch = y_batch.to(device)
+        x_batch = x_batch.to(device, non_blocking=True)
+        y_batch = y_batch.to(device, non_blocking=True)
 
         logits = model(x_batch, return_logits=True)
         loss = criterion(logits, y_batch)
@@ -188,10 +188,17 @@ def run_training(
     if device_name:
         device = torch.device(device_name)
     elif torch.cuda.is_available():
-        device = torch.device("cuda")
+        device = torch.device("cuda:0")
     else:
         device = torch.device("cpu")
-    print(f"[1/6] Urządzenie obliczeniowe: {device}")
+
+    if device.type == "cuda":
+        gpu_name = torch.cuda.get_device_name(device)
+        gpu_props = torch.cuda.get_device_properties(device)
+        vram_gb = gpu_props.total_memory / (1024 ** 3)
+        print(f"[1/6] Urządzenie obliczeniowe: {device} ({gpu_name}, {vram_gb:.2f} GB VRAM)")
+    else:
+        print(f"[1/6] Urządzenie obliczeniowe: {device}")
 
     print(f"[2/6] Przygotowywanie DataLoaderów z: {dataset_dir}")
     train_loader, val_loader, test_loader, classes, class_weights = create_pytorch_dataloaders(

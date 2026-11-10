@@ -1,0 +1,13 @@
+{
+  "classes": [
+    "beeping",
+    "clicking",
+    "normal",
+    "scratching"
+  ],
+  "input_shape": [
+    128,
+    259,
+    3
+  ]
+}

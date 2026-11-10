@@ -1,0 +1,13 @@
+{
+  "test_metrics": {
+    "loss": 1.226332187652588,
+    "compile_metrics": 0.534246563911438
+  },
+  "classes": [
+    "beeping",
+    "clicking",
+    "normal",
+    "scratching"
+  ],
+  "total_test_samples": 73
+}

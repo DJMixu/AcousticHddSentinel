@@ -1,5 +1,6 @@
 import os
 import random
+import shutil
 from pathlib import Path
 from typing import Tuple, List, Dict, Callable
 import numpy as np
@@ -45,6 +46,7 @@ def normalize_waveform_peak(y: np.ndarray, eps: float = 1e-6) -> np.ndarray:
     Normalizacja szczytowa (Peak Normalization) surowego sygnału audio do zakresu [-1.0, 1.0].
     Idealna do zachowania wysokiego Crest Factor (ostrych kliknięć głowicy).
     """
+    y = y - np.mean(y)  # Usunięcie DC offsetu (dochodzącego do 0.377 w surowych plikach)
     peak = np.max(np.abs(y))
     if peak > eps:
         return y / peak
@@ -56,6 +58,7 @@ def normalize_waveform_rms(y: np.ndarray, target_rms: float = 0.05, eps: float =
     Alternatywna normalizacja energii (RMS Normalization) surowego sygnału audio.
     Wyrównuje średnią głośność tła, z zabezpieczeniem przed przesterowaniem (clippingiem).
     """
+    y = y - np.mean(y)
     current_rms = np.sqrt(np.mean(y ** 2))
     if current_rms > eps:
         y_norm = y * (target_rms / current_rms)
@@ -135,8 +138,8 @@ def encode_audio_chunk(
     log_mel = librosa.power_to_db(mel_spec, ref=np.max, top_db=80.0)
 
     # Krok 3: Wyliczenie pochodnych czasowych (Delta i Delta-Delta)
-    delta = librosa.feature.delta(log_mel, order=1)
-    delta2 = librosa.feature.delta(log_mel, order=2)
+    delta = librosa.feature.delta(log_mel, width=9, order=1, mode="nearest")
+    delta2 = librosa.feature.delta(log_mel, width=9, order=2, mode="nearest")
 
     # Krok 4: Złożenie kanałów w odpowiednim formacie (TensorFlow vs PyTorch)
     if tensor_format.lower() == "pytorch":
@@ -164,20 +167,21 @@ def slice_waveform_into_chunks(y: np.ndarray, sr: int, is_train: bool = True) ->
     # W zbiorze walidacyjnym i testowym możemy wyłączyć overlap lub zostawić taki sam krok
     step_samples = int(sr * (CHUNK_DURATION - OVERLAP_DURATION)) if is_train else chunk_samples
 
+    y = y - np.mean(y)
     y_trimmed, _ = librosa.effects.trim(y, top_db=TRIM_DB)
     if len(y_trimmed) < int(sr * 0.5):
         return []
 
-    # Jeśli nagranie po odcięciu ciszy jest krótsze niż 3s, powielamy je cyklicznie
+    # Odbicie lustrzane zamiast np.tile zapobiega skokom fazy (sztucznym kliknięciom)
     if len(y_trimmed) < chunk_samples:
-        repeats = int(np.ceil(chunk_samples / len(y_trimmed)))
-        y_trimmed = np.tile(y_trimmed, repeats)[:chunk_samples]
+        pad_len = chunk_samples - len(y_trimmed)
+        y_trimmed = np.pad(y_trimmed, (0, pad_len), mode="reflect")
 
     chunks = []
     for start in range(0, len(y_trimmed) - chunk_samples + 1, step_samples):
         chunk = y_trimmed[start : start + chunk_samples]
         # Odrzucenie fragmentów całkowicie cichych w środku nagrania
-        if np.sqrt(np.mean(chunk ** 2)) >= 1e-4:
+        if np.sqrt(np.mean((chunk - np.mean(chunk)) ** 2)) >= 1e-4:
             chunks.append(chunk)
 
     return chunks
@@ -243,6 +247,9 @@ def build_dataset():
     if not in_root.exists():
         print(f"Błąd: Katalog wejściowy '{INPUT_DIR}' nie istnieje.")
         return
+
+    if out_root.exists():
+        shutil.rmtree(out_root)
 
     splits = split_files_by_class(in_root)
     summary_stats = {"train": 0, "validate": 0, "test": 0, "skipped_files": 0}

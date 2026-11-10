@@ -22,10 +22,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # Ścieżki
-RAW_DATASET_DIR = Path("CNN/dataset")
-ENCODED_DIR = Path("dataset_encoded")
-OUTPUT_IMG = Path("CNN/normalization_quality_report.png")
-OUTPUT_METRICS_JSON = Path("CNN/normalization_quality_metrics.json")
+RAW_DATASET_DIR = Path("CNN/dataset") if Path("CNN/dataset").exists() else Path("dataset")
+ENCODED_DIR = Path("dataset_encoded") if Path("dataset_encoded").exists() else Path("CNN/dataset_encoded")
+OUTPUT_IMG = Path("normalization_quality_report.png")
+OUTPUT_METRICS_JSON = Path("normalization_quality_metrics.json")
 
 
 def analyze_raw_audio_profile():
@@ -254,8 +254,6 @@ def generate_comparative_plots(sample_wav_files):
     OUTPUT_IMG.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(OUTPUT_IMG)
     plt.close()
-    # Kopia do root
-    plt.close()
 
 
 def run_assessment():
@@ -297,10 +295,12 @@ def run_assessment():
         json.dump(full_report, f, indent=2)
     print(f"  -> Metryki JSON zapisano w: {OUTPUT_METRICS_JSON}")
 
-    # Kopia do root
-    import shutil
-    shutil.copy2(OUTPUT_IMG, "normalization_quality_report.png")
-    shutil.copy2(OUTPUT_METRICS_JSON, "normalization_quality_metrics.json")
+    # Jeśli istnieje podkatalog CNN, zapisz kopię również tam
+    cnn_dir = Path("CNN")
+    if cnn_dir.exists() and cnn_dir.is_dir():
+        import shutil
+        shutil.copy2(OUTPUT_IMG, cnn_dir / "normalization_quality_report.png")
+        shutil.copy2(OUTPUT_METRICS_JSON, cnn_dir / "normalization_quality_metrics.json")
 
     print("\n" + "=" * 70)
     print("PROFILOWANIE ZAKOŃCZONE!")

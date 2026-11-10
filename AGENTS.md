@@ -108,3 +108,4 @@ python train_cnn.py --epochs 30 --batch-size 32 --output-dir ./training_output
 1. **Konwersja do TFLite:** Użycie `tf.lite.TFLiteConverter.from_keras_model` z kwantyzacją `int8` lub `float16` w celu uruchomienia inferencji na telefonie Android (zgodnie ze `docx/specs.txt`).
 2. **Augmentacja spektrogramów w locie:** Dodanie warstwy SpecAugment (TimeMasking / FreqMasking) bezpośrednio do `train_cnn.py` w celu poprawy czułości na rzadsze klasy.
 3. **Zwiększenie bazy dla klasy `scratching`:** Klasa zarysowania talerza miała tylko 6 próbek testowych – warto wyodrębnić więcej fragmentów z nagrań tarcia głowic.
+4. **Seed Ensembling (Komitet modeli):** Wdrożenie zespołu 3–5 modeli trenowanych na różnych ziarnach losowości (`seed = 42, 123, 777...`) z uśrednianiem prawdopodobieństw Softmax (Soft Voting) w celu redukcji wariancji błędu i podniesienia F1-score (szczegóły w [NOTES.md](file:///home/DJMixu/Pulpit/AcousticHddSentinel/NOTES.md)).

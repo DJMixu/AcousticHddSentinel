@@ -52,11 +52,11 @@ def build_hdd_cnn_model(
     # BLOK 1: Niskopoziomowa ekstrakcja cech widmowych i transjentów
     # Wejście: (128, 259, 3) -> Wyjście po poolingu: (64, 129, 32)
     # =========================================================================
-    x = layers.Conv2D(32, kernel_size=(3, 3), padding="same", kernel_regularizer=reg, name="conv1_1")(inputs)
+    x = layers.Conv2D(32, kernel_size=(3, 3), padding="same", use_bias=False, kernel_regularizer=reg, name="conv1_1")(inputs)
     x = layers.BatchNormalization(name="bn1_1")(x)
     x = layers.Activation("relu", name="relu1_1")(x)
 
-    x = layers.Conv2D(32, kernel_size=(3, 3), padding="same", kernel_regularizer=reg, name="conv1_2")(x)
+    x = layers.Conv2D(32, kernel_size=(3, 3), padding="same", use_bias=False, kernel_regularizer=reg, name="conv1_2")(x)
     x = layers.BatchNormalization(name="bn1_2")(x)
     x = layers.Activation("relu", name="relu1_2")(x)
 
@@ -67,11 +67,11 @@ def build_hdd_cnn_model(
     # BLOK 2: Średniopoziomowe wzorce czasowo-częstotliwościowe (np. klikanie głowicy)
     # Wejście: (64, 129, 32) -> Wyjście po poolingu: (32, 64, 64)
     # =========================================================================
-    x = layers.Conv2D(64, kernel_size=(3, 3), padding="same", kernel_regularizer=reg, name="conv2_1")(x)
+    x = layers.Conv2D(64, kernel_size=(3, 3), padding="same", use_bias=False, kernel_regularizer=reg, name="conv2_1")(x)
     x = layers.BatchNormalization(name="bn2_1")(x)
     x = layers.Activation("relu", name="relu2_1")(x)
 
-    x = layers.Conv2D(64, kernel_size=(3, 3), padding="same", kernel_regularizer=reg, name="conv2_2")(x)
+    x = layers.Conv2D(64, kernel_size=(3, 3), padding="same", use_bias=False, kernel_regularizer=reg, name="conv2_2")(x)
     x = layers.BatchNormalization(name="bn2_2")(x)
     x = layers.Activation("relu", name="relu2_2")(x)
 
@@ -82,11 +82,11 @@ def build_hdd_cnn_model(
     # BLOK 3: Wysokopoziomowa dynamika zmian (zatarte łożyska, rezonanse, zarysowania)
     # Wejście: (32, 64, 64) -> Wyjście po poolingu: (16, 32, 128)
     # =========================================================================
-    x = layers.Conv2D(128, kernel_size=(3, 3), padding="same", kernel_regularizer=reg, name="conv3_1")(x)
+    x = layers.Conv2D(128, kernel_size=(3, 3), padding="same", use_bias=False, kernel_regularizer=reg, name="conv3_1")(x)
     x = layers.BatchNormalization(name="bn3_1")(x)
     x = layers.Activation("relu", name="relu3_1")(x)
 
-    x = layers.Conv2D(128, kernel_size=(3, 3), padding="same", kernel_regularizer=reg, name="conv3_2")(x)
+    x = layers.Conv2D(128, kernel_size=(3, 3), padding="same", use_bias=False, kernel_regularizer=reg, name="conv3_2")(x)
     x = layers.BatchNormalization(name="bn3_2")(x)
     x = layers.Activation("relu", name="relu3_2")(x)
 
@@ -97,11 +97,11 @@ def build_hdd_cnn_model(
     # BLOK 4: Semantyczna reprezentacja akustyczna
     # Wejście: (16, 32, 128) -> Wyjście po poolingu: (8, 16, 256)
     # =========================================================================
-    x = layers.Conv2D(256, kernel_size=(3, 3), padding="same", kernel_regularizer=reg, name="conv4_1")(x)
+    x = layers.Conv2D(256, kernel_size=(3, 3), padding="same", use_bias=False, kernel_regularizer=reg, name="conv4_1")(x)
     x = layers.BatchNormalization(name="bn4_1")(x)
     x = layers.Activation("relu", name="relu4_1")(x)
 
-    x = layers.Conv2D(256, kernel_size=(3, 3), padding="same", kernel_regularizer=reg, name="conv4_2")(x)
+    x = layers.Conv2D(256, kernel_size=(3, 3), padding="same", use_bias=False, kernel_regularizer=reg, name="conv4_2")(x)
     x = layers.BatchNormalization(name="bn4_2")(x)
     x = layers.Activation("relu", name="relu4_2")(x)
 
@@ -117,10 +117,10 @@ def build_hdd_cnn_model(
     x = layers.GlobalAveragePooling2D(name="global_avg_pool")(x)
 
     # Gęsta warstwa projekcyjna (Dense Projection Layer)
-    x = layers.Dense(128, kernel_regularizer=reg, name="dense_features")(x)
+    x = layers.Dense(128, use_bias=False, kernel_regularizer=reg, name="dense_features")(x)
     x = layers.BatchNormalization(name="bn_dense")(x)
     x = layers.Activation("relu", name="relu_dense")(x)
-    x = layers.Dropout(dropout_rate * 1.33, name="dense_dropout")(x)
+    x = layers.Dropout(dropout_rate, name="dense_dropout")(x)
 
     # =========================================================================
     # WARSTWA WYJŚCIOWA (Klasyfikator)
@@ -140,6 +140,7 @@ def build_transfer_learning_model(
     num_classes: int = DEFAULT_NUM_CLASSES,
     freeze_backbone: bool = True,
     dropout_rate: float = 0.3,
+    weights: Optional[str] = "imagenet",
     model_name: Optional[str] = None
 ) -> tf.keras.Model:
     """
@@ -153,31 +154,48 @@ def build_transfer_learning_model(
         num_classes: Liczba klas wyjściowych.
         freeze_backbone: Czy zablokować wagi bazowe podczas wstępnego treningu.
         dropout_rate: Stopień dropoutu w głowicy klasyfikatora.
+        weights: Wagi ('imagenet' lub None).
         model_name: Opcjonalna nazwa modelu.
     """
     inputs = layers.Input(shape=input_shape, name="audio_spectrogram_input")
 
     backbone_name_lower = backbone_name.lower()
-    if backbone_name_lower == "mobilenetv2":
-        base_model = tf.keras.applications.MobileNetV2(
-            input_tensor=inputs,
-            include_top=False,
-            weights="imagenet"
-        )
-    elif backbone_name_lower == "efficientnetb0":
-        base_model = tf.keras.applications.EfficientNetB0(
-            input_tensor=inputs,
-            include_top=False,
-            weights="imagenet"
-        )
-    elif backbone_name_lower == "resnet50":
-        base_model = tf.keras.applications.ResNet50(
-            input_tensor=inputs,
-            include_top=False,
-            weights="imagenet"
-        )
-    else:
-        raise ValueError(f"Nieobsługiwany szkielet: {backbone_name}. Wybierz: mobilenetv2, efficientnetb0, resnet50.")
+    
+    def _create_backbone(w_target):
+        if backbone_name_lower == "mobilenetv2":
+            return tf.keras.applications.MobileNetV2(
+                input_tensor=inputs,
+                include_top=False,
+                weights=w_target
+            )
+        elif backbone_name_lower == "efficientnetb0":
+            try:
+                return tf.keras.applications.EfficientNetB0(
+                    input_tensor=inputs,
+                    include_top=False,
+                    weights=w_target,
+                    include_preprocessing=False
+                )
+            except TypeError:
+                return tf.keras.applications.EfficientNetB0(
+                    input_tensor=inputs,
+                    include_top=False,
+                    weights=w_target
+                )
+        elif backbone_name_lower == "resnet50":
+            return tf.keras.applications.ResNet50(
+                input_tensor=inputs,
+                include_top=False,
+                weights=w_target
+            )
+        else:
+            raise ValueError(f"Nieobsługiwany szkielet: {backbone_name}. Wybierz: mobilenetv2, efficientnetb0, resnet50.")
+
+    try:
+        base_model = _create_backbone(weights)
+    except Exception:
+        # Fallback offline w przypadku braku połączenia sieciowego
+        base_model = _create_backbone(None)
 
     base_model.trainable = not freeze_backbone
 
@@ -229,11 +247,10 @@ def compile_cnn_model(
             tf.keras.metrics.AUC(name="auc")
         ]
     else:  # categorical (one-hot)
-        loss = tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.05)
+        loss = tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.02)
         metrics = [
             tf.keras.metrics.CategoricalAccuracy(name="accuracy"),
-            tf.keras.metrics.Precision(name="precision"),
-            tf.keras.metrics.Recall(name="recall")
+            tf.keras.metrics.TopKCategoricalAccuracy(k=2, name="top2_accuracy")
         ]
 
     model.compile(optimizer=optimizer, loss=loss, metrics=metrics)

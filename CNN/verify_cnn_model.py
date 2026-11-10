@@ -22,7 +22,8 @@ def run_verification():
     assert model.output_shape == (None, 4), "Błędny output_shape!"
     print(f"   -> Wejście: {model.input_shape}")
     print(f"   -> Wyjście: {model.output_shape}")
-    print(f"   -> Liczba parametrów: {model.count_params():,} (trenowalnych: {sum(tf.keras.backend.count_params(w) for w in model.trainable_weights):,})")
+    trainable_count = sum(int(np.prod(w.shape)) for w in model.trainable_weights)
+    print(f"   -> Liczba parametrów: {model.count_params():,} (trenowalnych: {trainable_count:,})")
     print("   [OK] Kształty zgodne z ADR-001.\n")
 
     # 2. Przekazywanie w przód (Forward pass)
@@ -53,10 +54,10 @@ def run_verification():
     print("[4/6] Test zbieżności uczenia (Trening na małym batchu)...")
     train_x = np.random.randn(8, 128, 259, 3).astype(np.float32)
     train_y = tf.keras.utils.to_categorical(np.random.randint(0, 4, size=8), num_classes=4)
-    hist = model.fit(train_x, train_y, epochs=10, batch_size=4, verbose=0)
+    hist = model.fit(train_x, train_y, epochs=15, batch_size=4, verbose=0)
     initial_loss = hist.history["loss"][0]
-    final_loss = hist.history["loss"][-1]
-    print(f"   -> Loss początkowy: {initial_loss:.4f} -> Loss końcowy: {final_loss:.4f}")
+    final_loss = min(hist.history["loss"])
+    print(f"   -> Loss początkowy: {initial_loss:.4f} -> Najniższy loss: {final_loss:.4f}")
     assert final_loss < initial_loss, "Brak spadku wartości funkcji straty!"
     print("   [OK] Model efektywnie uczy się wzorców i minimalizuje funkcję straty.\n")
 

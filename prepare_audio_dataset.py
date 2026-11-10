@@ -29,31 +29,33 @@ def generate_healthy_hdd_sound(duration_sec: float = 12.0, rpm: int = 7200, sr: 
     num_samples = int(duration_sec * sr)
     t = np.linspace(0, duration_sec, num_samples, endpoint=False)
 
-    # 1. Częstotliwość podstawowa wrzeciona
-    f_base = rpm / 60.0  # np. 120 Hz dla 7200 RPM, 90 Hz dla 5400 RPM
+    # 1. Częstotliwość podstawowa wrzeciona z lekką odchyłką produkcyjną
+    f_base = (rpm * np.random.uniform(0.985, 1.015)) / 60.0
     
     # Drobne fluktuacje prędkości obrotowej (wow/flutter)
     flutter = 1.0 + 0.002 * np.sin(2 * np.pi * 0.5 * t)
     phase = 2 * np.pi * f_base * np.cumsum(flutter) / sr
+    rand_phi = np.random.uniform(0, 2 * np.pi, size=6)
 
     # Harmoniczne silnika i biegunów stojana
-    motor_sound = 0.40 * np.sin(phase)                    # 1x f_base
-    motor_sound += 0.25 * np.sin(2 * phase)                # 2x (druga harmoniczna)
-    motor_sound += 0.15 * np.sin(3 * phase + 0.5)          # 3x
-    motor_sound += 0.10 * np.sin(4 * phase + 1.2)          # 4x
-    motor_sound += 0.06 * np.sin(6 * phase)                # 6x (bieguny stojana)
-    motor_sound += 0.04 * np.sin(12 * phase)               # 12x
+    motor_sound = 0.40 * np.sin(phase + rand_phi[0])
+    motor_sound += 0.25 * np.sin(2 * phase + rand_phi[1])
+    motor_sound += 0.15 * np.sin(3 * phase + rand_phi[2])
+    motor_sound += 0.10 * np.sin(4 * phase + rand_phi[3])
+    motor_sound += 0.06 * np.sin(6 * phase + rand_phi[4])
+    motor_sound += 0.04 * np.sin(12 * phase + rand_phi[5])
 
     # 2. Szum łożysk i oporu powietrza wirujących talerzy (szum różowy / filtrowany)
     white_noise = np.random.randn(num_samples)
-    # Filtr pasmowo-przepustowy 150 Hz - 2400 Hz symulujący obudowę dysku
-    sos_air = signal.butter(4, [150 / (sr / 2), 2400 / (sr / 2)], btype="bandpass", output="sos")
+    upper_cutoff = np.random.uniform(3500, 7500)
+    sos_air = signal.butter(3, [120 / (sr / 2), upper_cutoff / (sr / 2)], btype="bandpass", output="sos")
     air_noise = signal.sosfilt(sos_air, white_noise) * 0.35
 
-    # 3. Delikatny szum tła otoczenia
+    # 3. Delikatny szum tła otoczenia + szerokopasmowy szum własny mikrofonu (zapobiega martwemu pasmu >2.4kHz)
     ambient_noise = np.random.randn(num_samples) * 0.05
     sos_low = signal.butter(2, 800 / (sr / 2), btype="lowpass", output="sos")
-    ambient_noise = signal.sosfilt(sos_low, ambient_noise)
+    mic_floor = np.random.randn(num_samples) * np.random.uniform(0.008, 0.025)
+    ambient_noise = signal.sosfilt(sos_low, ambient_noise) + mic_floor
 
     combined = motor_sound + air_noise + ambient_noise
 
@@ -129,7 +131,7 @@ def categorize_existing_files():
                 if flatness < 0.003:
                     # Bardzo czysty ton / pisk / syrena zablokowanego wrzeciona
                     target_class = "beeping"
-                elif rolloff > 8500 and crest_factor < 20.0 and flatness > 0.05:
+                elif (rolloff > 6500 and crest_factor < 22.0 and flatness > 0.025) or flatness > 0.12:
                     # Ciągły szerokopasmowy pisk/tarcie o wysokiej energii wysokotonowej
                     target_class = "scratching"
                 elif crest_factor > 18.0 or onset_rate > 1.2:

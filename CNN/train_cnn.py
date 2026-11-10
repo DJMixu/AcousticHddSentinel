@@ -55,7 +55,9 @@ except Exception:
             normalize_tensor_zscore,
             TARGET_SR
         )
-    except Exception:
+    except Exception as e:
+        import warnings
+        warnings.warn(f"Nie udało się zaimportować hdd_audio_encoder ({e}). Funkcja predict_audio_chunk nie będzie dostępna.")
         encode_audio_chunk = None
         normalize_waveform_peak = None
         normalize_tensor_zscore = None
@@ -92,7 +94,10 @@ def resolve_dataset_dir(custom_path: Optional[str] = None) -> Path:
     return (current_dir / "dataset_encoded").resolve()
 
 
-def discover_classes_and_files(split_dir: Path) -> Tuple[List[str], List[Path], List[int]]:
+def discover_classes_and_files(
+    split_dir: Path,
+    expected_classes: Optional[List[str]] = None
+) -> Tuple[List[str], List[Path], List[int]]:
     """
     Skanuje katalog danego podziału (train/validate/test), wykrywa podfoldery klas,
     mapuje klasy alfabetycznie i zbiera listę plików .npy wraz z etykietami całkowitymi.
@@ -109,7 +114,7 @@ def discover_classes_and_files(split_dir: Path) -> Tuple[List[str], List[Path], 
         labels = [0] * len(npy_files)
         return ["default"], npy_files, labels
 
-    class_names = [d.name for d in subdirs]
+    class_names = expected_classes if expected_classes is not None else [d.name for d in subdirs]
     class_to_idx = {name: idx for idx, name in enumerate(class_names)}
 
     all_files: List[Path] = []
@@ -117,6 +122,8 @@ def discover_classes_and_files(split_dir: Path) -> Tuple[List[str], List[Path], 
 
     for class_name in class_names:
         class_folder = split_dir / class_name
+        if not class_folder.exists():
+            continue
         files = sorted(list(class_folder.glob("*.npy")))
         all_files.extend(files)
         all_labels.extend([class_to_idx[class_name]] * len(files))
@@ -142,6 +149,31 @@ def load_npy_tensor(filepath_input) -> np.ndarray:
 
     tensor = np.load(path_str).astype(np.float32)
     return tensor
+
+
+def apply_spec_augment(tensor: tf.Tensor, max_freq_mask: int = 16, max_time_mask: int = 24) -> tf.Tensor:
+    """
+    Wykonywana w locie augmentacja SpecAugment (Frequency & Time Masking) dla tensora (128, 259, 3).
+    Poprawia generalizację na rzadkich klasach (scratching, beeping).
+    """
+    freq_bins, time_steps, _ = INPUT_SHAPE
+    f_len = tf.random.uniform([], minval=0, maxval=max_freq_mask, dtype=tf.int32)
+    f0 = tf.random.uniform([], minval=0, maxval=freq_bins - f_len, dtype=tf.int32)
+    freq_mask = tf.concat([
+        tf.ones([f0, time_steps, 1]),
+        tf.zeros([f_len, time_steps, 1]),
+        tf.ones([freq_bins - f0 - f_len, time_steps, 1])
+    ], axis=0)
+
+    t_len = tf.random.uniform([], minval=0, maxval=max_time_mask, dtype=tf.int32)
+    t0 = tf.random.uniform([], minval=0, maxval=time_steps - t_len, dtype=tf.int32)
+    time_mask = tf.concat([
+        tf.ones([freq_bins, t0, 1]),
+        tf.zeros([freq_bins, t_len, 1]),
+        tf.ones([freq_bins, time_steps - t0 - t_len, 1])
+    ], axis=1)
+
+    return tensor * freq_mask * time_mask
 
 
 def create_tf_dataset(
@@ -178,6 +210,8 @@ def create_tf_dataset(
         )
         # Niezmiennik: jawne ustawienie kształtu tensora
         tensor.set_shape(INPUT_SHAPE)  # [128, 259, 3]
+        if is_training:
+            tensor = apply_spec_augment(tensor)
 
         # Konwersja etykiety do wektora one-hot
         one_hot_label = tf.one_hot(label_elem, depth=num_classes)
@@ -198,7 +232,7 @@ def create_tf_dataset(
 
 def calculate_balanced_class_weights(labels: List[int], num_classes: int) -> Dict[int, float]:
     """
-    Oblicza wagi klas w formule 'balanced' ze scikit-learn, aby zniwelować
+    Oblicza wygładzone (sqrt-balanced) wagi klas, aby zniwelować
     asymetrię liczby próbek w poszczególnych rodzajach uszkodzeń dysków HDD.
     """
     unique_present = np.unique(labels)
@@ -212,7 +246,8 @@ def calculate_balanced_class_weights(labels: List[int], num_classes: int) -> Dic
     for cls_idx in range(num_classes):
         if cls_idx in unique_present:
             pos = np.where(unique_present == cls_idx)[0][0]
-            weights_dict[cls_idx] = float(computed_weights[pos])
+            # Pierwiastkowanie wag zapobiega zdominowaniu gradientów przez rzadkie klasy
+            weights_dict[cls_idx] = float(np.clip(np.sqrt(computed_weights[pos]), 0.5, 3.5))
         else:
             weights_dict[cls_idx] = 1.0
 
@@ -428,8 +463,8 @@ def train_and_evaluate(
 
     # Weryfikacja katalogów
     train_classes, train_files, train_labels = discover_classes_and_files(train_dir)
-    val_classes, val_files, val_labels = discover_classes_and_files(val_dir)
-    test_classes, test_files, test_labels = discover_classes_and_files(test_dir)
+    val_classes, val_files, val_labels = discover_classes_and_files(val_dir, expected_classes=train_classes)
+    test_classes, test_files, test_labels = discover_classes_and_files(test_dir, expected_classes=train_classes)
 
     if not train_files:
         raise FileNotFoundError(
@@ -542,6 +577,13 @@ def train_and_evaluate(
             digits=4,
             zero_division=0
         )
+        report_dict = classification_report(
+            y_true_arr,
+            y_pred_arr,
+            target_names=class_names,
+            output_dict=True,
+            zero_division=0
+        )
         print("\nRaport Klasyfikacji (Classification Report):")
         print(report_str)
 
@@ -564,6 +606,7 @@ def train_and_evaluate(
         with open(summary_path, "w", encoding="utf-8") as f:
             json.dump({
                 "test_metrics": eval_dict,
+                "detailed_metrics": report_dict,
                 "classes": class_names,
                 "total_test_samples": len(test_files)
             }, f, indent=2)

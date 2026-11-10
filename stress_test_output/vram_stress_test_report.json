@@ -1,0 +1,25 @@
+{
+  "device": "/GPU:0",
+  "batch_size": 64,
+  "vram_pool_tensors": 5000,
+  "vram_pool_mb": 1896.97265625,
+  "duration_seconds": 3600.0074286460876,
+  "total_batches_processed": 148956,
+  "total_chunks_processed": 9533184,
+  "throughput_chunks_per_sec": 2648.1012022759346,
+  "ram_memory_mb": {
+    "initial": 2828.125,
+    "final": 2764.28125,
+    "growth": -63.84375
+  },
+  "gpu_batch_latencies_ms": {
+    "mean": 23.75344251848592,
+    "p50": 23.63345449884946,
+    "p95": 23.859375948813977,
+    "p99": 24.098301161429845,
+    "max": 2254.1878480005835
+  },
+  "max_canary_drift": 0.0,
+  "nan_errors": 0,
+  "inf_errors": 0
+}

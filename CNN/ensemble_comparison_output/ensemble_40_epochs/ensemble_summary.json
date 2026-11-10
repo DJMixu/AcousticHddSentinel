@@ -1,0 +1,177 @@
+{
+  "ensemble_config": {
+    "num_models": 3,
+    "seeds": [
+      42,
+      123,
+      777
+    ],
+    "epochs_per_model": 40,
+    "total_train_time_sec": 287.0322949886322,
+    "fused_model_path": "ensemble_comparison_output/ensemble_40_epochs/models/fused_ensemble_model.keras"
+  },
+  "individual_models": [
+    {
+      "seed": 42,
+      "stats": {
+        "seed": 42,
+        "epochs": 40,
+        "train_time_sec": 90.7082269191742,
+        "checkpoint_path": "ensemble_comparison_output/ensemble_40_epochs/models/ensemble_model_seed_42.keras",
+        "final_loss": 0.5423074960708618,
+        "final_val_loss": 1.2432624101638794,
+        "best_val_loss": 1.0444799661636353
+      },
+      "metrics": {
+        "accuracy": 0.782608695652174,
+        "weighted_f1": 0.7191783661859704,
+        "per_class": {
+          "beeping": {
+            "precision": 0.5714285714285714,
+            "recall": 0.5714285714285714,
+            "f1": 0.5714285714285714,
+            "support": 7
+          },
+          "clicking": {
+            "precision": 0.7333333333333333,
+            "recall": 0.9361702127659575,
+            "f1": 0.822429906542056,
+            "support": 47
+          },
+          "normal": {
+            "precision": 0.96,
+            "recall": 1.0,
+            "f1": 0.9795918367346939,
+            "support": 24
+          },
+          "scratching": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 14
+          }
+        }
+      }
+    },
+    {
+      "seed": 123,
+      "stats": {
+        "seed": 123,
+        "epochs": 40,
+        "train_time_sec": 97.43380904197693,
+        "checkpoint_path": "ensemble_comparison_output/ensemble_40_epochs/models/ensemble_model_seed_123.keras",
+        "final_loss": 0.5377007722854614,
+        "final_val_loss": 1.2931694984436035,
+        "best_val_loss": 1.0193610191345215
+      },
+      "metrics": {
+        "accuracy": 0.7608695652173914,
+        "weighted_f1": 0.7397403116531706,
+        "per_class": {
+          "beeping": {
+            "precision": 0.6,
+            "recall": 0.42857142857142855,
+            "f1": 0.5,
+            "support": 7
+          },
+          "clicking": {
+            "precision": 0.7407407407407407,
+            "recall": 0.851063829787234,
+            "f1": 0.7920792079207921,
+            "support": 47
+          },
+          "normal": {
+            "precision": 0.96,
+            "recall": 1.0,
+            "f1": 0.9795918367346939,
+            "support": 24
+          },
+          "scratching": {
+            "precision": 0.375,
+            "recall": 0.21428571428571427,
+            "f1": 0.2727272727272727,
+            "support": 14
+          }
+        }
+      }
+    },
+    {
+      "seed": 777,
+      "stats": {
+        "seed": 777,
+        "epochs": 40,
+        "train_time_sec": 96.271981716156,
+        "checkpoint_path": "ensemble_comparison_output/ensemble_40_epochs/models/ensemble_model_seed_777.keras",
+        "final_loss": 0.5342097878456116,
+        "final_val_loss": 1.4583948850631714,
+        "best_val_loss": 1.1735668182373047
+      },
+      "metrics": {
+        "accuracy": 0.7065217391304348,
+        "weighted_f1": 0.6908715301068493,
+        "per_class": {
+          "beeping": {
+            "precision": 0.3125,
+            "recall": 0.7142857142857143,
+            "f1": 0.43478260869565216,
+            "support": 7
+          },
+          "clicking": {
+            "precision": 0.7391304347826086,
+            "recall": 0.723404255319149,
+            "f1": 0.7311827956989247,
+            "support": 47
+          },
+          "normal": {
+            "precision": 0.9230769230769231,
+            "recall": 1.0,
+            "f1": 0.96,
+            "support": 24
+          },
+          "scratching": {
+            "precision": 0.5,
+            "recall": 0.14285714285714285,
+            "f1": 0.2222222222222222,
+            "support": 14
+          }
+        }
+      }
+    }
+  ],
+  "ensemble_results": {
+    "accuracy": 0.782608695652174,
+    "weighted_f1": 0.7327653227077096,
+    "weighted_precision": 0.7468115942028986,
+    "weighted_recall": 0.782608695652174,
+    "per_class": {
+      "beeping": {
+        "precision": 0.6,
+        "recall": 0.42857142857142855,
+        "f1": 0.5,
+        "support": 7
+      },
+      "clicking": {
+        "precision": 0.7333333333333333,
+        "recall": 0.9361702127659575,
+        "f1": 0.822429906542056,
+        "support": 47
+      },
+      "normal": {
+        "precision": 0.96,
+        "recall": 1.0,
+        "f1": 0.9795918367346939,
+        "support": 24
+      },
+      "scratching": {
+        "precision": 0.5,
+        "recall": 0.07142857142857142,
+        "f1": 0.125,
+        "support": 14
+      }
+    },
+    "gain_vs_single_avg": {
+      "accuracy_gain": 0.03260869565217395,
+      "f1_gain": 0.016168586725712752
+    }
+  }
+}

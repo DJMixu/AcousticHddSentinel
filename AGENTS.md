@@ -133,6 +133,8 @@ W systemie użytkownika działa lokalna instalacja Ollama (`http://localhost:114
 2. **Programista Wykonawczy / Coder (9 GB VRAM):** `qwen2.5-coder:14b`
 
 ### Zasady automatycznego wykorzystania przez każdego agenta:
+- **Uruchomienie usług LLM w razie potrzeby:**
+  Przed pracą z modelami lokalnymi agent może upewnić się o działaniu usług za pomocą `./start_services.sh` (lub zatrzymać je po pracy przez `./stop_services.sh`).
 - **Automatyczne delegowanie zadań programistycznych:**
   Gdy użytkownik zleca projektowanie nowych modułów, implementację zaawansowanych algorytmów (np. eksport ONNX, skrypty Android/Kotlin, testy jednostkowe), agent powinien **automatycznie** wykorzystać tandem modeli za pomocą skryptu:
   ```bash

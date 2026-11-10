@@ -12,7 +12,14 @@ Zainstalowane i w pełni zintegrowane są dwa wyspecjalizowane modele open-weigh
 
 ### Obowiązkowe wytyczne dla agentów AGY:
 
-1. **Automatyczne delegowanie złożonych zadań (Pipeline Tandemu):**
+1. **Uruchamianie i weryfikacja usług LLM:**
+   Przed wykonaniem zapytań do modeli lokalnych, agent sprawdza dostępność usług lub uruchamia je skryptem:
+   ```bash
+   ./start_services.sh
+   ```
+   (Skrypt podnosi `ollama.service` oraz bezhasłowy kontener `podman start open-webui`).
+
+2. **Automatyczne delegowanie złożonych zadań (Pipeline Tandemu):**
    Gdy użytkownik zleca projektowanie nowych modułów, implementację zaawansowanych algorytmów (np. eksport do ONNX/Android, rozszerzone testy jednostkowe, refaktoring), agent powinien **automatycznie** wykorzystywać tandem modeli za pomocą skryptu orkiestrującego:
    ```bash
    python local_llm_bridge.py --task "<precyzyjny opis zadania>" [--context <plik_kontekstu>] [--output <plik_wyjściowy>]

@@ -22,7 +22,15 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # Ścieżki
-RAW_DATASET_DIR = Path("CNN/dataset") if Path("CNN/dataset").exists() else Path("dataset")
+if Path("data/raw").exists():
+    RAW_DATASET_DIR = Path("data/raw")
+elif Path("dataset_categorized").exists():
+    RAW_DATASET_DIR = Path("dataset_categorized")
+elif Path("CNN/dataset").exists():
+    RAW_DATASET_DIR = Path("CNN/dataset")
+else:
+    RAW_DATASET_DIR = Path("dataset")
+
 ENCODED_DIR = Path("dataset_encoded") if Path("dataset_encoded").exists() else Path("CNN/dataset_encoded")
 OUTPUT_IMG = Path("normalization_quality_report.png")
 OUTPUT_METRICS_JSON = Path("normalization_quality_metrics.json")
@@ -32,14 +40,14 @@ def analyze_raw_audio_profile():
     """
     Analizuje statystyki surowych nagrań przed normalizacją.
     """
-    wav_files = sorted(list(RAW_DATASET_DIR.glob("*.wav")))
+    audio_files = sorted([p for p in RAW_DATASET_DIR.rglob("*") if p.suffix.lower() in [".wav", ".mp3", ".flac"]])
     rms_list = []
     peak_list = []
     crest_list = []
     dc_list = []
     dur_list = []
 
-    for fpath in wav_files:
+    for fpath in audio_files:
         try:
             y, sr = librosa.load(str(fpath), sr=22050, mono=True)
             if len(y) == 0:
@@ -73,7 +81,7 @@ def analyze_raw_audio_profile():
         "dc_offset_max_abs": float(np.max(np.abs(dc_list))),
         "dc_offset_mean_abs": float(np.mean(np.abs(dc_list))),
     }
-    return raw_stats, wav_files
+    return raw_stats, audio_files
 
 
 def analyze_encoded_tensors_profile():

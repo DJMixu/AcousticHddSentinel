@@ -91,11 +91,31 @@ Projekt **Acoustic HDD Sentinel** to system akustycznej detekcji i wieloklasowej
 
 ---
 
+### Faza 5: Usunięcie Nadmiarowości, Konsolidacja Modułów i Uporządkowanie Struktury
+*(Identyfikator sesji: `4f1178fe`)*
+
+1. **Eliminacja duplikatów i niepotrzebnych plików:**
+   - Usunięto zduplikowany podkatalog `CNN/` (zawierający stare duplikaty skryptów `model_cnn.py`, `train_cnn.py`, `dataset_pytorch.py`, przestarzałe skrypty z fazy wczesnej oraz fałszywy plik `Audio_Player_57.wav`). Zwolniono ponad **840 MB** przestrzeni dyskowej.
+   - Usunięto redundantne pliki aliasowe w katalogu głównym: `model_cnn_pytorch.py`, `train_pytorch.py`, `verify_pytorch_model.py`.
+2. **Promocja ulepszeń eksperymentalnych do modułów kanonicznych:**
+   - Włączono do `model_cnn.py` architekturę komitetu modeli `FusedEnsemblePyTorch` (Soft Voting).
+   - Włączono do `hdd_audio_encoder.py` filtrację ciszy/szumu ($RMS < 0.002$) oraz zbalansowaną augmentację audio dla klas rzadkich.
+   - Włączono do `dataset_pytorch.py` preloading do RAM oraz augmentację `SpecAugmentPyTorch`.
+   - Zaktualizowano `prepare_audio_dataset.py` do automatycznej kategoryzacji na podstawie Ground Truth z bazy `data/raw/`.
+   - Zaktualizowano `train_cnn.py` z obsługą `AdamW`, `LabelSmoothing` oraz `ReduceLROnPlateau`.
+   - Zaktualizowano `export_model.py` do bezpośredniego eksportu najlepszego modelu z `training_output/best_hdd_cnn_model.pt`.
+3. **Uporządkowanie danych:**
+   - Zorganizowano bazę nagrań laboratoryjnych w `data/raw/` (`northwind/` 82 MP3s, `additional/` 13 MP3s, `aesonlabs/` 9 WAVs).
+   - Umieszczono wygenerowane, zbalansowane tensory (1598 plików) w `dataset_encoded/` i objęto wykluczeniem w `.gitignore`.
+   - Zaktualizowano `training_output/` – referencyjny model produkcyjny osiąga Accuracy 83.76% i Macro F1 84.63%.
+
+---
+
 ## 3. Zestawienie Wyników Ewaluacji (Przed i Po)
 
 ### Porównanie Metryki F1-Score na Niezależnym Zbiorze Testowym:
 
-| Klasa Uszkodzenia | Stan Początkowy (TF/PyTorch Base) | **Stan Końcowy (CNN/TESTY/)** | Wzrost | Warunek ($\ge 0.70$) |
+| Klasa Uszkodzenia | Stan Początkowy (TF/PyTorch Base) | **Stan Końcowy (Produkcyjny)** | Wzrost | Warunek ($\ge 0.70$) |
 | :--- | :---: | :---: | :---: | :---: |
 | **`beeping`** (stiction / zablokowane wrzeciono) | 0.2000 (20.0%) | **0.8636 (86.4%)** | **+66.4 p.p.** | **SPEŁNIONY** |
 | **`clicking`** (uderzanie głowic / servo failure) | 0.7200 (72.0%) | **0.7848 (78.5%)** | **+6.5 p.p.** | **SPEŁNIONY** |
@@ -116,43 +136,46 @@ Projekt **Acoustic HDD Sentinel** to system akustycznej detekcji i wieloklasowej
 ```
 AcousticHddSentinel/
 ├── kontekst.md                        # Niniejsze całościowe podsumowanie projektu
-├── fineTuning.md                      # Szczegółowa dokumentacja prac i metryk w CNN/TESTY/
+├── fineTuning.md                      # Szczegółowa dokumentacja prac optymalizacyjnych
 ├── AUDIT_REVIEW_BUNDLE.md             # Historyczny pakiet audytowy dla zewnętrznych modeli LLM
 ├── NOTES.md                           # Notatki badawcze (koncepcja komitetu Seed Ensembling)
 ├── AGENTS.md                          # Wytyczne i niezmienniki techniczne dla agentów AI
 ├── README.md                          # Główna dokumentacja projektu
 ├── requirements.txt                   # Zależności Python (PyTorch, Librosa, Scikit-learn)
 │
-├── model_cnn.py                       # Architektura 2D CNN w PyTorch (AcousticHddSentinelCNN)
-├── dataset_pytorch.py                 # PyTorch Dataset i DataLoader dla tensorów .npy
+├── model_cnn.py                       # Architektura 2D CNN w PyTorch (AcousticHddSentinelCNN & FusedEnsemblePyTorch)
+├── dataset_pytorch.py                 # PyTorch Dataset z preloadem RAM i SpecAugment (HddNpyDataset)
 ├── train_cnn.py                       # Główny pipeline treningowy PyTorch z akceleracją ROCm
 ├── train_ensemble.py                  # Trening komitetu modeli o różnych seedach losowości
 ├── hdd_audio_encoder.py               # Enkoder audio do tensorów zgodny z ADR-001
-├── prepare_audio_dataset.py           # Narzędzie kategoryzacji nagrań audio
+├── prepare_audio_dataset.py           # Narzędzie kategoryzacji nagrań audio i generator klasy 'normal'
 ├── profile_normalization_quality.py   # Profiler jakości normalizacji DSP
+├── export_model.py                    # Eksport do ONNX (FP32/INT8), TorchScript i Android Kotlin
+├── test_project_logic.py              # Test integralności i poprawności architektury
+├── local_llm_bridge.py                # Most orkiestrujący lokalne modele Ollama (27B + Coder 14B)
+├── start_services.sh / stop_services.sh # Zarządzanie usługami Ollama i Open WebUI
+│
+├── data/raw/                          # Baza surowych nagrań laboratoryjnych (Ground Truth)
+│   ├── northwind/                     # 82 pliki MP3 z nazwami laboratoryjnymi
+│   ├── additional/                    # 13 nowych nagrań laboratoryjnych uszkodzeń HDD
+│   └── aesonlabs/                     # 9 nagrań uszkodzeń Aesonlabs Data Recovery
+│
+├── dataset_categorized/               # 134 nagrania podzielone na 4 klasy
+├── dataset_encoded/                   # 1598 tensorów .npy (1389 train, 92 val, 117 test)
+│
+├── training_output/                   # Produkcyjny model, wagi i raporty ewaluacji
+│   ├── best_hdd_cnn_model.pt          # Wagi najlepszego pojedynczego modelu PyTorch (seed 777)
+│   ├── fused_ensemble_model.pt        # Wagi zintegrowanego komitetu modeli
+│   ├── classification_report.txt      # Pełny raport metryk per klasa
+│   ├── test_evaluation_summary.json   # Podsumowanie metryk w formacie JSON
+│   ├── confusion_matrix.png           # Wykres macierzy pomyłek
+│   └── classes.json                   # Mapowanie klas
+│
+├── exported_models/                   # Wyeksportowane modele produkcyjne ONNX i Kotlin
 │
 ├── stress_test.py                     # Skrypt 1h/24h stress testu inferencji
 ├── stress_test_vram.py                # Skrypt monitoringu pamięci VRAM GPU
 ├── testEpok.py                        # Eksperyment porównawczy dla 20-60 epok
-├── verify_cnn_model.py                # Testy weryfikacyjne poprawności modelu PyTorch
-│
-├── training_output/                   # Poprzedni bazowy model produkcyjny
-│   └── best_hdd_cnn_model.pt          # Wagi modelu bazowego
-│
-├── CNN/TESTY/                         # Nowe, zoptymalizowane środowisko eksperymentalne
-│   ├── raw_northwind/                 # 82 oryginalne pliki MP3 z serwera Northwind
-│   ├── raw_additional/                # 11 nowo pozyskanych nagrań awarii (yt-dlp)
-│   ├── dataset_categorized/           # 134 unikalne nagrania źródłowe podzielone na klasy
-│   ├── dataset_encoded/               # Wygenerowane tensory (1389 train, 92 val, 117 test)
-│   ├── encoder_testy.py               # Enkoder z filtracją ciszy i zbalansowaną augmentacją
-│   ├── dataset_testy.py               # Dataset PyTorch z RAM-preloading i SpecAugment
-│   ├── model_testy.py                 # Architektura CNN i moduł komitetu modeli
-│   ├── train_testy.py                 # Pipeline treningowy dla komitetu modeli
-│   └── training_output/               # Wyjściowe wagi i raporty nowego modelu:
-│       ├── best_hdd_cnn_model.pt      # Wagi najlepszego modelu (F1 > 0.70 dla wszystkich klas)
-│       ├── classification_report.txt  # Pełny raport metryk per klasa
-│       ├── confusion_matrix.png       # Wykres macierzy pomyłek
-│       └── test_evaluation_summary.json # Podsumowanie metryk w formacie JSON
 │
 └── docx/adr/
     └── adr.md                         # ADR-001: Architektura DSP i niezmienniki techniczne
@@ -162,7 +185,12 @@ AcousticHddSentinel/
 
 ## 5. Historia Istotnych Commitów Git
 
-- `f508af8` — *Save current project state before CNN/TESTY experiments* (zabezpieczenie kodu przed optymalizacją w `CNN/TESTY/`).
-- `c45b9ff` — *feat: complete migration from TensorFlow to PyTorch, eliminate data leakage and purge TF* (pełne usunięcie TensorFlow, wdrożenie PyTorch, eliminacja zdublowanych plików audio, konfiguracja ROCm dla RX 9060 XT).
+- `dfa36bc` — *feat(export): export PyTorch model to ONNX FP32, ONNX INT8, and TorchScript with Android Kotlin integration template*.
+- `ca4d615` — *feat: document headless dGPU architecture and support up to 128k context in local LLM bridge*.
+- `2184869` — *feat: add start_services.sh and stop_services.sh for automated Ollama and Open WebUI management*.
+- `a05ea88` — *feat: add automatic local LLM tandem orchestration and agent rules*.
+- `f508af8` — *Save current project state before CNN/TESTY experiments*.
+- `c45b9ff` — *feat: complete migration from TensorFlow to PyTorch, eliminate data leakage and purge TF*.
 - `16031f4` — *Zapis stanu projektu: bazowy model CNN, stress test i skrypty weryfikacyjne*.
 - `876d65a` — *feat(cnn): implement 2D CNN architecture, training pipeline, and AGY workspace setup*.
+

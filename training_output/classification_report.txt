@@ -1,10 +1,12 @@
+=== MODEL EWALUACYJNY (CNN/TESTY - SEED 777) ===
+
               precision    recall  f1-score   support
 
-     beeping     1.0000    0.3636    0.5333        11
-    clicking     0.4286    0.4091    0.4186        22
-      normal     1.0000    1.0000    1.0000        12
-  scratching     0.2273    0.3571    0.2778        14
+     beeping     0.8636    0.8636    0.8636        22
+    clicking     0.7045    0.8857    0.7848        35
+      normal     1.0000    1.0000    1.0000        27
+  scratching     0.8750    0.6364    0.7368        33
 
-    accuracy                         0.5085        59
-   macro avg     0.6640    0.5325    0.5574        59
-weighted avg     0.6036    0.5085    0.5248        59
+    accuracy                         0.8376       117
+   macro avg     0.8608    0.8464    0.8463       117
+weighted avg     0.8507    0.8376    0.8358       117

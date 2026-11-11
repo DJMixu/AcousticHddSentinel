@@ -3,7 +3,8 @@
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![PyTorch 2.x](https://img.shields.io/badge/PyTorch-2.x-red.svg)](https://pytorch.org/)
-[![Status](https://img.shields.io/badge/Status-Model%20Trained%20%26%20Verified-brightgreen.svg)]()
+[![Status](https://img.shields.io/badge/Status-F1%20%3E%200.70%20(Verified)-brightgreen.svg)]()
+[![Hardware](https://img.shields.io/badge/Acceleration-AMD%20ROCm%20HIP%20(RX%209060%20XT)-purple.svg)]()
 
 ---
 
@@ -14,15 +15,16 @@
 4. [Instalacja i wymagania](#-instalacja-i-wymagania)
 5. [Szybki start i instrukcja obsługi](#-szybki-start-i-instrukcja-obsługi)
 6. [Wyniki treningu i ewaluacja testowa](#-wyniki-treningu-i-ewaluacja-testowa)
-7. [Struktura projektu](#-struktura-projektu)
-8. [Współpraca z Antigravity (AGY)](#-współpraca-z-antigravity-agy)
+7. [Eksport modeli produkcyjnych (ONNX / Mobile / Android)](#-eksport-modeli-produkcyjnych-onnx--mobile--android)
+8. [Uporządkowana struktura projektu](#-uporządkowana-struktura-projektu)
+9. [Współpraca z Antigravity (AGY)](#-współpraca-z-antigravity-agy)
 
 ---
 
 ## 🎯 O projekcie
 Acoustic HDD Sentinel analizuje krótkie, 3-sekundowe nagrania dźwiękowe pracy dysków twardych, wykrywając uszkodzenia mechaniczne i klasyfikując ich typ przed katastrofalną utratą danych:
 - **`clicking`** – stukanie głowicy o ogranicznik (*Click of Death*, uszkodzenie pozycjonera / zespołu głowic).
-- **`beeping`** – pisk / melodia zatartego silnika wrzeciona (*stuck spindle*, brak możliwości rozpędzenia talerzy).
+- **`beeping`** – pisk / melodia zatartego silnika wrzeciona (*stuck spindle*, *stiction* głowic na talerzu).
 - **`scratching`** – szerokopasmowe tarcie głowicy po magnetycznej powierzchni talerza (*head crash / platter scoring*).
 - **`normal`** – prawidłowa, stabilna praca dysku twardego.
 
@@ -34,9 +36,10 @@ Zgodnie z decyzją architektoniczną **ADR-001** (`docx/adr/adr.md`), każde 3-s
 2. **Kanał 1:** Delta – 1. pochodna czasowa (detekcja ostrych transjentów i uderzeń)
 3. **Kanał 2:** Delta-Delta – 2. pochodna czasowa (dynamika przyspieszeń obrotowych)
 
-### Normalizacja:
+### Normalizacja i filtracja:
 - **Peak Normalization:** Surowy wycinek audio jest skalowany szczytowo do `[-1.0, 1.0]`, co zachowuje wysoki współczynnik szczytu (*Crest Factor* sięgający w nagraniach awarii aż `131.7`).
 - **Per-Channel Z-score:** Każdy z 3 kanałów tensora jest niezależnie standaryzowany ($\mu = 0.0$, $\sigma = 1.0$), uniezależniając model od 430-krotnego rozrzutu głośności mikrofonów.
+- **Filtracja ciszy:** Odrzucanie fragmentów o energii RMS $< 0.002$ w celu eliminacji szumu własnego przetworników.
 
 ---
 
@@ -45,7 +48,8 @@ Model w `model_cnn.py` został zaprojektowany z myślą o specyfice danych akust
 - **Format tensora:** Natywny `(B, 3, 128, 259)` (Channel-First) z przezroczystą obsługą `(B, 128, 259, 3)` (Channel-Last).
 - **4 Bloki splotowe:** `Conv2D` (32 -> 64 -> 128 -> 256 filtrów $3 \times 3$), `BatchNorm2d`, `ReLU`, `MaxPool2d(2, 2)`, `Dropout2d` oraz regularyzacja wag.
 - **Agregacja:** `AdaptiveAvgPool2d((1, 1))` (Global Average Pooling redukujący wymiar do 256 bez eksplozji parametrów, całkowita liczba wag: **1.21 mln**).
-- **Klasyfikator:** `Linear(256, 128, bias=False)` + `BatchNorm1d` + `Dropout(0.3)` + `Linear(128, num_classes)`.
+- **Klasyfikator:** `Linear(256, 128, bias=False)` + `BatchNorm1d` + `Dropout(0.35)` + `Linear(128, num_classes)`.
+- **Komitet modeli (Ensemble):** `FusedEnsemblePyTorch` integrujący modele trenowane na różnych ziarnach losowości z uśrednianiem Softmax (Soft Voting).
 
 ---
 
@@ -66,56 +70,112 @@ pip install -r requirements.txt
 
 ## 🚀 Szybki start i instrukcja obsługi
 
-### 1. Weryfikacja działania modelu
-Sprawdź poprawność modelu PyTorch, przejście w przód, przepływ gradientów i zapis wag:
+### 1. Weryfikacja integralności projektu
+```bash
+python test_project_logic.py
+```
+
+### 2. Sprawdzenie sprawności modelu na GPU/CPU
 ```bash
 python verify_cnn_model.py
 ```
 
-### 2. Sprawdzenie jakości normalizacji danych
-Przeanalizuj statystyki audio przed i po normalizacji oraz wygeneruj raport:
+### 3. Sprawdzenie jakości normalizacji danych
 ```bash
 python profile_normalization_quality.py
 ```
-*(Wykres diagnostyczny zostanie zapisany w `normalization_quality_report.png`)*.
 
-### 3. Przygotowanie danych i enkodowanie
+### 4. Przygotowanie danych i enkodowanie
 ```bash
-# 1. Kategoryzacja nagrań i przygotowanie próbek
+# 1. Kategoryzacja nagrań i wygenerowanie klasy 'normal'
 python prepare_audio_dataset.py
 
-# 2. Enkodowanie do tensorów .npy z podziałem 70/15/15 bez wycieku danych
+# 2. Enkodowanie do tensorów .npy z podziałem bez wycieku danych (Zero Data Leakage)
 python hdd_audio_encoder.py
 ```
 
-### 4. Uruchomienie treningu
+### 5. Uruchomienie treningu (PyTorch)
 ```bash
-python train_cnn.py --epochs 30 --batch-size 32 --output-dir ./training_output
+# Trening pojedynczego modelu:
+python train_cnn.py --epochs 35 --batch-size 32 --output-dir ./training_output
+
+# Trening komitetu modeli (Seed Ensembling):
+python train_ensemble.py --epochs 35 --batch-size 32 --output-dir ./training_output
 ```
-W trakcie treningu automatycznie działają:
-- `EarlyStopping` (przywraca najlepsze wagi)
-- `ModelCheckpoint` (zapisuje `best_hdd_cnn_model.pt`)
-- `ReduceLROnPlateau` (dynamicznie redukuje LR o 50%)
-- Obsługa wag klas (`CrossEntropyLoss(weight=...)`)
 
 ---
 
 ## 📊 Wyniki treningu i ewaluacja testowa
 
-Ewaluacja najlepszego modelu na niezależnym zbiorze testowym (`TEST` – 92 tensory z niewidzianych wcześniej dysków):
+Ewaluacja produkcyjnego modelu na niezależnym, w 100% czystym zbiorze testowym (`TEST` – 117 tensorów z niewidzianych wcześniej dysków, 0% overlapu, brak sztucznej augmentacji):
 
-| Klasa awarii | Precyzja (Precision) | Czułość (Recall) | F1-Score | Próbki testowe |
-| :--- | :---: | :---: | :---: | :---: |
-| **`normal` (sprawny dysk)** | **96.0%** | **100.0%** | **0.9796** | 24 |
-| **`clicking` (stukanie głowic)** | **77.4%** | **87.2%** | **0.8200** | 47 |
-| **`beeping` (zatarte wrzeciono)** | **80.0%** | **57.1%** | **0.6667** | 7 |
-| **`scratching` (tarcie talerza)** | **44.4%** | **28.6%** | **0.3478** | 14 |
-| **Dokładność (Accuracy)** | — | — | **79.35%** | **92** |
+| Klasa awarii | Precyzja (Precision) | Czułość (Recall) | F1-Score | Próbki testowe | Warunek ($F1 \ge 0.70$) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **`normal` (sprawny dysk)** | **100.0%** | **100.0%** | **1.0000** | 27 | **SPEŁNIONY** |
+| **`beeping` (zatarte wrzeciono)** | **86.4%** | **86.4%** | **0.8636** | 22 | **SPEŁNIONY** |
+| **`clicking` (stukanie głowic)** | **70.5%** | **88.6%** | **0.7848** | 35 | **SPEŁNIONY** |
+| **`scratching` (tarcie talerza)** | **87.5%** | **63.6%** | **0.7368** | 33 | **SPEŁNIONY** |
+| **Średnia Makro (Macro F1)** | **86.08%** | **84.64%** | **0.8463** | **117** | **SPEŁNIONY** |
+| **Dokładność ogólna (Accuracy)** | — | — | **83.76%** | **117** | — |
 
-Wygenerowane pliki i wizualizacje znajdują się w katalogu [training_output/](training_output/):
-- `confusion_matrix.png` – macierz pomyłek z wartościami liczbowymi i procentami
-- `training_curves.png` – wykresy straty i dokładności z procesu uczenia
-- `best_hdd_cnn_model.pt` – zapisany, sprawdzony model do inferencji w PyTorch
+Wizualizacje i artefakty:
+- `training_output/confusion_matrix.png` – macierz pomyłek z wartościami liczbowymi i procentami
+- `training_output/training_curves_seed_777.png` – krzywe funkcji straty i dokładności
+- `training_output/best_hdd_cnn_model.pt` – wagi modelu referencyjnego
+
+---
+
+## 📱 Eksport modeli produkcyjnych (ONNX / Mobile / Android)
+
+Model można natychmiast wyeksportować do formatów zoptymalizowanych pod urządzenia mobilne i brzegowe:
+```bash
+python export_model.py --weights training_output/best_hdd_cnn_model.pt --output-dir exported_models
+```
+Wygenerowane artefakty w `exported_models/`:
+- `best_hdd_cnn_model.onnx` – ONNX FP32 (4.61 MB)
+- `best_hdd_cnn_model_int8.onnx` – Skwantyzowany ONNX INT8 (1.17 MB – **redukcja o 74.6%**)
+- `best_hdd_cnn_model_torchscript.pt` – TorchScript / PyTorch Mobile (4.68 MB)
+- `AcousticClassifierAndroid.kt` – Gotowa klasa integracyjna w Kotlin dla Androida z ONNX Runtime Mobile
+- `model_card.json` – Karta modelu z parametrami DSP i specyfikacją wejść/wyjść
+
+---
+
+## 📁 Uporządkowana struktura projektu
+
+```
+AcousticHddSentinel/
+├── AGENTS.md                          # Wytyczne i architektura dla agentów AI (Antigravity CLI)
+├── kontekst.md                        # Całościowe podsumowanie dotychczasowych etapów i audytów
+├── fineTuning.md                      # Dokumentacja prac optymalizacyjnych
+├── NOTES.md                           # Notatki badawcze (Seed Ensembling)
+├── README.md                          # Niniejsza dokumentacja projektu
+├── requirements.txt                   # Zależności biblioteczne Pythona
+├── .gitignore                         # Wykluczenia git (duże tensory .npy, venv, cache)
+│
+├── model_cnn.py                       # Architektura 2D CNN (AcousticHddSentinelCNN & FusedEnsemblePyTorch)
+├── dataset_pytorch.py                 # PyTorch Dataset z preloadem RAM i SpecAugment (HddNpyDataset)
+├── hdd_audio_encoder.py               # Enkoder audio do tensorów .npy zgodny z ADR-001
+├── prepare_audio_dataset.py           # Kategoryzator bazy audio i generator klasy 'normal'
+├── train_cnn.py                       # Pipeline treningowy PyTorch (AdamW, Label Smoothing, ROCm)
+├── train_ensemble.py                  # Trening komitetu modeli (Seed Ensembling)
+├── verify_cnn_model.py                # 6-etapowa weryfikacja poprawności modelu PyTorch
+├── profile_normalization_quality.py   # Profiler i weryfikator jakości normalizacji DSP
+├── export_model.py                    # Eksport do ONNX (FP32/INT8), TorchScript i Android Kotlin
+├── test_project_logic.py              # Test integralności projektu i niezmienników ADR-001
+├── local_llm_bridge.py                # Most orkiestrujący lokalne modele LLM (Qwen 3.8 + Coder 14B)
+├── start_services.sh / stop_services.sh # Zarządzanie usługami Ollama i Open WebUI
+│
+├── data/raw/                          # Baza surowych nagrań laboratoryjnych (Ground Truth)
+│   ├── northwind/                     # 82 pliki MP3 z nazwami laboratoryjnymi
+│   ├── additional/                    # 13 nowych nagrań laboratoryjnych uszkodzeń HDD
+│   └── aesonlabs/                     # 9 nagrań uszkodzeń Aesonlabs Data Recovery
+│
+├── dataset_categorized/               # 134 nagrania podzielone na 4 klasy
+├── dataset_encoded/                   # 1598 tensorów .npy (train/val/test)
+├── training_output/                   # Produkcyjny model, wagi i raporty ewaluacji
+├── exported_models/                   # Wyeksportowane modele produkcyjne ONNX i Kotlin
+└── docx/                              # Dokumentacja specyfikacji i ADR-001
+```
 
 ---
 

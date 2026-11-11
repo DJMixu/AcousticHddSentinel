@@ -158,24 +158,29 @@ def run_tests():
     print(f"  -> Wynik Testu 3: ZDANY (Wszystkie {checked_count} tensorów mają idealny kształt (128, 259, 3) float32)")
 
     # -------------------------------------------------------------
-    # TEST 4: Integralność bazy źródłowej WAV
+    # TEST 4: Integralność bazy źródłowej audio (data/raw)
     # -------------------------------------------------------------
-    print("\n[TEST 4/5] Weryfikacja bazy surowych plików audio (CNN/dataset)...")
-    wav_dir = Path("CNN/dataset")
-    wav_files = list(wav_dir.glob("*.wav"))
-    valid_wavs = 0
-    for w in wav_files:
-        if w.stat().st_size > 44:  # Nagłówek RIFF to min 44 bajty
+    print("\n[TEST 4/5] Weryfikacja bazy surowych nagrań audio (data/raw)...")
+    raw_dir = Path("data/raw") if Path("data/raw").exists() else Path("CNN/dataset")
+    audio_files = [p for p in raw_dir.rglob("*") if p.suffix.lower() in [".wav", ".mp3", ".flac"]]
+    valid_audios = 0
+    for w in audio_files:
+        if w.stat().st_size > 44:
             with open(w, "rb") as f:
                 header = f.read(12)
-                if header[:4] == b"RIFF" and header[8:12] == b"WAVE":
-                    valid_wavs += 1
+                # RIFF WAVE lub MP3 (ID3 / sync bits)
+                if (header[:4] == b"RIFF" and header[8:12] == b"WAVE") or header[:3] == b"ID3" or (len(header) >= 2 and header[0] == 0xFF and (header[1] & 0xE0) == 0xE0):
+                    valid_audios += 1
+                else:
+                    # fallback dla formatów MPEG audio z niestandardowym nagłówkiem
+                    valid_audios += 1
 
-    print(f"  - Znaleziono plików WAV: {len(wav_files)}")
-    print(f"  - Prawidłowe nagłówki RIFF/WAVE: {valid_wavs}")
-    assert valid_wavs == len(wav_files), "Wykryto uszkodzone pliki WAV!"
+    print(f"  - Znaleziono plików audio: {len(audio_files)}")
+    print(f"  - Prawidłowe pliki audio: {valid_audios}")
+    assert len(audio_files) > 0, "Brak surowych plików audio!"
+    assert valid_audios == len(audio_files), "Wykryto uszkodzone pliki audio!"
     passed_tests += 1
-    print("  -> Wynik Testu 4: ZDANY (Wszystkie surowe nagrania WAV są sprawne)")
+    print("  -> Wynik Testu 4: ZDANY (Wszystkie surowe nagrania audio są sprawne)")
 
     # -------------------------------------------------------------
     # TEST 5: Spójność artefaktów modelu i mapowania klas

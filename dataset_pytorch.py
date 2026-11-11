@@ -113,9 +113,8 @@ def resolve_dataset_dir(custom_path: Optional[str] = None) -> Path:
     current_dir = Path(__file__).resolve().parent
     candidates = [
         Path("dataset_encoded"),
-        Path("CNN/dataset_encoded"),
         current_dir / "dataset_encoded",
-        current_dir / "CNN" / "dataset_encoded",
+        Path("data/dataset_encoded"),
     ]
     for c in candidates:
         if c.exists() and (c / "train").exists():

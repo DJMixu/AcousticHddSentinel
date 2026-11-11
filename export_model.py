@@ -13,23 +13,21 @@ import os
 import sys
 import json
 import argparse
+from pathlib import Path
 import numpy as np
 import torch
 
-# Upewniamy się, że importujemy architekturę z CNN/TESTY lub katalogu głównego
-sys.path.insert(0, os.path.abspath("CNN/TESTY"))
-sys.path.insert(0, os.path.abspath("."))
+current_dir = Path(__file__).resolve().parent
+if str(current_dir) not in sys.path:
+    sys.path.insert(0, str(current_dir))
 
-try:
-    from model_testy import AcousticHddSentinelCNN
-except ImportError:
-    from model_cnn import AcousticHddSentinelCNN
+from model_cnn import AcousticHddSentinelCNN
 
 
 def export_pipeline(
-    weights_path: str = "CNN/TESTY/training_output/best_hdd_cnn_model.pt",
+    weights_path: str = "training_output/best_hdd_cnn_model.pt",
     output_dir: str = "exported_models",
-    classes_path: str = "CNN/TESTY/training_output/classes.json"
+    classes_path: str = "training_output/classes.json"
 ):
     os.makedirs(output_dir, exist_ok=True)
     print("=" * 70)
@@ -43,10 +41,15 @@ def export_pipeline(
     if os.path.isfile(classes_path):
         with open(classes_path, "r", encoding="utf-8") as f:
             class_map = json.load(f)
-            # Jeśli mapowanie to {"beeping": 0, ...} zamień na listę
             if isinstance(class_map, dict):
-                sorted_classes = sorted(class_map.items(), key=lambda x: x[1])
-                class_names = [k for k, _ in sorted_classes]
+                if "classes" in class_map and isinstance(class_map["classes"], list):
+                    class_names = class_map["classes"]
+                else:
+                    try:
+                        sorted_classes = sorted(class_map.items(), key=lambda x: int(x[0]) if x[0].isdigit() else int(x[1]))
+                        class_names = [k if not k.isdigit() else v for k, v in sorted_classes]
+                    except Exception:
+                        class_names = list(class_map.keys())
             elif isinstance(class_map, list):
                 class_names = class_map
     print(f"📋 Wykryte klasy ({len(class_names)}): {class_names}")
@@ -281,7 +284,7 @@ class AcousticClassifierAndroid(context: Context) {
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Eksport modelu PyTorch do ONNX i TorchScript dla aplikacji.")
-    parser.add_argument("--weights", default="CNN/TESTY/training_output/best_hdd_cnn_model.pt", help="Ścieżka do wag modelu .pt")
+    parser.add_argument("--weights", default="training_output/best_hdd_cnn_model.pt", help="Ścieżka do wag modelu .pt")
     parser.add_argument("--output-dir", default="exported_models", help="Katalog wyjściowy")
     args = parser.parse_args()
 

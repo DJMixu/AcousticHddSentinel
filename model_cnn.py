@@ -8,7 +8,7 @@ wycinków audio dysków HDD.
 Obsługuje tensory (128, 259, 3) oraz (3, 128, 259).
 """
 
-from typing import Tuple, Optional, Union
+from typing import Tuple, Optional, Union, List, List
 import numpy as np
 import torch
 import torch.nn as nn
@@ -227,6 +227,44 @@ class AcousticHddSentinelCNN(nn.Module):
         probs = self.predict_proba(x)
         if self.num_classes == 1:
             return (probs > 0.5).astype(np.int64)
+        return np.argmax(probs, axis=-1)
+
+
+class FusedEnsemblePyTorch(nn.Module):
+    """
+    Komitet N modeli PyTorch z uśrednianiem Softmax (Soft Voting).
+    Redukuje wariancję błędu i podnosi stabilność klasyfikacji na próbkach brzegowych.
+    """
+    def __init__(self, models: List[AcousticHddSentinelCNN]):
+        super().__init__()
+        self.models = nn.ModuleList(models)
+        self.num_classes = models[0].num_classes if models else DEFAULT_NUM_CLASSES
+
+    def forward(self, x: torch.Tensor, return_logits: bool = False) -> torch.Tensor:
+        probs = [m(x, return_logits=False) for m in self.models]
+        avg_prob = torch.stack(probs, dim=0).mean(dim=0)
+        if return_logits:
+            return torch.log(avg_prob + 1e-9)
+        return avg_prob
+
+    @torch.no_grad()
+    def predict_proba(self, x: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
+        was_training = self.training
+        self.eval()
+        device = next(self.parameters()).device
+        if isinstance(x, np.ndarray):
+            x_t = torch.from_numpy(x).float().to(device)
+        else:
+            x_t = x.to(device)
+        probs = self.forward(x_t, return_logits=False)
+        result = probs.detach().cpu().numpy()
+        if was_training:
+            self.train()
+        return result
+
+    @torch.no_grad()
+    def predict(self, x: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
+        probs = self.predict_proba(x)
         return np.argmax(probs, axis=-1)
 
 

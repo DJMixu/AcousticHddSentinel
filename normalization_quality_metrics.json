@@ -1,47 +1,47 @@
 {
   "raw_audio_profile": {
-    "count": 91,
-    "rms_min": 0.0008801857475191355,
-    "rms_max": 0.3798445761203766,
-    "rms_mean": 0.050156835466623306,
-    "rms_ratio_max_min": 431.54998779296875,
-    "peak_min": 0.01837158203125,
-    "peak_max": 1.0,
-    "crest_min": 1.3138070106506348,
-    "crest_max": 131.72459411621094,
-    "crest_mean": 26.120580673217773,
-    "crest_p95": 73.95867156982422,
-    "dc_offset_max_abs": 0.3766556978225708,
-    "dc_offset_mean_abs": 0.03392370417714119
+    "count": 104,
+    "rms_min": 0.0008801227086223662,
+    "rms_max": 0.3798444867134094,
+    "rms_mean": 0.046252693980932236,
+    "rms_ratio_max_min": 431.580810546875,
+    "peak_min": 0.018377769738435745,
+    "peak_max": 1.270963191986084,
+    "crest_min": 1.3138675689697266,
+    "crest_max": 130.94195556640625,
+    "crest_mean": 27.15338134765625,
+    "crest_p95": 74.24126434326172,
+    "dc_offset_max_abs": 0.37665557861328125,
+    "dc_offset_mean_abs": 0.030142268165946007
   },
   "encoded_tensors_profile": {
-    "total_tensors": 1050,
+    "total_tensors": 1598,
     "nan_tensors": 0,
     "inf_tensors": 0,
     "channel_0_log_mel": {
-      "mean_of_means": 3.64356538971679e-09,
-      "std_of_means": 1.6106134704005106e-07,
-      "mean_of_stds": 0.9999998965717497,
-      "std_of_stds": 5.151731170433566e-08,
-      "min_global": -7.46762228012085,
-      "max_global": 8.70011043548584
+      "mean_of_means": 1.3472474197647266e-09,
+      "std_of_means": 1.6265423067886311e-07,
+      "mean_of_stds": 0.9999999022006392,
+      "std_of_stds": 5.0997771156561633e-08,
+      "min_global": -7.491804122924805,
+      "max_global": 6.653060436248779
     },
     "channel_1_delta": {
-      "mean_of_means": -2.5301022328814783e-11,
-      "std_of_means": 5.9641645956979205e-09,
-      "mean_of_stds": 0.9999986410708654,
-      "std_of_stds": 5.210992153251632e-07,
-      "min_global": -12.418219566345215,
-      "max_global": 12.325632095336914
+      "mean_of_means": 2.967018297771339e-11,
+      "std_of_means": 5.8859992258048086e-09,
+      "mean_of_stds": 0.9999985962322865,
+      "std_of_stds": 4.908862867580158e-07,
+      "min_global": -13.182547569274902,
+      "max_global": 13.089401245117188
     },
     "channel_2_delta_delta": {
-      "mean_of_means": -2.5399301523451734e-10,
-      "std_of_means": 6.666933574642109e-09,
-      "mean_of_stds": 0.9999980452514831,
-      "std_of_stds": 5.581022935259883e-07,
-      "min_global": -12.715740203857422,
-      "max_global": 13.225836753845215
+      "mean_of_means": 3.7079849454371544e-11,
+      "std_of_means": 6.58384752709546e-09,
+      "mean_of_stds": 0.9999978964185535,
+      "std_of_stds": 5.102360448053481e-07,
+      "min_global": -12.662205696105957,
+      "max_global": 14.008320808410645
     },
-    "mean_3sigma_outlier_pct": 1.184122579211865
+    "mean_3sigma_outlier_pct": 1.0822308904873048
   }
 }

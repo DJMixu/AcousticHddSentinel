@@ -216,8 +216,8 @@ def run_training(
     model = model.to(device)
 
     weights_tensor = class_weights.to(device)
-    criterion = nn.CrossEntropyLoss(weight=weights_tensor)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    criterion = nn.CrossEntropyLoss(weight=weights_tensor, label_smoothing=0.03)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=3)
 
     history = {

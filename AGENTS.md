@@ -13,7 +13,7 @@ System akustycznej detekcji i wieloklasowej klasyfikacji uszkodzeń mechanicznyc
 Każdy agent AGY modyfikujący lub rozwijający projekt **MUSI bezwzględnie** przestrzegać poniższych reguł zdefiniowanych w [ADR-001](file:///home/DJMixu/Pulpit/AcousticHddSentinel/docx/adr/adr.md):
 
 1. **Brak Data Leakage (Podział na poziomie plików):**
-   Podział na `train` (70%), `validate` (15%) i `test` (15%) **MUSI** odbywać się na całych nagraniach źródłowych przed ich pocięciem na 3-sekundowe okna czasowe. Nigdy nie stosuj losowego `train_test_split` bezpośrednio na wygenerowanych plikach `.npy`.
+   Podział na `train` (68%), `validate` (14%) i `test` (18%) **MUSI** odbywać się na całych nagraniach źródłowych przed ich pocięciem na 3-sekundowe okna czasowe. Nigdy nie stosuj losowego `train_test_split` bezpośrednio na wygenerowanych plikach `.npy`.
 2. **Kształt tensora wejściowego:**
    - Na dysku w plikach `.npy`: tensor `float32` o stałych wymiarach **`(128, 259, 3)`** (Channel-Last).
    - W pamięci modelu PyTorch: tensor `(B, 3, 128, 259)` (Channel-First).
@@ -26,6 +26,7 @@ Każdy agent AGY modyfikujący lub rozwijający projekt **MUSI bezwzględnie** p
    - `FMIN = 50.0` Hz, `FMAX = 10000.0` Hz
    - `CHUNK_DURATION = 3.0` s (66 150 próbek)
    - `OVERLAP = 1.5` s dla zbioru `train` (50% augmentacji), `0.0` s dla `validate`/`test`.
+   - Odrzucanie ramek ciszy i szumu tła: $RMS < 0.002$.
 4. **Izolacja funkcji normalizacji:**
    Podczas pisania skryptów ewaluacyjnych, testowych lub inferencyjnych zawsze importuj `encode_audio_chunk`, `normalize_waveform_peak` oraz `normalize_tensor_zscore` bezpośrednio z [hdd_audio_encoder.py](file:///home/DJMixu/Pulpit/AcousticHddSentinel/hdd_audio_encoder.py). Nie duplikuj kodu normalizacji.
 5. **Loader PyTorch `DataLoader` z `HddNpyDataset`:**
@@ -33,47 +34,64 @@ Każdy agent AGY modyfikujący lub rozwijający projekt **MUSI bezwzględnie** p
 
 ---
 
-## 3. Mapa plików i architektura repozytorium
+## 3. Mapa plików i uporządkowana architektura repozytorium
 
 ```
 AcousticHddSentinel/
 ├── AGENTS.md                          # Główny przewodnik i Single Source of Truth dla agentów AGY
-├── kontekst.md                        # Całościowe podsumowanie dotychczasowych etapów i rozmów
-├── fineTuning.md                      # Dokumentacja prac optymalizacyjnych i wyników w CNN/TESTY/
-├── local_llm_bridge.py                # Most orkiestrujący lokalne modele Ollama (27B + Coder 14B)
-├── README.md                          # Dokumentacja repozytorium dla ludzi i developerów
+├── kontekst.md                        # Całościowe podsumowanie dotychczasowych etapów i audytów
+├── fineTuning.md                      # Dokumentacja prac optymalizacyjnych i wyników F1 >= 0.70
+├── NOTES.md                           # Notatki badawcze (koncepcja Seed Ensembling)
+├── README.md                          # Główna dokumentacja projektu dla ludzi i developerów
 ├── requirements.txt                   # Zależności Python (PyTorch, Librosa, Scikit-learn, etc.)
 ├── .gitignore                         # Wykluczenia git (duże zbiory .npy, venv, cache)
-├── model_cnn.py                       # Architektura sieci 2D CNN w PyTorch (AcousticHddSentinelCNN)
-├── model_cnn_pytorch.py               # Alias / moduł PyTorch
-├── train_cnn.py                       # Kompletny pipeline treningowy w PyTorch (DataLoader, SpecAugment, callbacki)
-├── train_pytorch.py                   # Dedykowany moduł treningowy PyTorch
-├── dataset_pytorch.py                 # PyTorch Dataset i DataLoader dla wycinków .npy zgodny z ADR-001
-├── verify_cnn_model.py                # 6-etapowy test weryfikacyjny sprawności modelu PyTorch
-├── verify_pytorch_model.py            # Dedykowany test weryfikacyjny PyTorch
+│
+├── model_cnn.py                       # Architektura sieci 2D CNN w PyTorch (AcousticHddSentinelCNN & FusedEnsemblePyTorch)
+├── dataset_pytorch.py                 # PyTorch Dataset z preloadem RAM i SpecAugment (HddNpyDataset)
 ├── hdd_audio_encoder.py               # Enkoder audio do tensorów .npy zgodny z ADR-001
-├── prepare_audio_dataset.py           # Kategoryzator i generator próbek audio
-├── profile_normalization_quality.py   # Profiler i weryfikator jakości normalizacji
-├── normalization_quality_report.png   # Diagnostyczny wykres jakości normalizacji
-├── normalization_quality_metrics.json # Metryki numeryczne jakości normalizacji
+├── prepare_audio_dataset.py           # Kategoryzator bazy audio i generator klasy 'normal'
+├── train_cnn.py                       # Kompletny pipeline treningowy w PyTorch (AdamW, Label Smoothing, ROCm)
+├── train_ensemble.py                  # Pipeline Seed Ensembling (komitet modeli o różnych ziarnach)
+├── verify_cnn_model.py                # 6-etapowy test weryfikacyjny sprawności modelu PyTorch
+├── profile_normalization_quality.py   # Profiler i weryfikator jakości normalizacji DSP
+├── export_model.py                    # Eksport do formatów ONNX (FP32/INT8), TorchScript i Android Kotlin
+├── test_project_logic.py              # Automatyczny test integralności projektu i niezmienników ADR-001
+├── local_llm_bridge.py                # Most orkiestrujący lokalne modele Ollama (27B + Coder 14B)
+├── start_services.sh / stop_services.sh # Skrypty zarządzania lokalnymi usługami LLM i Open WebUI
 │
-├── training_output/                   # Wytrenowany model i wyniki ewaluacji
-│   ├── best_hdd_cnn_model.pt          # Wagi najlepszego modelu w PyTorch (1.2M parametrów)
+├── data/                              # Baza surowych nagrań laboratoryjnych (Ground Truth)
+│   └── raw/
+│       ├── northwind/                 # 82 autentyczne pliki MP3 z nazwami laboratoryjnymi
+│       ├── additional/                # 13 nowych nagrań laboratoryjnych uszkodzeń HDD
+│       └── aesonlabs/                 # 9 nagrań uszkodzeń Aesonlabs Data Recovery
+│
+├── dataset_categorized/               # 134 nagrania podzielone na 4 klasy (beeping, clicking, normal, scratching)
+├── dataset_encoded/                   # 1598 tensorów .npy (1389 train, 92 validate, 117 test)
+│
+├── training_output/                   # Produkcyjny model, wagi i raporty ewaluacji (Accuracy 83.8%, Macro F1 84.6%)
+│   ├── best_hdd_cnn_model.pt          # Wagi najlepszego pojedynczego modelu PyTorch (seed 777)
+│   ├── fused_ensemble_model.pt        # Wagi zintegrowanego komitetu modeli
+│   ├── ensemble_model_1_seed_42.pt    # Model składowy komitetu (seed 42)
+│   ├── ensemble_model_2_seed_123.pt   # Model składowy komitetu (seed 123)
+│   ├── ensemble_model_3_seed_777.pt   # Model składowy komitetu (seed 777)
 │   ├── confusion_matrix.png           # Wykres macierzy pomyłek (liczby i procenty)
-│   ├── training_curves.png            # Krzywe funkcji straty i dokładności (Train & Val)
-│   ├── training_history.csv           # Log wszystkich epok
+│   ├── training_curves_seed_777.png   # Krzywe funkcji straty i dokładności (Train & Val)
 │   ├── classification_report.txt      # Raport Precision, Recall, F1 per klasa
-│   ├── test_evaluation_summary.json   # Podsumowanie metryk testowych
-│   └── classes.json                   # Mapowanie indeksów klas
+│   ├── test_evaluation_summary.json   # Podsumowanie metryk testowych w JSON
+│   └── classes.json                   # Mapowanie klas i parametrów wejścia
 │
-├── CNN/TESTY/                         # Zoptymalizowane środowisko (F1 >= 0.70 dla wszystkich klas)
-│   ├── training_output/best_hdd_cnn_model.pt # Model z F1: beeping 86.4%, clicking 78.5%, scratching 73.7%
-│   ├── encoder_testy.py               # Enkoder audio z filtracją ciszy i zbalansowaną augmentacją
-│   ├── train_testy.py                 # Pipeline treningowy PyTorch z akceleracją ROCm
-│   └── ...
+├── exported_models/                   # Wyeksportowane modele dla urządzeń brzegowych i aplikacji mobilnych
+│   ├── best_hdd_cnn_model.onnx        # Model ONNX FP32 z dynamiczną osią batcha (4.61 MB)
+│   ├── best_hdd_cnn_model_int8.onnx   # Skwantyzowany model ONNX INT8 (1.17 MB - redukcja o 74.6%)
+│   ├── best_hdd_cnn_model_torchscript.pt # Model TorchScript / PyTorch Mobile (4.68 MB)
+│   ├── AcousticClassifierAndroid.kt   # Gotowy szablon integracyjny w Kotlin dla Androida
+│   ├── model_card.json                # Karta modelu z parametrami DSP i specyfikacją
+│   └── classes.json                   # Mapowanie indeksów klas dla aplikacji
 │
-└── docx/adr/
-    └── adr.md                         # ADR-001: Architektura przetwarzania sygnału i enkodowania
+└── docx/
+    ├── adr/adr.md                     # ADR-001: Architektura DSP i niezmienniki techniczne
+    ├── diagramOverView.svg            # Schemat architektury systemu
+    └── specs.txt                      # Specyfikacja techniczna wymagań
 ```
 
 ---
@@ -82,52 +100,57 @@ AcousticHddSentinel/
 
 Każdy agent lub programista może uruchomić kluczowe etapy za pomocą gotowych poleceń:
 
-### A. Sprawdzenie sprawności modelu:
+### A. Sprawdzenie integralności i testów logicznych projektu:
+```bash
+python test_project_logic.py
+```
+
+### B. Weryfikacja sprawności modelu na GPU/CPU:
 ```bash
 python verify_cnn_model.py
 ```
 
-### B. Weryfikacja jakości normalizacji:
+### C. Profilowanie jakości normalizacji DSP:
 ```bash
 python profile_normalization_quality.py
 ```
 
-### C. Regeneracja zbioru tensorów (w razie potrzeby):
+### D. Regeneracja zbioru audio i tensorów:
 ```bash
 python prepare_audio_dataset.py
 python hdd_audio_encoder.py
 ```
 
-### D. Uruchomienie pełnego treningu (PyTorch):
+### E. Uruchomienie pełnego treningu (PyTorch z akceleracją ROCm):
 ```bash
-python train_cnn.py --epochs 30 --batch-size 32 --output-dir ./training_output
+python train_cnn.py --epochs 35 --batch-size 32 --output-dir ./training_output
 ```
 
-### E. Akceleracja GPU (AMD Radeon RX 9060 XT / ROCm HIP):
-Projekt wspiera natywnie akcelerację GPU na architekturze RDNA 4 (`gfx1200`) poprzez AMD ROCm (`torch+rocm` z modułem `amd-torch-device-gfx1200`):
-- Pamięć VRAM: 16 GB, taktowanie do 2.78 GHz.
-- Czas epoki treningowej: **~1.9 s** na GPU (vs ~16 s na CPU – ok. **8.5x–9x przyspieszenie**).
-- Asynchroniczny transfer PCIe DMA (`to(device, non_blocking=True)` + `pin_memory=True`).
+### F. Trening komitetu modeli (Seed Ensembling):
+```bash
+python train_ensemble.py --epochs 35 --batch-size 32 --output-dir ./training_output
+```
+
+### G. Eksport do formatów produkcyjnych (ONNX, TorchScript, Android Kotlin):
+```bash
+python export_model.py --weights training_output/best_hdd_cnn_model.pt --output-dir exported_models
+```
 
 ---
 
-## 5. Aktualne wyniki modelu (Stan obecny)
-- **Model:** Wytrenowany na 695 tensorach treningowych z ważeniem klas `class_weight`.
+## 5. Aktualne wyniki modelu produkcyjnego (Stan obecny)
+- **Model:** Wytrenowany na 1389 zbalansowanych tensorach treningowych z ważeniem klas `CrossEntropyLoss(label_smoothing=0.03)` oraz `AdamW`.
+- **Ewaluacja:** Zbiór testowy w 100% czysty (117 próbek bez nakładania okien i bez sztucznej augmentacji).
 - **Wykrywanie dysków sprawnych (`normal`):** **100% precyzja, 100% czułość (F1 = 1.000)** na zbiorze testowym.
-- **Wykrywanie stukania głowicy (`clicking`):** **90.9% precyzja** na zbiorze testowym.
-- **Średnia ważona precyzja:** **74.55%**.
+- **Wykrywanie stukania głowicy (`clicking`):** **Precision: 70.5%, Recall: 88.6%, F1 = 0.785**.
+- **Wykrywanie zatarcia / zablokowania (`beeping`):** **Precision: 86.4%, Recall: 86.4%, F1 = 0.864**.
+- **Wykrywanie tarcia głowic o talerz (`scratching`):** **Precision: 87.5%, Recall: 63.6%, F1 = 0.737**.
+- **Dokładność ogólna (Accuracy):** **83.76%** (98/117 próbek testowych).
+- **Średnia Makro (Macro F1):** **0.8463 (84.63%)** — warunek $F1 \ge 0.70$ dla wszystkich klas w pełni spełniony!
 
 ---
 
-## 6. Sugerowany backlog dla kolejnego agenta AGY:
-1. **Eksport do ONNX / TorchScript / ExecuTorch:** Użycie `torch.onnx.export` lub `torch.jit.trace` z kwantyzacją `int8` lub `float16` w celu uruchomienia lekkiej inferencji na telefonie Android lub mikrokontrolerach brzegowych (zgodnie ze `docx/specs.txt`).
-2. **Augmentacja spektrogramów w locie:** Dodanie warstwy SpecAugment (TimeMasking / FreqMasking) bezpośrednio do `train_cnn.py` w celu poprawy czułości na rzadsze klasy.
-3. **Zwiększenie bazy dla klasy `scratching`:** Klasa zarysowania talerza miała tylko 6 próbek testowych – warto wyodrębnić więcej fragmentów z nagrań tarcia głowic.
-4. **Seed Ensembling (Komitet modeli):** Wdrożenie zespołu 3–5 modeli trenowanych na różnych ziarnach losowości (`seed = 42, 123, 777...`) z uśrednianiem prawdopodobieństw Softmax (Soft Voting) w celu redukcji wariancji błędu i podniesienia F1-score (szczegóły w [NOTES.md](file:///home/DJMixu/Pulpit/AcousticHddSentinel/NOTES.md)).
-
----
-
-## 7. Automatyczna Integracja z Lokalnymi Modelami LLM (Ollama & RX 9060 XT)
+## 6. Automatyczna Integracja z Lokalnymi Modelami LLM (Ollama & RX 9060 XT)
 W systemie użytkownika działa lokalna instalacja Ollama (`http://localhost:11434` oraz Open WebUI na `http://localhost:8080`) z dwoma modelami open-weights:
 1. **Architekt / Planista (128k kontekstu, 12 GB VRAM):** `hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ3_S`
 2. **Programista Wykonawczy / Coder (9 GB VRAM):** `qwen2.5-coder:14b`
@@ -136,11 +159,10 @@ W systemie użytkownika działa lokalna instalacja Ollama (`http://localhost:114
 - **Uruchomienie usług LLM w razie potrzeby:**
   Przed pracą z modelami lokalnymi agent może upewnić się o działaniu usług za pomocą `./start_services.sh` (lub zatrzymać je po pracy przez `./stop_services.sh`).
 - **Automatyczne delegowanie zadań programistycznych:**
-  Gdy użytkownik zleca projektowanie nowych modułów, implementację zaawansowanych algorytmów (np. eksport ONNX, skrypty Android/Kotlin, testy jednostkowe), agent powinien **automatycznie** wykorzystać tandem modeli za pomocą skryptu:
+  Gdy użytkownik zleca projektowanie nowych modułów, implementację zaawansowanych algorytmów, agent powinien **automatycznie** wykorzystać tandem modeli za pomocą skryptu:
   ```bash
   python local_llm_bridge.py --task "<opis zadania>" [--context <plik_kontekstu>] [--output <plik_wyjścia>]
   ```
 - **Niezmiennik VRAM (16 GB) i architektura iGPU + dGPU:**
   Monitor i pulpit Linux działają na iGPU (Ryzen 7 7700), dzięki czemu karta **AMD Radeon RX 9060 XT (16 GB)** ma 100% VRAM (15.9 GB) wolne na czyste obliczenia AI. Dzięki FlashAttention i Q4_0 KV Cache w Ollama, model Qwen 3.8 27B obsługuje bezpiecznie kontekst **aż do 128k (`131072`)** bez wycieku do RAM CPU.
   Modele 27B i 14B nie mogą znajdować się w VRAM równocześnie. Skrypt `local_llm_bridge.py` automatycznie wyładowuje modele (`keep_alive=0`). Przed rozpoczęciem jakiegokolwiek treningu PyTorch na GPU agent **MUSI** upewnić się, że VRAM jest zwolniony (`ollama ps` puste).
-

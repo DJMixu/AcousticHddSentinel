@@ -7,19 +7,21 @@ __pycache__/
 # Wirtualne środowiska Pythona
 venv/
 .venv/
+.venv*/
 env/
 ENV/
 
-# Duże generowane zbiory tensorów .npy (odtwarzalne komendą python hdd_audio_encoder.py)
+# Generowane zbiory (odtwarzalne skryptami prepare_audio_dataset.py oraz hdd_audio_encoder.py)
+dataset_categorized/
 dataset_encoded/
-CNN/dataset_encoded
-CNN/dataset_categorized/
 
 # Pliki tymczasowe edytorów i systemowe
 .DS_Store
 Thumbs.db
 *.swp
 *~
+*.log
+
 # Artefakty testów obciążeniowych i tymczasowe
 stress_test_output/
 .idea/

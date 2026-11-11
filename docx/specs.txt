@@ -1,11 +1,17 @@
+# [Kontekst: Acoustic HDD Sentinel — Wstępne założenia projektowe]
+# UWAGA: Dokument historyczny/szkicowy. Pełna i obowiązująca specyfikacja architektoniczna
+# została sformalizowana w:
+# - docx/adr/adr.md (ADR-001: Architektura DSP i enkodowania)
+# - docx/adr/adr-002-mobile-architecture.md (ADR-002: Architektura aplikacji mobilnej Android)
+
 [Kontekst: Acoustic HDD Sentinel]
 
-    Tech: Android (Java), API 26+, MVVM z Repository.
+    Tech: Android (Kotlin), API 26+, MVVM z Repository, Coroutines & StateFlow.
 
-    Audio: Mikrofon (AudioRecord), 44.1 kHz, 16-bit PCM, Mono. Nagrywanie 5-30s, podział na sztywne 5-sekundowe okna -> konwersja do Mel-spektrogramu.
+    Audio: Mikrofon (AudioRecord), 22.05 kHz, 16-bit PCM, Mono. Sztywne okno 3.0s (66 150 próbek) -> konwersja do 3-kanałowego tensora [Log-Mel, Delta, Delta-Delta].
 
-    ML: PyTorch Mobile (.ptl). Własna płytka sieć CNN. Wejście: 1-kanałowy spektrogram (5s). Wyjście: binarnie (0=zdrowy, 1=anomalia). Wykrycie w 1 oknie = dysk uszkodzony.
+    ML: ONNX Runtime Mobile (.onnx INT8, 1.17 MB). 2D CNN (4 bloki ze SpatialDropout). Wejście: tensor (1, 3, 128, 259). Wyjście: wieloklasowe (beeping, clicking, normal, scratching).
 
-    DB: SQLite. Tabela Diagnostics: id (PK), hdd_name (TEXT), timestamp (INT, ms), has_anomaly (INT, 0/1), spectrogram_path (TEXT).
+    DB: SQLite (Room ORM). Tabela diagnostics: id (PK), hdd_name (TEXT), timestamp (INT, ms), predicted_class (TEXT), confidence (REAL), has_anomaly (INT, 0/1), spectrogram_path (TEXT), audio_path (TEXT).
 
-    Pliki: Spektrogramy zapisywane w Internal Storage (np. PNG). Baza przechowuje tylko absolutną ścieżkę do pliku.
+    Pliki i Prywatność: 100% lokalne przetwarzanie na urządzeniu (brak uprawnień INTERNET). Spektrogramy i próbki zapisywane w pamięci wewnętrznej aplikacji.

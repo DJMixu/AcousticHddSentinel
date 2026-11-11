@@ -113,9 +113,11 @@ AcousticHddSentinel/
 │   └── classes.json                   # Mapowanie indeksów klas dla aplikacji
 │
 └── docx/
-    ├── adr/adr.md                     # ADR-001: Architektura DSP i niezmienniki techniczne
+    ├── adr/
+    │   ├── adr.md                     # ADR-001: Architektura DSP i niezmienniki techniczne
+    │   └── adr-002-mobile-architecture.md # ADR-002: Architektura aplikacji mobilnej Android
     ├── diagramOverView.svg            # Schemat architektury systemu
-    └── specs.txt                      # Specyfikacja techniczna wymagań
+    └── specs.txt                      # Zaktualizowana specyfikacja techniczna wymagań
 ```
 
 ---

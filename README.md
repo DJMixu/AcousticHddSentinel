@@ -197,7 +197,7 @@ AcousticHddSentinel/
 │   ├── gradlew / gradlew.bat          # Wrapper narzędzia Gradle
 │   └── README.md                      # Instrukcja uruchomienia i testowania w Android Studio
 │
-└── docx/                              # Dokumentacja specyfikacji i ADR-001
+└── docx/                              # Dokumentacja specyfikacji i decyzji (ADR-001, ADR-002)
 ```
 
 ---
@@ -206,7 +206,7 @@ AcousticHddSentinel/
 Projekt jest w pełni przystosowany do pracy w trybie pair programming z agentami **Antigravity CLI (AGY)**:
 - Szczegółowe niezmienniki i wytyczne dla agenta znajdują się w [AGENTS.md](AGENTS.md).
 - Reguły automatyczne zdefiniowano w [.agents/rules/adr-001-audio-pipeline.md](.agents/rules/adr-001-audio-pipeline.md).
-- Decyzje architektoniczne opisano w [docx/adr/adr.md](docx/adr/adr.md).
+- Decyzje architektoniczne opisano w [docx/adr/adr.md](docx/adr/adr.md) (ADR-001) oraz [docx/adr/adr-002-mobile-architecture.md](docx/adr/adr-002-mobile-architecture.md) (ADR-002).
 
 ---
 

@@ -24,7 +24,7 @@ MODEL_ARCHITECT = "hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ3_S"
 MODEL_CODER = "qwen2.5-coder:14b"
 
 
-def query_ollama(model_name: str, messages: list, stream: bool = True, keep_alive: str = "0s", num_ctx: int = 16384) -> str:
+def query_ollama(model_name: str, messages: list, stream: bool = True, keep_alive: str = "0s", num_ctx: int = 32768, num_predict: int = 2500) -> str:
     """Wysyła zapytanie do API czatu Ollama z automatycznym zwalnianiem VRAM."""
     url = f"{OLLAMA_API_URL}/chat"
     payload = {
@@ -33,7 +33,8 @@ def query_ollama(model_name: str, messages: list, stream: bool = True, keep_aliv
         "stream": stream,
         "keep_alive": keep_alive,
         "options": {
-            "num_ctx": num_ctx
+            "num_ctx": num_ctx,
+            "num_predict": num_predict
         }
     }
     data = json.dumps(payload).encode("utf-8")

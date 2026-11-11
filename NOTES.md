@@ -2,7 +2,7 @@
 
 ## 1. Seed Ensembling (Komitet modeli o różnych ziarnach losowości)
 > **Data dodania:** 2026-11-10  
-> **Status:** Zaplanowane do wdrożenia (Backlog)
+> **Status:** Wdrożone i zweryfikowane w produkcji (Model FusedEnsemble z F1 = 84.63%)
 
 ### Cel i motywacja
 Przy stosunkowo niedużych zbiorach danych audio (np. 854 próbki treningowe) i rzadszych klasach awarii mechanicznych (`scratching`, `beeping`), pojedynczy model może być podatny na specyficzny układ wag początkowych lub kolejność próbek w batchach. Zamiast poszukiwać jednego „magicznego” seeda (co grozi przeuczeniem pod zbiór testowy), profesjonalnym i wysoce skutecznym podejściem produkcyjnym jest **Seed Ensembling** (zespół / komitet modeli).

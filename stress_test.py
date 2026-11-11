@@ -375,7 +375,7 @@ def parse_args():
     parser.add_argument("--hours", type=float, default=1.0, help="Czas trwania w godzinach (domyślnie: 1.0)")
     parser.add_argument("--seconds", type=float, default=None, help="Opcjonalny czas trwania w sekundach (nadpisuje --hours)")
     parser.add_argument("--model-path", type=str, default="training_output/best_hdd_cnn_model.pt", help="Ścieżka do modelu PyTorch (.pt)")
-    default_dataset = "data/raw/aesonlabs" if Path("data/raw/aesonlabs").exists() else ("data/raw" if Path("data/raw").exists() else "CNN/dataset")
+    default_dataset = "data/raw/aesonlabs" if Path("data/raw/aesonlabs").exists() else ("data/raw" if Path("data/raw").exists() else "dataset")
     parser.add_argument("--dataset-dir", type=str, default=default_dataset, help="Katalog z surowymi plikami WAV")
     parser.add_argument("--output-dir", type=str, default="stress_test_output", help="Katalog na wyniki testu")
     parser.add_argument("--log-interval", type=float, default=60.0, help="Interwał logowania w konsoli (sekundy)")

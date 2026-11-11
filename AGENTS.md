@@ -56,6 +56,10 @@ AcousticHddSentinel/
 ├── profile_normalization_quality.py   # Profiler i weryfikator jakości normalizacji DSP
 ├── export_model.py                    # Eksport do formatów ONNX (FP32/INT8), TorchScript i Android Kotlin
 ├── test_project_logic.py              # Automatyczny test integralności projektu i niezmienników ADR-001
+├── compare_ensembles.py               # Narzędzie ewaluacji porównawczej komitetu modeli z modelem bazowym
+├── stress_test.py                     # Test ciągły odporności potoku DSP + CNN (latencja, wycieki RAM, edge cases)
+├── stress_test_vram.py                # Test obciążeniowy pamięci VRAM karty GPU
+├── testEpok.py                        # Diagnostyka stabilności uczenia dla różnej liczby epok
 ├── local_llm_bridge.py                # Most orkiestrujący lokalne modele Ollama (27B + Coder 14B)
 ├── start_services.sh / stop_services.sh # Skrypty zarządzania lokalnymi usługami LLM i Open WebUI
 │

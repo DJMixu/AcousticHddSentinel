@@ -161,7 +161,7 @@ def run_tests():
     # TEST 4: Integralność bazy źródłowej audio (data/raw)
     # -------------------------------------------------------------
     print("\n[TEST 4/5] Weryfikacja bazy surowych nagrań audio (data/raw)...")
-    raw_dir = Path("data/raw") if Path("data/raw").exists() else Path("CNN/dataset")
+    raw_dir = Path("data/raw")
     audio_files = [p for p in raw_dir.rglob("*") if p.suffix.lower() in [".wav", ".mp3", ".flac"]]
     valid_audios = 0
     for w in audio_files:

@@ -93,8 +93,6 @@ def categorize_real_files(output_dir: Path = CATEGORIZED_DIR):
     # 2. Aesonlabs
     if RAW_AESON_DIR.exists():
         candidate_files.extend(list(RAW_AESON_DIR.glob("Aesonlabs*.wav")))
-    elif Path("CNN/dataset").exists():
-        candidate_files.extend(list(Path("CNN/dataset").glob("Aesonlabs*.wav")))
     # 3. Dodatkowe nagrania laboratoryjne
     if RAW_ADDITIONAL_DIR.exists():
         candidate_files.extend(list(RAW_ADDITIONAL_DIR.glob("*.mp3")))

@@ -165,16 +165,17 @@ scratching                    2         10        0           21
 
 ## 8. Struktura Wdrożonych Plików i Artefaktów
 
-Wszystkie rezultaty zostały zapisane w katalogu `CNN/TESTY/`:
+Po pomyślnej weryfikacji w `CNN/TESTY/` wszystkie artefakty, ulepszenia enkodera, model oraz wagi zostały scalone i promowane do kanonicznych ścieżek produkcyjnych projektu (zgodnie z decyzją o oczyszczeniu projektu z nadmiarowych plików):
 
-| Plik / Ścieżka | Opis |
-| :--- | :--- |
-| [CNN/TESTY/training_output/best_hdd_cnn_model.pt](file:///home/DJMixu/Pulpit/AcousticHddSentinel/CNN/TESTY/training_output/best_hdd_cnn_model.pt) | Wagi najlepszego modelu PyTorch (F1 > 0.70 dla wszystkich klas) |
-| [CNN/TESTY/training_output/classification_report.txt](file:///home/DJMixu/Pulpit/AcousticHddSentinel/CNN/TESTY/training_output/classification_report.txt) | Pełny raport metryk per klasa |
-| [CNN/TESTY/training_output/test_evaluation_summary.json](file:///home/DJMixu/Pulpit/AcousticHddSentinel/CNN/TESTY/training_output/test_evaluation_summary.json) | Metryki w formacie JSON |
-| [CNN/TESTY/training_output/confusion_matrix.png](file:///home/DJMixu/Pulpit/AcousticHddSentinel/CNN/TESTY/training_output/confusion_matrix.png) | Wykres macierzy pomyłek (liczby i procenty) |
-| [CNN/TESTY/training_output/training_curves_seed_777.png](file:///home/DJMixu/Pulpit/AcousticHddSentinel/CNN/TESTY/training_output/training_curves_seed_777.png) | Krzywe uczenia Loss i Accuracy |
-| [CNN/TESTY/encoder_testy.py](file:///home/DJMixu/Pulpit/AcousticHddSentinel/CNN/TESTY/encoder_testy.py) | Skrypt enkodera audio zgodny z ADR-001 |
-| [CNN/TESTY/train_testy.py](file:///home/DJMixu/Pulpit/AcousticHddSentinel/CNN/TESTY/train_testy.py) | Kompletny pipeline treningowy w PyTorch z ROCm |
-| [CNN/TESTY/dataset_testy.py](file:///home/DJMixu/Pulpit/AcousticHddSentinel/CNN/TESTY/dataset_testy.py) | PyTorch Dataset z RAM preload i SpecAugment |
-| [CNN/TESTY/model_testy.py](file:///home/DJMixu/Pulpit/AcousticHddSentinel/CNN/TESTY/model_testy.py) | Architektura 2D CNN i moduł komitetu modeli |
+| Kanoniczny plik produkcyjny | Pierwotny plik w `CNN/TESTY/` | Opis |
+| :--- | :--- | :--- |
+| [`training_output/best_hdd_cnn_model.pt`](file:///home/DJMixu/Pulpit/AcousticHddSentinel/training_output/best_hdd_cnn_model.pt) | `CNN/TESTY/training_output/best_hdd_cnn_model.pt` | Wagi najlepszego modelu PyTorch (F1 > 0.70 dla wszystkich klas) |
+| [`training_output/classification_report.txt`](file:///home/DJMixu/Pulpit/AcousticHddSentinel/training_output/classification_report.txt) | `CNN/TESTY/training_output/classification_report.txt` | Pełny raport metryk per klasa |
+| [`training_output/test_evaluation_summary.json`](file:///home/DJMixu/Pulpit/AcousticHddSentinel/training_output/test_evaluation_summary.json) | `CNN/TESTY/training_output/test_evaluation_summary.json` | Metryki w formacie JSON |
+| [`training_output/confusion_matrix.png`](file:///home/DJMixu/Pulpit/AcousticHddSentinel/training_output/confusion_matrix.png) | `CNN/TESTY/training_output/confusion_matrix.png` | Wykres macierzy pomyłek (liczby i procenty) |
+| [`training_output/training_curves_seed_777.png`](file:///home/DJMixu/Pulpit/AcousticHddSentinel/training_output/training_curves_seed_777.png) | `CNN/TESTY/training_output/training_curves_seed_777.png` | Krzywe uczenia Loss i Accuracy |
+| [`hdd_audio_encoder.py`](file:///home/DJMixu/Pulpit/AcousticHddSentinel/hdd_audio_encoder.py) | `CNN/TESTY/encoder_testy.py` | Skrypt enkodera audio zgodny z ADR-001 |
+| [`train_cnn.py`](file:///home/DJMixu/Pulpit/AcousticHddSentinel/train_cnn.py) | `CNN/TESTY/train_testy.py` | Kompletny pipeline treningowy w PyTorch z ROCm |
+| [`dataset_pytorch.py`](file:///home/DJMixu/Pulpit/AcousticHddSentinel/dataset_pytorch.py) | `CNN/TESTY/dataset_testy.py` | PyTorch Dataset z RAM preload i SpecAugment |
+| [`model_cnn.py`](file:///home/DJMixu/Pulpit/AcousticHddSentinel/model_cnn.py) | `CNN/TESTY/model_testy.py` | Architektura 2D CNN i moduł komitetu modeli |
+| [`data/raw/`](file:///home/DJMixu/Pulpit/AcousticHddSentinel/data/raw/) | `CNN/TESTY/raw_northwind/` itp. | Baza surowych plików laboratoryjnych |

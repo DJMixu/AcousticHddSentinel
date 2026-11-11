@@ -26,12 +26,10 @@ if Path("data/raw").exists():
     RAW_DATASET_DIR = Path("data/raw")
 elif Path("dataset_categorized").exists():
     RAW_DATASET_DIR = Path("dataset_categorized")
-elif Path("CNN/dataset").exists():
-    RAW_DATASET_DIR = Path("CNN/dataset")
 else:
     RAW_DATASET_DIR = Path("dataset")
 
-ENCODED_DIR = Path("dataset_encoded") if Path("dataset_encoded").exists() else Path("CNN/dataset_encoded")
+ENCODED_DIR = Path("dataset_encoded")
 OUTPUT_IMG = Path("normalization_quality_report.png")
 OUTPUT_METRICS_JSON = Path("normalization_quality_metrics.json")
 

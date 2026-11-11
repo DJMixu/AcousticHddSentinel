@@ -135,9 +135,102 @@ data class DiagnosticEntity(
 )
 ```
 
+### 3.3. Diagram architektury komponentów i przepływu danych
+
+```mermaid
+flowchart TD
+    subgraph UI ["Warstwa Prezentacji (UI & MVVM)"]
+        Activity["MainActivity (ViewBinding / Material 3)"]
+        ViewModel["MainViewModel (StateFlow & Coroutines)"]
+        Adapter["DiagnosticHistoryAdapter (RecyclerView)"]
+        Activity --> ViewModel
+        ViewModel --> Activity
+        Activity --> Adapter
+    end
+
+    subgraph Domain ["Warstwa Biznesowa i Koordynacja"]
+        Repo["DiagnosticRepository"]
+        ViewModel --> Repo
+    end
+
+    subgraph Hardware ["Komponent Hardware"]
+        Mic["Mikrofon telefonu (AudioRecord)"]
+        Recorder["AudioRecorder (22050 Hz Mono, bufor 3s)"]
+        Mic --> Recorder
+        Recorder -->|66150 próbek PCM| ViewModel
+    end
+
+    subgraph DSP ["Potok Przetwarzania Sygnału (ADR-001)"]
+        PeakNorm["Peak Normalization fali"]
+        STFT["StftTransformer (Okno Hanna 1024, Hop 256)"]
+        Mel["MelFilterBank (128 filtrów Mel 50-10000 Hz)"]
+        Deltas["Log-Mel + Delta + Delta-Delta"]
+        ZScore["Standaryzacja Z-score per kanał"]
+
+        PeakNorm --> STFT --> Mel --> Deltas --> ZScore
+    end
+
+    subgraph ML ["Warstwa AI/ML (Urządzenie Brzegowe)"]
+        Classifier["AcousticClassifier (ONNX Runtime Mobile)"]
+        ModelAsset["Model INT8 w Assets: best_hdd_cnn_model_int8.onnx (1.17 MB)"]
+        ModelAsset -.-> Classifier
+        ZScore -->|Tensor (1, 3, 128, 259)| Classifier
+        Classifier -->|Klasa + Prawdopodobieństwa| ViewModel
+    end
+
+    subgraph Data ["Warstwa Trwałości Danych (Lokalna Persystencja)"]
+        RoomDB["AppDatabase (SQLite)"]
+        DAO["DiagnosticDao"]
+        Entity["Tabela: diagnostics"]
+
+        Repo --> DAO
+        DAO --> RoomDB
+        RoomDB --> Entity
+        DAO -->|Flow List DiagnosticEntity| Repo
+        Repo -->|Flow List DiagnosticEntity| ViewModel
+    end
+```
+
 ---
 
-## 4. Konsekwencje i ocena decyzji
+## 4. Wymagania Funkcjonalne i Niefunkcjonalne
+
+### 4.1. Wymagania Funkcjonalne (FR)
+- **FR-01:** Użytkownik może wprowadzić identyfikator/oznaczenie badanego dysku (np. model lub numer seryjny).
+- **FR-02:** Aplikacja rejestruje dokładnie 3-sekundowy wycinek dźwięku pracy dysku za pomocą mikrofonu urządzenia.
+- **FR-03:** Aplikacja automatycznie wykrywa i odrzuca nagrania o zbyt niskiej energii ($RMS < 0.002$), informując o konieczności zbliżenia telefonu do nośnika.
+- **FR-04:** Silnik AI klasyfikuje zarejestrowany dźwięk do jednej z 4 klas: `normal`, `clicking`, `beeping`, `scratching`.
+- **FR-05:** Interfejs prezentuje wiodącą diagnozę (kolorowy badge: zielony dla dysku sprawnego, czerwony dla awarii), poziom pewności (%) oraz szczegółowy rozkład prawdopodobieństw wszystkich klas.
+- **FR-06:** Wynik każdego badania jest automatycznie zapisywany w trwałej historii badań wraz ze znacznikiem czasu.
+- **FR-07:** Użytkownik ma wgląd w pełną historię badań w postaci przewijanej listy oraz możliwość usuwania pojedynczych wpisów lub czyszczenia historii.
+
+### 4.2. Wymagania Niefunkcjonalne (NFR)
+- **NFR-01 (Wydajność):** Czas inferencji ONNX na CPU urządzenia mobilnego nie przekracza 50 ms (typowo 10–18 ms).
+- **NFR-02 (Rozmiar binarny):** Model produkcyjny INT8 nie przekracza 2 MB (dokładnie 1.17 MB).
+- **NFR-03 (Prywatność i Bezpieczeństwo):** Aplikacja działa w 100% offline; brak uprawnień sieciowych `INTERNET` w manifeście.
+- **NFR-04 (Kompatybilność):** Wsparcie dla urządzeń z systemem Android od wersji 8.0 (API 26) do Android 14 (API 34).
+- **NFR-05 (Niezawodność DSP):** Implementacja DSP na urządzeniu zachowuje pełną deterministyczną zgodność z modelem referencyjnym ADR-001 (tolerancja wyjść $< 10^{-4}$).
+
+---
+
+## 5. Zgodność z Wymaganiami Projektu Akademickiego (Projekt - Aplikacje Mobilne)
+
+Dokumentacja i kod aplikacji spełniają w 100% formalne wytyczne przedmiotu **Aplikacje Mobilne** (prowadzący: inż. Dominik Ciura):
+
+| Kryterium w karcie projektu | Wymaganie formalne | Realizacja w Acoustic HDD Sentinel | Status |
+| :--- | :--- | :--- | :---: |
+| **Język i środowisko** | Android Studio, Kotlin | Android Studio, Kotlin 1.9.23, Gradle 8.4, Java 17 | **SPEŁNIONE** |
+| **Minimalna wersja SDK** | Minimum API 26 | `minSdk = 26` (Android 8.0 Oreo), `targetSdk = 34` | **SPEŁNIONE** |
+| **Wzorzec architektoniczny** | MVVM lub równoważna | Czyste MVVM: Activity -> ViewModel (StateFlow) -> Repository | **SPEŁNIONE** |
+| **Komponent Hardware** | Co najmniej jeden (mikrofon/kamera) | Mikrofon urządzenia przez `AudioRecord` (22050 Hz 16-bit PCM Mono) | **SPEŁNIONE** |
+| **Trwałe dane** | SQLite | Android Jetpack Room (SQLite ORM) z tabelą `diagnostics` | **SPEŁNIONE** |
+| **AI / Machine Learning** | Obowiązkowy moduł AI rozwiązujący problem | Własna sieć 2D CNN w ONNX Runtime Mobile (INT8, F1 = 84.6%) | **SPEŁNIONE** |
+| **Tryb OFFLINE** | Bezpieczeństwo i niezawodność | 100% offline, brak uprawnień `INTERNET` w `AndroidManifest.xml` | **SPEŁNIONE** |
+| **Etap M2 Workflow** | Architektura + ADR + Plan | ADR-001 (DSP) oraz ADR-002 (Aplikacja mobilna) w katalogu `docx/adr/` | **SPEŁNIONE** |
+
+---
+
+## 6. Konsekwencje i ocena decyzji
 
 ### Pozytywne (+)
 - **Błyskawiczna inferencja:** Czas pełnego badania (3s nagrania + ~18ms DSP + ~12ms inferencji ONNX INT8) wynosi poniżej 35 ms od zakończenia nagrywania.

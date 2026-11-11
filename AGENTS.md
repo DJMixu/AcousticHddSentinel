@@ -82,15 +82,29 @@ AcousticHddSentinel/
 │   ├── training_curves_seed_777.png   # Krzywe funkcji straty i dokładności (Train & Val)
 │   ├── classification_report.txt      # Raport Precision, Recall, F1 per klasa
 │   ├── test_evaluation_summary.json   # Podsumowanie metryk testowych w JSON
+│   ├── normalization_quality_report.png # Wykres profilowania jakości normalizacji
+│   ├── normalization_quality_metrics.json # Metryki numeryczne normalizacji
 │   └── classes.json                   # Mapowanie klas i parametrów wejścia
 │
 ├── exported_models/                   # Wyeksportowane modele dla urządzeń brzegowych i aplikacji mobilnych
 │   ├── best_hdd_cnn_model.onnx        # Model ONNX FP32 z dynamiczną osią batcha (4.61 MB)
 │   ├── best_hdd_cnn_model_int8.onnx   # Skwantyzowany model ONNX INT8 (1.17 MB - redukcja o 74.6%)
 │   ├── best_hdd_cnn_model_torchscript.pt # Model TorchScript / PyTorch Mobile (4.68 MB)
-│   ├── AcousticClassifierAndroid.kt   # Gotowy szablon integracyjny w Kotlin dla Androida
+│   ├── AcousticClassifierAndroid.kt   # Szablon integracyjny w Kotlin dla Androida
 │   ├── model_card.json                # Karta modelu z parametrami DSP i specyfikacją
 │   └── classes.json                   # Mapowanie indeksów klas dla aplikacji
+│
+├── android/                           # Kompletny moduł natywnej aplikacji mobilnej (Android Studio / Gradle / Kotlin)
+│   ├── app/
+│   │   ├── src/main/assets/           # Skwantyzowany model ONNX INT8, classes.json, model_card.json
+│   │   ├── src/main/java/             # Pakiety: audio (AudioRecord), data (Room SQLite), dsp (ADR-001 DSP), ml (ONNX), ui (MVVM)
+│   │   ├── src/main/res/              # Zasoby UI (layouty, motywy Material 3, kolory, ikony)
+│   │   ├── src/test/java/             # Testy jednostkowe DSP (AudioPreprocessorTest)
+│   │   ├── build.gradle.kts           # Zależności: ONNX Runtime Mobile, Room, Coroutines
+│   │   └── AndroidManifest.xml        # Uprawnienia RECORD_AUDIO, deklaracje aktywności
+│   ├── build.gradle.kts / settings.gradle.kts # Konfiguracja projektu Gradle
+│   ├── gradlew / gradlew.bat          # Wrapper narzędzia Gradle
+│   └── README.md                      # Instrukcja uruchomienia i testowania w Android Studio
 │
 └── docx/
     ├── adr/adr.md                     # ADR-001: Architektura DSP i niezmienniki techniczne

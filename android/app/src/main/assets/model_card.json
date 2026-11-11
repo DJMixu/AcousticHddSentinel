@@ -1,0 +1,51 @@
+{
+  "model_name": "AcousticHddSentinelCNN",
+  "version": "1.0.0",
+  "architecture": "4-block 2D CNN with BatchNorm and SpatialDropout",
+  "parameters_count": 1206756,
+  "classes": [
+    "beeping",
+    "clicking",
+    "normal",
+    "scratching"
+  ],
+  "input_specification": {
+    "shape_channel_first": [
+      1,
+      3,
+      128,
+      259
+    ],
+    "data_type": "float32",
+    "channels": [
+      "Channel 0: Log-Mel Spectrogram",
+      "Channel 1: Delta (1st temporal derivative)",
+      "Channel 2: Delta-Delta (2nd temporal derivative)"
+    ],
+    "dsp_parameters": {
+      "sample_rate_hz": 22050,
+      "n_fft": 1024,
+      "hop_length": 256,
+      "n_mels": 128,
+      "f_min_hz": 50.0,
+      "f_max_hz": 10000.0,
+      "chunk_duration_sec": 3.0,
+      "samples_per_chunk": 66150
+    },
+    "normalization": "Channel-wise Z-score normalization"
+  },
+  "output_specification": {
+    "shape": [
+      1,
+      4
+    ],
+    "activation": "Softmax",
+    "interpretation": "Class probability distribution"
+  },
+  "artifacts": {
+    "onnx_fp32": "best_hdd_cnn_model.onnx",
+    "onnx_int8": "best_hdd_cnn_model_int8.onnx",
+    "torchscript": "best_hdd_cnn_model_torchscript.pt",
+    "pytorch_mobile": "best_hdd_cnn_model_mobile.ptl"
+  }
+}

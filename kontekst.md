@@ -111,6 +111,29 @@ Projekt **Acoustic HDD Sentinel** to system akustycznej detekcji i wieloklasowej
 
 ---
 
+### Faza 6: Uporządkowanie Struktury i Przygotowanie Modułu Aplikacji Mobilnej (Android / Kotlin)
+*(Identyfikator sesji: `3cd6e5ea`)*
+
+1. **Uporządkowanie katalogu głównego:**
+   - Przeniesiono luźne raporty diagnostyczne (`normalization_quality_report.png`, `normalization_quality_metrics.json`) z katalogu głównego do `training_output/`.
+   - Zaktualizowano `profile_normalization_quality.py`, aby zapisywał raporty domyślnie w `training_output/` i usunięto przestarzałe odwołania do usuniętego folderu `CNN/`.
+   - Rozbudowano `.gitignore` o wykluczenia dla artefaktów budowania systemu Android (`.gradle/`, `build/`, `*.apk`, `*.aab`, `local.properties`).
+2. **Inicjalizacja modułu natywnej aplikacji mobilnej (`android/`):**
+   - Utworzono kompletną strukturę projektu Android Studio (Gradle 8+, AGP 8.3+, Kotlin 1.9+, Java 17, Min SDK 26, Target SDK 34).
+   - Skonfigurowano zależności: `ONNX Runtime Mobile` (`com.microsoft.onnxruntime:onnxruntime-android`), `Room Database` (SQLite), `Coroutines Android`, `Material Design 3`.
+   - Zintegrowano skwantyzowany model produkcyjny INT8 (`best_hdd_cnn_model_int8.onnx`, 1.17 MB), `classes.json` oraz `model_card.json` w `android/app/src/main/assets/`.
+   - Zaimplementowano warstwy:
+     - **`dsp/`**: `AudioPreprocessor.kt`, `MelFilterBank.kt`, `StftTransformer.kt`, `DspConstants.kt` – wierna implementacja potoku ADR-001 w czystym Kotlinie generująca tensor `(1, 3, 128, 259)`.
+     - **`ml/`**: `AcousticClassifier.kt`, `ClassificationResult.kt` – inferencja ONNX Runtime Mobile w pamięci urządzenia.
+     - **`audio/`**: `AudioRecorder.kt`, `AudioChunk.kt` – rejestrator mikrofonowy `AudioRecord` (22050 Hz, 16-bit PCM Mono, bufor 3.0s, bramka szumu $RMS < 0.002$).
+     - **`data/`**: `AppDatabase.kt`, `DiagnosticEntity.kt`, `DiagnosticDao.kt`, `DiagnosticRepository.kt` – trwała baza Room SQLite przechowująca historię diagnoz.
+     - **`ui/`**: `MainActivity.kt`, `MainViewModel.kt`, `DiagnosticHistoryAdapter.kt`, layouty Material 3 z wizualizacją prawdopodobieństw 4 klas.
+   - Opracowano testy jednostkowe DSP (`AudioPreprocessorTest.kt`) oraz test integracyjny w `test_project_logic.py` (rozszerzony do 6/6 testów).
+3. **Automatyzacja synchronizacji w `export_model.py`:**
+   - Dodano automatyczne kopiowanie wyeksportowanych modeli bezpośrednio do katalogu `android/app/src/main/assets/` po każdym pomyślnym eksporcie.
+
+---
+
 ## 3. Zestawienie Wyników Ewaluacji (Przed i Po)
 
 ### Porównanie Metryki F1-Score na Niezależnym Zbiorze Testowym:
@@ -171,6 +194,18 @@ AcousticHddSentinel/
 │   └── classes.json                   # Mapowanie klas
 │
 ├── exported_models/                   # Wyeksportowane modele produkcyjne ONNX i Kotlin
+│
+├── android/                           # Kompletny moduł natywnej aplikacji mobilnej (Android Studio / Gradle / Kotlin)
+│   ├── app/
+│   │   ├── src/main/assets/           # Skwantyzowany model ONNX INT8, classes.json, model_card.json
+│   │   ├── src/main/java/             # Pakiety: audio (AudioRecord), data (Room SQLite), dsp (ADR-001 DSP), ml (ONNX), ui (MVVM)
+│   │   ├── src/main/res/              # Zasoby UI (layouty, motywy Material 3, kolory, ikony)
+│   │   ├── src/test/java/             # Testy jednostkowe DSP (AudioPreprocessorTest)
+│   │   ├── build.gradle.kts           # Zależności: ONNX Runtime Mobile, Room, Coroutines
+│   │   └── AndroidManifest.xml        # Uprawnienia RECORD_AUDIO, deklaracje aktywności
+│   ├── build.gradle.kts / settings.gradle.kts # Konfiguracja projektu Gradle
+│   ├── gradlew / gradlew.bat          # Wrapper narzędzia Gradle
+│   └── README.md                      # Instrukcja uruchomienia i testowania w Android Studio
 │
 ├── stress_test.py                     # Skrypt 1h/24h stress testu inferencji
 ├── stress_test_vram.py                # Skrypt monitoringu pamięci VRAM GPU

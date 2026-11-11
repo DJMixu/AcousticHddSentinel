@@ -30,8 +30,9 @@ else:
     RAW_DATASET_DIR = Path("dataset")
 
 ENCODED_DIR = Path("dataset_encoded")
-OUTPUT_IMG = Path("normalization_quality_report.png")
-OUTPUT_METRICS_JSON = Path("normalization_quality_metrics.json")
+OUTPUT_DIR = Path("training_output")
+OUTPUT_IMG = OUTPUT_DIR / "normalization_quality_report.png"
+OUTPUT_METRICS_JSON = OUTPUT_DIR / "normalization_quality_metrics.json"
 
 
 def analyze_raw_audio_profile():
@@ -297,16 +298,10 @@ def run_assessment():
         "raw_audio_profile": raw_stats,
         "encoded_tensors_profile": encoded_stats
     }
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     with open(OUTPUT_METRICS_JSON, "w", encoding="utf-8") as f:
         json.dump(full_report, f, indent=2)
     print(f"  -> Metryki JSON zapisano w: {OUTPUT_METRICS_JSON}")
-
-    # Jeśli istnieje podkatalog CNN, zapisz kopię również tam
-    cnn_dir = Path("CNN")
-    if cnn_dir.exists() and cnn_dir.is_dir():
-        import shutil
-        shutil.copy2(OUTPUT_IMG, cnn_dir / "normalization_quality_report.png")
-        shutil.copy2(OUTPUT_METRICS_JSON, cnn_dir / "normalization_quality_metrics.json")
 
     print("\n" + "=" * 70)
     print("PROFILOWANIE ZAKOŃCZONE!")

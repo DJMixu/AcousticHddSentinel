@@ -26,3 +26,16 @@ Thumbs.db
 stress_test_output/
 .idea/
 .vscode/
+
+# Artefakty i pliki tymczasowe projektu mobilnego Android
+android/.gradle/
+android/build/
+android/*/build/
+android/local.properties
+android/.cxx/
+android/*.apk
+android/*.aab
+*.iml
+.gradle/
+build/
+

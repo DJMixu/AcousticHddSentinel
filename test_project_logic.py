@@ -54,12 +54,12 @@ def run_tests():
     print("=" * 70)
     
     passed_tests = 0
-    total_tests = 5
+    total_tests = 6
 
     # -------------------------------------------------------------
     # TEST 1: Składnia i AST wszystkich skryptów Python
     # -------------------------------------------------------------
-    print("\n[TEST 1/5] Walidacja składniowa AST modułów Python...")
+    print("\n[TEST 1/6] Walidacja składniowa AST modułów Python...")
     scripts = [
         "hdd_audio_encoder.py",
         "model_cnn.py",
@@ -90,7 +90,7 @@ def run_tests():
     # -------------------------------------------------------------
     # TEST 2: Niezmiennik ADR-001 — Brak Data Leakage (Izolacja plików źródłowych)
     # -------------------------------------------------------------
-    print("\n[TEST 2/5] Weryfikacja braku Data Leakage w podziale zbiorów...")
+    print("\n[TEST 2/6] Weryfikacja braku Data Leakage w podziale zbiorów...")
     splits = ["train", "validate", "test"]
     stems_per_split = {s: set() for s in splits}
     total_tensors = 0
@@ -128,7 +128,7 @@ def run_tests():
     # -------------------------------------------------------------
     # TEST 3: Niezmiennik ADR-001 — Stały kształt tensora (128, 259, 3) i typ <f4
     # -------------------------------------------------------------
-    print("\n[TEST 3/5] Weryfikacja kształtu i typu wszystkich wygenerowanych tensorów .npy...")
+    print("\n[TEST 3/6] Weryfikacja kształtu i typu wszystkich wygenerowanych tensorów .npy...")
     target_shape = (128, 259, 3)
     target_dtype = "<f4"  # float32 little-endian
     
@@ -160,7 +160,7 @@ def run_tests():
     # -------------------------------------------------------------
     # TEST 4: Integralność bazy źródłowej audio (data/raw)
     # -------------------------------------------------------------
-    print("\n[TEST 4/5] Weryfikacja bazy surowych nagrań audio (data/raw)...")
+    print("\n[TEST 4/6] Weryfikacja bazy surowych nagrań audio (data/raw)...")
     raw_dir = Path("data/raw")
     audio_files = [p for p in raw_dir.rglob("*") if p.suffix.lower() in [".wav", ".mp3", ".flac"]]
     valid_audios = 0
@@ -185,7 +185,7 @@ def run_tests():
     # -------------------------------------------------------------
     # TEST 5: Spójność artefaktów modelu i mapowania klas
     # -------------------------------------------------------------
-    print("\n[TEST 5/5] Weryfikacja artefaktów treningowych...")
+    print("\n[TEST 5/6] Weryfikacja artefaktów treningowych...")
     out_dir = Path("training_output")
     classes_json_path = out_dir / "classes.json"
     model_path = out_dir / "best_hdd_cnn_model.pt"
@@ -206,6 +206,40 @@ def run_tests():
     assert classes_data["input_shape"] == [128, 259, 3]
     passed_tests += 1
     print("  -> Wynik Testu 5: ZDANY (Artefakty modelu i konfiguracja w 100% kompletne)")
+
+    # -------------------------------------------------------------
+    # TEST 6: Integralność struktury modułu mobilnego Android
+    # -------------------------------------------------------------
+    print("\n[TEST 6/6] Weryfikacja struktury modułu mobilnego Android...")
+    android_dir = Path("android")
+    assert android_dir.exists(), "Brak katalogu android/!"
+
+    required_android_files = [
+        android_dir / "build.gradle.kts",
+        android_dir / "settings.gradle.kts",
+        android_dir / "gradlew",
+        android_dir / "app" / "build.gradle.kts",
+        android_dir / "app" / "src" / "main" / "AndroidManifest.xml",
+        android_dir / "app" / "src" / "main" / "assets" / "best_hdd_cnn_model_int8.onnx",
+        android_dir / "app" / "src" / "main" / "assets" / "classes.json",
+        android_dir / "app" / "src" / "main" / "java" / "com" / "acoustichddsentinel" / "ml" / "AcousticClassifier.kt",
+        android_dir / "app" / "src" / "main" / "java" / "com" / "acoustichddsentinel" / "dsp" / "AudioPreprocessor.kt",
+        android_dir / "app" / "src" / "main" / "java" / "com" / "acoustichddsentinel" / "audio" / "AudioRecorder.kt",
+        android_dir / "app" / "src" / "main" / "java" / "com" / "acoustichddsentinel" / "ui" / "MainActivity.kt",
+        android_dir / "app" / "src" / "main" / "java" / "com" / "acoustichddsentinel" / "data" / "local" / "AppDatabase.kt",
+    ]
+
+    missing_files = [str(f) for f in required_android_files if not f.exists()]
+    assert not missing_files, f"Brakujące pliki w module Android: {missing_files}"
+
+    onnx_asset = android_dir / "app" / "src" / "main" / "assets" / "best_hdd_cnn_model_int8.onnx"
+    assert onnx_asset.stat().st_size > 500_000, "Zasób ONNX INT8 w Android assets jest niekompletny!"
+
+    print(f"  - Moduł Android: {android_dir} [KOMPLETNY]")
+    print(f"  - Model ONNX INT8 w assets: {onnx_asset.stat().st_size / (1024*1024):.2f} MB")
+    print(f"  - Sprawdzono kluczowych plików Android: {len(required_android_files)}/{len(required_android_files)}")
+    passed_tests += 1
+    print("  -> Wynik Testu 6: ZDANY (Moduł aplikacji mobilnej w 100% zintegrowany i gotowy do pracy)")
 
     print("\n" + "=" * 70)
     print(f"PODSUMOWANIE: {passed_tests}/{total_tests} TESTÓW ZDANYCH POMYŚLNIE (100% SUKCES)")

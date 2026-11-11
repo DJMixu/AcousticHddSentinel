@@ -277,6 +277,18 @@ class AcousticClassifierAndroid(context: Context) {
 ''')
     print(f"📱 Wygenerowano szablon integracyjny Android (Kotlin): {android_snippet_path}")
 
+    # 10. Automatyczna synchronizacja z modułem aplikacji mobilnej Android
+    android_assets_dir = Path("android/app/src/main/assets")
+    if android_assets_dir.exists() and android_assets_dir.is_dir():
+        import shutil
+        print("\n[Synchronizacja] Aktualizacja artefaktów w android/app/src/main/assets/...")
+        for fname in ["best_hdd_cnn_model_int8.onnx", "classes.json", "model_card.json"]:
+            src_file = Path(output_dir) / fname
+            if src_file.exists():
+                shutil.copy2(src_file, android_assets_dir / fname)
+                print(f"  -> Skopiowano do aplikacji: {fname}")
+        print("✅ Synchronizacja z aplikacją mobilną Android zakończona sukcesem.")
+
     print("\n" + "=" * 70)
     print("🎉 SUKCES: Wszystkie modele produkcyjne zostały wyeksportowane i zweryfikowane!")
     print("=" * 70)

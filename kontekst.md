@@ -38,7 +38,7 @@ Projekt **Acoustic HDD Sentinel** to system akustycznej detekcji i wieloklasowej
 ### Faza 2: Rygorystyczny Audyt Zewnętrzny, Stress-Testy i Analiza Logiki
 *(Identyfikator sesji: `ad8cb723` — 44 interakcje)*
 
-1. **Pakiet audytowy ([AUDIT_REVIEW_BUNDLE.md](AUDIT_REVIEW_BUNDLE.md)):**
+1. **Pakiet audytowy ([AUDIT_REVIEW_BUNDLE.md](docx/AUDIT_REVIEW_BUNDLE.md)):**
    - Przygotowano całościowy plik (~100k znaków) zawierający architekturę, założenia ADR-001, logi i kody źródłowe w celu poddania projektu niezależnemu audytowi zewnętrznego modelu LLM (Claude Opus).
 2. **Wykryte wady i anomalie (Acoustic & Engineering Forensics):**
    - **DC Offset:** W surowych nagraniach występowało silne przesunięcie składowej stałej (`dc_offset_max_abs = 0.3766`), które zaburzało wyliczanie energii RMS i normalizację szczytową.
@@ -137,7 +137,6 @@ Projekt **Acoustic HDD Sentinel** to system akustycznej detekcji i wieloklasowej
 AcousticHddSentinel/
 ├── kontekst.md                        # Niniejsze całościowe podsumowanie projektu
 ├── fineTuning.md                      # Szczegółowa dokumentacja prac optymalizacyjnych
-├── AUDIT_REVIEW_BUNDLE.md             # Historyczny pakiet audytowy dla zewnętrznych modeli LLM
 ├── NOTES.md                           # Notatki badawcze (koncepcja komitetu Seed Ensembling)
 ├── AGENTS.md                          # Wytyczne i niezmienniki techniczne dla agentów AI
 ├── README.md                          # Główna dokumentacja projektu
@@ -177,8 +176,11 @@ AcousticHddSentinel/
 ├── stress_test_vram.py                # Skrypt monitoringu pamięci VRAM GPU
 ├── testEpok.py                        # Eksperyment porównawczy dla 20-60 epok
 │
-└── docx/adr/
-    └── adr.md                         # ADR-001: Architektura DSP i niezmienniki techniczne
+└── docx/
+    ├── adr/adr.md                     # ADR-001: Architektura DSP i niezmienniki techniczne
+    ├── diagramOverView.svg            # Schemat architektury systemu
+    ├── specs.txt                      # Specyfikacja techniczna wymagań
+    └── AUDIT_REVIEW_BUNDLE.md         # Historyczny pakiet audytowy z Fazy 2
 ```
 
 ---

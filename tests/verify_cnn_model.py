@@ -5,12 +5,20 @@ Uruchomienie: python verify_cnn_model.py
 """
 
 import os
+import sys
 import tempfile
 from pathlib import Path
 import numpy as np
 import torch
 import torch.nn as nn
 from sklearn.metrics import classification_report, accuracy_score
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+os.chdir(PROJECT_ROOT)
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+if str(PROJECT_ROOT / "ml") not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT / "ml"))
 
 from model_cnn import build_hdd_cnn_model, AcousticHddSentinelCNN, INPUT_SHAPE
 from dataset_pytorch import resolve_dataset_dir, discover_classes_and_files

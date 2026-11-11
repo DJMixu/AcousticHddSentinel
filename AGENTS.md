@@ -28,9 +28,9 @@ Każdy agent AGY modyfikujący lub rozwijający projekt **MUSI bezwzględnie** p
    - `OVERLAP = 1.5` s dla zbioru `train` (50% augmentacji), `0.0` s dla `validate`/`test`.
    - Odrzucanie ramek ciszy i szumu tła: $RMS < 0.002$.
 4. **Izolacja funkcji normalizacji:**
-   Podczas pisania skryptów ewaluacyjnych, testowych lub inferencyjnych zawsze importuj `encode_audio_chunk`, `normalize_waveform_peak` oraz `normalize_tensor_zscore` bezpośrednio z [hdd_audio_encoder.py](file:///home/DJMixu/Pulpit/AcousticHddSentinel/hdd_audio_encoder.py). Nie duplikuj kodu normalizacji.
+   Podczas pisania skryptów ewaluacyjnych, testowych lub inferencyjnych zawsze importuj `encode_audio_chunk`, `normalize_waveform_peak` oraz `normalize_tensor_zscore` z [ml/hdd_audio_encoder.py](file:///home/DJMixu/Pulpit/AcousticHddSentinel/ml/hdd_audio_encoder.py). Nie duplikuj kodu normalizacji.
 5. **Loader PyTorch `DataLoader` z `HddNpyDataset`:**
-   Wczytując pliki `.npy` z dysku, używaj `HddNpyDataset` i `create_pytorch_dataloaders` z [dataset_pytorch.py](file:///home/DJMixu/Pulpit/AcousticHddSentinel/dataset_pytorch.py) oraz funkcji ważenia klas `compute_balanced_class_weights`.
+   Wczytując pliki `.npy` z dysku, używaj `HddNpyDataset` i `create_pytorch_dataloaders` z [ml/dataset_pytorch.py](file:///home/DJMixu/Pulpit/AcousticHddSentinel/ml/dataset_pytorch.py) oraz funkcji ważenia klas `compute_balanced_class_weights`.
 
 ---
 
@@ -39,29 +39,47 @@ Każdy agent AGY modyfikujący lub rozwijający projekt **MUSI bezwzględnie** p
 ```
 AcousticHddSentinel/
 ├── AGENTS.md                          # Główny przewodnik i Single Source of Truth dla agentów AGY
+├── README.md                          # Główna dokumentacja projektu dla ludzi i developerów
 ├── kontekst.md                        # Całościowe podsumowanie dotychczasowych etapów i audytów
 ├── fineTuning.md                      # Dokumentacja prac optymalizacyjnych i wyników F1 >= 0.70
 ├── NOTES.md                           # Notatki badawcze (koncepcja Seed Ensembling)
-├── README.md                          # Główna dokumentacja projektu dla ludzi i developerów
 ├── requirements.txt                   # Zależności Python (PyTorch, Librosa, Scikit-learn, etc.)
 ├── .gitignore                         # Wykluczenia git (duże zbiory .npy, venv, cache)
 │
-├── model_cnn.py                       # Architektura sieci 2D CNN w PyTorch (AcousticHddSentinelCNN & FusedEnsemblePyTorch)
-├── dataset_pytorch.py                 # PyTorch Dataset z preloadem RAM i SpecAugment (HddNpyDataset)
-├── hdd_audio_encoder.py               # Enkoder audio do tensorów .npy zgodny z ADR-001
-├── prepare_audio_dataset.py           # Kategoryzator bazy audio i generator klasy 'normal'
-├── train_cnn.py                       # Kompletny pipeline treningowy w PyTorch (AdamW, Label Smoothing, ROCm)
-├── train_ensemble.py                  # Pipeline Seed Ensembling (komitet modeli o różnych ziarnach)
-├── verify_cnn_model.py                # 6-etapowy test weryfikacyjny sprawności modelu PyTorch
-├── profile_normalization_quality.py   # Profiler i weryfikator jakości normalizacji DSP
-├── export_model.py                    # Eksport do formatów ONNX (FP32/INT8), TorchScript i Android Kotlin
-├── test_project_logic.py              # Automatyczny test integralności projektu i niezmienników ADR-001
-├── compare_ensembles.py               # Narzędzie ewaluacji porównawczej komitetu modeli z modelem bazowym
-├── stress_test.py                     # Test ciągły odporności potoku DSP + CNN (latencja, wycieki RAM, edge cases)
-├── stress_test_vram.py                # Test obciążeniowy pamięci VRAM karty GPU
-├── testEpok.py                        # Diagnostyka stabilności uczenia dla różnej liczby epok
-├── local_llm_bridge.py                # Most orkiestrujący lokalne modele Ollama (27B + Coder 14B)
-├── start_services.sh / stop_services.sh # Skrypty zarządzania lokalnymi usługami LLM i Open WebUI
+├── ml/                                # 🧠 Pipeline uczenia maszynowego (PyTorch 2D CNN, DSP, eksport)
+│   ├── model_cnn.py                   # Architektura sieci 2D CNN w PyTorch (AcousticHddSentinelCNN & FusedEnsemblePyTorch)
+│   ├── dataset_pytorch.py             # PyTorch Dataset z preloadem RAM i SpecAugment (HddNpyDataset)
+│   ├── hdd_audio_encoder.py           # Enkoder audio do tensorów .npy zgodny z ADR-001
+│   ├── prepare_audio_dataset.py       # Kategoryzator bazy audio i generator klasy 'normal'
+│   ├── train_cnn.py                   # Kompletny pipeline treningowy w PyTorch (AdamW, Label Smoothing, ROCm)
+│   ├── train_ensemble.py              # Pipeline Seed Ensembling (komitet modeli o różnych ziarnach)
+│   ├── export_model.py                # Eksport do formatów ONNX (FP32/INT8), TorchScript z auto-sync do Androida
+│   └── compare_ensembles.py           # Narzędzie ewaluacji porównawczej komitetu modeli z modelem bazowym
+│
+├── tests/                             # 🧪 Testy logiczne, weryfikacja wag, profilowanie i stress-testy
+│   ├── test_project_logic.py          # Automatyczny test integralności projektu i niezmienników ADR-001 (6/6)
+│   ├── verify_cnn_model.py            # 6-etapowy test weryfikacyjny sprawności modelu PyTorch
+│   ├── profile_normalization_quality.py # Profiler i weryfikator jakości normalizacji DSP
+│   ├── stress_test.py                 # Test ciągły odporności potoku DSP + CNN (latencja, wycieki RAM, edge cases)
+│   ├── stress_test_vram.py            # Test obciążeniowy pamięci VRAM karty GPU
+│   └── testEpok.py                    # Diagnostyka stabilności uczenia dla różnej liczby epok
+│
+├── scripts/                           # 🛠️ Skrypty narzędziowe i orkiestracja lokalnych modeli LLM
+│   ├── local_llm_bridge.py            # Most orkiestrujący lokalne modele Ollama (27B + Coder 14B)
+│   ├── start_services.sh              # Skrypt uruchamiania usług Ollama i Open WebUI
+│   └── stop_services.sh               # Skrypt zatrzymywania usług Ollama i Open WebUI
+│
+├── android/                           # 📱 Kompletny moduł natywnej aplikacji mobilnej (Android Studio / Gradle / Kotlin)
+│   ├── app/
+│   │   ├── src/main/assets/           # Skwantyzowany model ONNX INT8, classes.json, model_card.json
+│   │   ├── src/main/java/             # Pakiety: audio (AudioRecord), data (Room SQLite), dsp (ADR-001 DSP), ml (ONNX), ui (MVVM)
+│   │   ├── src/main/res/              # Zasoby UI (layouty, motywy Material 3, kolory, ikony)
+│   │   ├── src/test/java/             # Testy jednostkowe DSP (AudioPreprocessorTest)
+│   │   ├── build.gradle.kts           # Zależności: ONNX Runtime Mobile, Room, Coroutines
+│   │   └── AndroidManifest.xml        # Uprawnienia RECORD_AUDIO, deklaracje aktywności
+│   ├── build.gradle.kts / settings.gradle.kts # Konfiguracja projektu Gradle
+│   ├── gradlew / gradlew.bat          # Wrapper narzędzia Gradle
+│   └── README.md                      # Instrukcja uruchomienia i testowania w Android Studio
 │
 ├── data/                              # Baza surowych nagrań laboratoryjnych (Ground Truth)
 │   └── raw/
@@ -94,18 +112,6 @@ AcousticHddSentinel/
 │   ├── model_card.json                # Karta modelu z parametrami DSP i specyfikacją
 │   └── classes.json                   # Mapowanie indeksów klas dla aplikacji
 │
-├── android/                           # Kompletny moduł natywnej aplikacji mobilnej (Android Studio / Gradle / Kotlin)
-│   ├── app/
-│   │   ├── src/main/assets/           # Skwantyzowany model ONNX INT8, classes.json, model_card.json
-│   │   ├── src/main/java/             # Pakiety: audio (AudioRecord), data (Room SQLite), dsp (ADR-001 DSP), ml (ONNX), ui (MVVM)
-│   │   ├── src/main/res/              # Zasoby UI (layouty, motywy Material 3, kolory, ikony)
-│   │   ├── src/test/java/             # Testy jednostkowe DSP (AudioPreprocessorTest)
-│   │   ├── build.gradle.kts           # Zależności: ONNX Runtime Mobile, Room, Coroutines
-│   │   └── AndroidManifest.xml        # Uprawnienia RECORD_AUDIO, deklaracje aktywności
-│   ├── build.gradle.kts / settings.gradle.kts # Konfiguracja projektu Gradle
-│   ├── gradlew / gradlew.bat          # Wrapper narzędzia Gradle
-│   └── README.md                      # Instrukcja uruchomienia i testowania w Android Studio
-│
 └── docx/
     ├── adr/adr.md                     # ADR-001: Architektura DSP i niezmienniki techniczne
     ├── diagramOverView.svg            # Schemat architektury systemu
@@ -120,38 +126,43 @@ Każdy agent lub programista może uruchomić kluczowe etapy za pomocą gotowych
 
 ### A. Sprawdzenie integralności i testów logicznych projektu:
 ```bash
-python test_project_logic.py
+python tests/test_project_logic.py
 ```
 
 ### B. Weryfikacja sprawności modelu na GPU/CPU:
 ```bash
-python verify_cnn_model.py
+python tests/verify_cnn_model.py
 ```
 
 ### C. Profilowanie jakości normalizacji DSP:
 ```bash
-python profile_normalization_quality.py
+python tests/profile_normalization_quality.py
 ```
 
 ### D. Regeneracja zbioru audio i tensorów:
 ```bash
-python prepare_audio_dataset.py
-python hdd_audio_encoder.py
+python ml/prepare_audio_dataset.py
+python ml/hdd_audio_encoder.py
 ```
 
 ### E. Uruchomienie pełnego treningu (PyTorch z akceleracją ROCm):
 ```bash
-python train_cnn.py --epochs 35 --batch-size 32 --output-dir ./training_output
+python ml/train_cnn.py --epochs 35 --batch-size 32 --output-dir ./training_output
 ```
 
 ### F. Trening komitetu modeli (Seed Ensembling):
 ```bash
-python train_ensemble.py --epochs 35 --batch-size 32 --output-dir ./training_output
+python ml/train_ensemble.py --epochs 35 --batch-size 32 --output-dir ./training_output
 ```
 
 ### G. Eksport do formatów produkcyjnych (ONNX, TorchScript, Android Kotlin):
 ```bash
-python export_model.py --weights training_output/best_hdd_cnn_model.pt --output-dir exported_models
+python ml/export_model.py --weights training_output/best_hdd_cnn_model.pt --output-dir exported_models
+```
+
+### H. Testy modułu aplikacji mobilnej Android:
+```bash
+cd android && ./gradlew test
 ```
 
 ---
@@ -175,11 +186,11 @@ W systemie użytkownika działa lokalna instalacja Ollama (`http://localhost:114
 
 ### Zasady automatycznego wykorzystania przez każdego agenta:
 - **Uruchomienie usług LLM w razie potrzeby:**
-  Przed pracą z modelami lokalnymi agent może upewnić się o działaniu usług za pomocą `./start_services.sh` (lub zatrzymać je po pracy przez `./stop_services.sh`).
+  Przed pracą z modelami lokalnymi agent może upewnić się o działaniu usług za pomocą `./scripts/start_services.sh` (lub zatrzymać je po pracy przez `./scripts/stop_services.sh`).
 - **Automatyczne delegowanie zadań programistycznych:**
   Gdy użytkownik zleca projektowanie nowych modułów, implementację zaawansowanych algorytmów, agent powinien **automatycznie** wykorzystać tandem modeli za pomocą skryptu:
   ```bash
-  python local_llm_bridge.py --task "<opis zadania>" [--context <plik_kontekstu>] [--output <plik_wyjścia>]
+  python scripts/local_llm_bridge.py --task "<opis zadania>" [--context <plik_kontekstu>] [--output <plik_wyjścia>]
   ```
 - **Niezmiennik VRAM (16 GB) i architektura iGPU + dGPU:**
   Monitor i pulpit Linux działają na iGPU (Ryzen 7 7700), dzięki czemu karta **AMD Radeon RX 9060 XT (16 GB)** ma 100% VRAM (15.9 GB) wolne na czyste obliczenia AI. Dzięki FlashAttention i Q4_0 KV Cache w Ollama, model Qwen 3.8 27B obsługuje bezpiecznie kontekst **aż do 128k (`131072`)** bez wycieku do RAM CPU.

@@ -13,7 +13,15 @@ import json
 import os
 import re
 import struct
+import sys
 from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+os.chdir(PROJECT_ROOT)
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+if str(PROJECT_ROOT / "ml") not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT / "ml"))
 
 def parse_npy_header(filepath: Path):
     """
@@ -61,12 +69,12 @@ def run_tests():
     # -------------------------------------------------------------
     print("\n[TEST 1/6] Walidacja składniowa AST modułów Python...")
     scripts = [
-        "hdd_audio_encoder.py",
-        "model_cnn.py",
-        "train_cnn.py",
-        "prepare_audio_dataset.py",
-        "verify_cnn_model.py",
-        "profile_normalization_quality.py",
+        "ml/hdd_audio_encoder.py",
+        "ml/model_cnn.py",
+        "ml/train_cnn.py",
+        "ml/prepare_audio_dataset.py",
+        "tests/verify_cnn_model.py",
+        "tests/profile_normalization_quality.py",
     ]
     all_ast_ok = True
     for s in scripts:

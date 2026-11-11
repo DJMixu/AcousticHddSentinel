@@ -165,17 +165,28 @@ AcousticHddSentinel/
 ├── README.md                          # Główna dokumentacja projektu
 ├── requirements.txt                   # Zależności Python (PyTorch, Librosa, Scikit-learn)
 │
-├── model_cnn.py                       # Architektura 2D CNN w PyTorch (AcousticHddSentinelCNN & FusedEnsemblePyTorch)
-├── dataset_pytorch.py                 # PyTorch Dataset z preloadem RAM i SpecAugment (HddNpyDataset)
-├── train_cnn.py                       # Główny pipeline treningowy PyTorch z akceleracją ROCm
-├── train_ensemble.py                  # Trening komitetu modeli o różnych seedach losowości
-├── hdd_audio_encoder.py               # Enkoder audio do tensorów zgodny z ADR-001
-├── prepare_audio_dataset.py           # Narzędzie kategoryzacji nagrań audio i generator klasy 'normal'
-├── profile_normalization_quality.py   # Profiler jakości normalizacji DSP
-├── export_model.py                    # Eksport do ONNX (FP32/INT8), TorchScript i Android Kotlin
-├── test_project_logic.py              # Test integralności i poprawności architektury
-├── local_llm_bridge.py                # Most orkiestrujący lokalne modele Ollama (27B + Coder 14B)
-├── start_services.sh / stop_services.sh # Zarządzanie usługami Ollama i Open WebUI
+├── ml/                                # 🧠 Pipeline uczenia maszynowego (PyTorch 2D CNN, DSP, eksport)
+│   ├── model_cnn.py                   # Architektura 2D CNN w PyTorch (AcousticHddSentinelCNN & FusedEnsemblePyTorch)
+│   ├── dataset_pytorch.py             # PyTorch Dataset z preloadem RAM i SpecAugment (HddNpyDataset)
+│   ├── hdd_audio_encoder.py           # Enkoder audio do tensorów .npy zgodny z ADR-001
+│   ├── prepare_audio_dataset.py       # Kategoryzator bazy audio i generator klasy 'normal'
+│   ├── train_cnn.py                   # Główny pipeline treningowy PyTorch z akceleracją ROCm
+│   ├── train_ensemble.py              # Trening komitetu modeli o różnych seedach losowości
+│   ├── export_model.py                # Eksport do ONNX (FP32/INT8), TorchScript z auto-sync do Androida
+│   └── compare_ensembles.py           # Narzędzie ewaluacji porównawczej komitetu modeli z modelem bazowym
+│
+├── tests/                             # 🧪 Testy logiczne, weryfikacja wag, profilowanie i stress-testy
+│   ├── test_project_logic.py          # Test integralności projektu i niezmienników ADR-001 (6/6)
+│   ├── verify_cnn_model.py            # 6-etapowy test weryfikacyjny sprawności modelu PyTorch
+│   ├── profile_normalization_quality.py # Profiler i weryfikator jakości normalizacji DSP
+│   ├── stress_test.py                 # Test ciągły odporności potoku DSP + CNN (latencja, wycieki RAM, edge cases)
+│   ├── stress_test_vram.py            # Test obciążeniowy pamięci VRAM karty GPU
+│   └── testEpok.py                    # Diagnostyka stabilności uczenia dla różnej liczby epok
+│
+├── scripts/                           # 🛠️ Skrypty narzędziowe i orkiestracja lokalnych modeli LLM
+│   ├── local_llm_bridge.py            # Most orkiestrujący lokalne modele Ollama (27B + Coder 14B)
+│   ├── start_services.sh              # Skrypt uruchamiania usług Ollama i Open WebUI
+│   └── stop_services.sh               # Skrypt zatrzymywania usług Ollama i Open WebUI
 │
 ├── data/raw/                          # Baza surowych nagrań laboratoryjnych (Ground Truth)
 │   ├── northwind/                     # 82 pliki MP3 z nazwami laboratoryjnymi
@@ -206,10 +217,6 @@ AcousticHddSentinel/
 │   ├── build.gradle.kts / settings.gradle.kts # Konfiguracja projektu Gradle
 │   ├── gradlew / gradlew.bat          # Wrapper narzędzia Gradle
 │   └── README.md                      # Instrukcja uruchomienia i testowania w Android Studio
-│
-├── stress_test.py                     # Skrypt 1h/24h stress testu inferencji
-├── stress_test_vram.py                # Skrypt monitoringu pamięci VRAM GPU
-├── testEpok.py                        # Eksperyment porównawczy dla 20-60 epok
 │
 └── docx/
     ├── adr/adr.md                     # ADR-001: Architektura DSP i niezmienniki techniczne

@@ -72,35 +72,35 @@ pip install -r requirements.txt
 
 ### 1. Weryfikacja integralności projektu
 ```bash
-python test_project_logic.py
+python tests/test_project_logic.py
 ```
 
 ### 2. Sprawdzenie sprawności modelu na GPU/CPU
 ```bash
-python verify_cnn_model.py
+python tests/verify_cnn_model.py
 ```
 
 ### 3. Sprawdzenie jakości normalizacji danych
 ```bash
-python profile_normalization_quality.py
+python tests/profile_normalization_quality.py
 ```
 
 ### 4. Przygotowanie danych i enkodowanie
 ```bash
 # 1. Kategoryzacja nagrań i wygenerowanie klasy 'normal'
-python prepare_audio_dataset.py
+python ml/prepare_audio_dataset.py
 
 # 2. Enkodowanie do tensorów .npy z podziałem bez wycieku danych (Zero Data Leakage)
-python hdd_audio_encoder.py
+python ml/hdd_audio_encoder.py
 ```
 
 ### 5. Uruchomienie treningu (PyTorch)
 ```bash
 # Trening pojedynczego modelu:
-python train_cnn.py --epochs 35 --batch-size 32 --output-dir ./training_output
+python ml/train_cnn.py --epochs 35 --batch-size 32 --output-dir ./training_output
 
 # Trening komitetu modeli (Seed Ensembling):
-python train_ensemble.py --epochs 35 --batch-size 32 --output-dir ./training_output
+python ml/train_ensemble.py --epochs 35 --batch-size 32 --output-dir ./training_output
 ```
 
 ---
@@ -129,7 +129,7 @@ Wizualizacje i artefakty:
 
 Model można natychmiast wyeksportować do formatów zoptymalizowanych pod urządzenia mobilne i brzegowe:
 ```bash
-python export_model.py --weights training_output/best_hdd_cnn_model.pt --output-dir exported_models
+python ml/export_model.py --weights training_output/best_hdd_cnn_model.pt --output-dir exported_models
 ```
 Wygenerowane artefakty w `exported_models/`:
 - `best_hdd_cnn_model.onnx` – ONNX FP32 (4.61 MB)
@@ -152,22 +152,28 @@ AcousticHddSentinel/
 ├── requirements.txt                   # Zależności biblioteczne Pythona
 ├── .gitignore                         # Wykluczenia git (duże tensory .npy, venv, cache)
 │
-├── model_cnn.py                       # Architektura 2D CNN (AcousticHddSentinelCNN & FusedEnsemblePyTorch)
-├── dataset_pytorch.py                 # PyTorch Dataset z preloadem RAM i SpecAugment (HddNpyDataset)
-├── hdd_audio_encoder.py               # Enkoder audio do tensorów .npy zgodny z ADR-001
-├── prepare_audio_dataset.py           # Kategoryzator bazy audio i generator klasy 'normal'
-├── train_cnn.py                       # Pipeline treningowy PyTorch (AdamW, Label Smoothing, ROCm)
-├── train_ensemble.py                  # Trening komitetu modeli (Seed Ensembling)
-├── verify_cnn_model.py                # 6-etapowa weryfikacja poprawności modelu PyTorch
-├── profile_normalization_quality.py   # Profiler i weryfikator jakości normalizacji DSP
-├── export_model.py                    # Eksport do ONNX (FP32/INT8), TorchScript i Android Kotlin
-├── test_project_logic.py              # Test integralności projektu i niezmienników ADR-001
-├── compare_ensembles.py               # Porównanie komitetu modeli z modelem bazowym
-├── stress_test.py                     # Test ciągły odporności potoku DSP + CNN (latencja, wycieki RAM, edge cases)
-├── stress_test_vram.py                # Test obciążeniowy pamięci VRAM karty graficznej
-├── testEpok.py                        # Diagnostyka stabilności uczenia dla różnej liczby epok
-├── local_llm_bridge.py                # Most orkiestrujący lokalne modele LLM (Qwen 3.8 + Coder 14B)
-├── start_services.sh / stop_services.sh # Zarządzanie usługami Ollama i Open WebUI
+├── ml/                                # 🧠 Moduł uczenia maszynowego i potoku DSP
+│   ├── model_cnn.py                   # Architektura 2D CNN (AcousticHddSentinelCNN & FusedEnsemblePyTorch)
+│   ├── dataset_pytorch.py             # PyTorch Dataset z preloadem RAM i SpecAugment (HddNpyDataset)
+│   ├── hdd_audio_encoder.py           # Enkoder audio do tensorów .npy zgodny z ADR-001
+│   ├── prepare_audio_dataset.py       # Kategoryzator bazy audio i generator klasy 'normal'
+│   ├── train_cnn.py                   # Pipeline treningowy PyTorch (AdamW, Label Smoothing, ROCm)
+│   ├── train_ensemble.py              # Trening komitetu modeli (Seed Ensembling)
+│   ├── export_model.py                # Eksport do ONNX (FP32/INT8), TorchScript z auto-sync do Androida
+│   └── compare_ensembles.py           # Porównanie komitetu modeli z modelem bazowym
+│
+├── tests/                             # 🧪 Moduł testów integralności i weryfikacji
+│   ├── test_project_logic.py          # Test integralności projektu i niezmienników ADR-001 (6/6)
+│   ├── verify_cnn_model.py            # 6-etapowa weryfikacja poprawności modelu PyTorch
+│   ├── profile_normalization_quality.py # Profiler i weryfikator jakości normalizacji DSP
+│   ├── stress_test.py                 # Test ciągły odporności potoku DSP + CNN (latencja, wycieki RAM, edge cases)
+│   ├── stress_test_vram.py            # Test obciążeniowy pamięci VRAM karty graficznej
+│   └── testEpok.py                    # Diagnostyka stabilności uczenia dla różnej liczby epok
+│
+├── scripts/                           # 🛠️ Skrypty narzędziowe i orkiestracja lokalnych usług LLM
+│   ├── local_llm_bridge.py            # Most orkiestrujący lokalne modele LLM (Qwen 3.8 + Coder 14B)
+│   ├── start_services.sh              # Skrypt uruchamiania usług Ollama i Open WebUI
+│   └── stop_services.sh               # Skrypt zatrzymywania usług Ollama i Open WebUI
 │
 ├── data/raw/                          # Baza surowych nagrań laboratoryjnych (Ground Truth)
 │   ├── northwind/                     # 82 pliki MP3 z nazwami laboratoryjnymi

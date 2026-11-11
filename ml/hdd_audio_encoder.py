@@ -18,6 +18,7 @@ Zgodność z ADR-001:
 """
 
 import os
+import sys
 import random
 import shutil
 from pathlib import Path
@@ -27,6 +28,13 @@ import soundfile as sf
 import librosa
 from tqdm import tqdm
 import warnings
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+os.chdir(PROJECT_ROOT)
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+if str(PROJECT_ROOT / "ml") not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT / "ml"))
 
 warnings.filterwarnings("ignore")
 

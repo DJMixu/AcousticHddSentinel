@@ -1,0 +1,277 @@
+package com.acoustichddsentinel.ui;
+
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.ImageView;
+import android.widget.Toast;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.LinearLayoutManager;
+
+import com.acoustichddsentinel.R;
+import com.acoustichddsentinel.data.DiagnosticModel;
+import com.acoustichddsentinel.databinding.ActivityMainBinding;
+import com.acoustichddsentinel.ml.ClassificationResult;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+
+import java.io.File;
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * Główna aktywność aplikacji diagnostycznej (Widok w MVVM).
+ * Obsługuje interakcję z użytkownikiem, uprawnienia systemowe RECORD_AUDIO,
+ * suwak czasu nagrywania (5-30s), wizualizację spektrogramu oraz historię badań w SQLite.
+ */
+public class MainActivity extends AppCompatActivity {
+
+    private ActivityMainBinding binding;
+    private MainViewModel viewModel;
+    private DiagnosticAdapter adapter;
+
+    private final ActivityResultLauncher<String> requestPermissionLauncher =
+        registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
+            if (isGranted) {
+                startRecordingFromUi();
+            } else {
+                Toast.makeText(this, "Uprawnienie do mikrofonu jest niezbędne do analizy dźwięku HDD.", Toast.LENGTH_LONG).show();
+            }
+        });
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        binding = ActivityMainBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
+
+        viewModel = new ViewModelProvider(this).get(MainViewModel.class);
+
+        setupViews();
+        observeViewModel();
+    }
+
+    private void setupViews() {
+        // Konfiguracja suwaka czasu nagrywania
+        binding.sliderDuration.addOnChangeListener((slider, value, fromUser) -> {
+            int seconds = (int) value;
+            binding.tvDurationValue.setText(String.format(Locale.US, "%d s", seconds));
+        });
+
+        // Przycisk rozpoczęcia badania
+        binding.btnStartDiagnosis.setOnClickListener(v -> checkPermissionAndStart());
+
+        // Przycisk czyszczenia historii
+        binding.btnClearHistory.setOnClickListener(v -> showClearHistoryConfirmationDialog());
+
+        // Konfiguracja listy historii (RecyclerView)
+        adapter = new DiagnosticAdapter(new DiagnosticAdapter.OnItemActionListener() {
+            @Override
+            public void onDeleteClick(DiagnosticModel item) {
+                viewModel.deleteHistoryItem(item);
+                Toast.makeText(MainActivity.this, "Usunięto wpis diagnozy.", Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onItemClick(DiagnosticModel item) {
+                showHistoryItemDialog(item);
+            }
+        });
+
+        binding.rvHistory.setLayoutManager(new LinearLayoutManager(this));
+        binding.rvHistory.setAdapter(adapter);
+    }
+
+    private void checkPermissionAndStart() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            startRecordingFromUi();
+        } else {
+            requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
+        }
+    }
+
+    private void startRecordingFromUi() {
+        String hddName = binding.etHddName.getText() != null
+            ? binding.etHddName.getText().toString().trim()
+            : "";
+        int durationSeconds = (int) binding.sliderDuration.getValue();
+        viewModel.startDiagnosis(hddName, durationSeconds);
+    }
+
+    private void observeViewModel() {
+        viewModel.getUiState().observe(this, this::renderUiState);
+
+        viewModel.getHistoryList().observe(this, list -> {
+            adapter.submitList(list);
+            if (list == null || list.isEmpty()) {
+                binding.tvHistoryEmpty.setVisibility(View.VISIBLE);
+                binding.rvHistory.setVisibility(View.GONE);
+            } else {
+                binding.tvHistoryEmpty.setVisibility(View.GONE);
+                binding.rvHistory.setVisibility(View.VISIBLE);
+            }
+        });
+    }
+
+    private void renderUiState(DiagnosticUiState state) {
+        if (state == null) return;
+
+        switch (state.getStatus()) {
+            case IDLE:
+                binding.btnStartDiagnosis.setEnabled(true);
+                binding.btnStartDiagnosis.setText(R.string.btn_start_diagnosis);
+                binding.sliderDuration.setEnabled(true);
+                binding.progressBarAudio.setVisibility(View.GONE);
+                binding.progressBarAudio.setIndeterminate(false);
+                binding.tvRecordingStatus.setText(R.string.status_idle);
+                break;
+
+            case RECORDING:
+                binding.btnStartDiagnosis.setEnabled(false);
+                binding.btnStartDiagnosis.setText("Nagrywanie w toku...");
+                binding.sliderDuration.setEnabled(false);
+                binding.progressBarAudio.setVisibility(View.VISIBLE);
+                binding.progressBarAudio.setIndeterminate(false);
+                int progress = state.getRecordingTotalMs() > 0
+                    ? (state.getRecordingElapsedMs() * 100) / state.getRecordingTotalMs()
+                    : 0;
+                binding.progressBarAudio.setProgress(progress);
+                binding.tvRecordingStatus.setText(state.getStatusMessage());
+                break;
+
+            case PROCESSING:
+                binding.btnStartDiagnosis.setEnabled(false);
+                binding.sliderDuration.setEnabled(false);
+                binding.progressBarAudio.setVisibility(View.VISIBLE);
+                binding.progressBarAudio.setIndeterminate(true);
+                binding.tvRecordingStatus.setText(state.getStatusMessage());
+                break;
+
+            case SUCCESS:
+                binding.btnStartDiagnosis.setEnabled(true);
+                binding.btnStartDiagnosis.setText(R.string.btn_start_diagnosis);
+                binding.sliderDuration.setEnabled(true);
+                binding.progressBarAudio.setVisibility(View.GONE);
+                binding.progressBarAudio.setIndeterminate(false);
+                binding.tvRecordingStatus.setText("Diagnoza zakończona pomyślnie.");
+
+                renderSuccessCard(state);
+                break;
+
+            case ERROR:
+                binding.btnStartDiagnosis.setEnabled(true);
+                binding.btnStartDiagnosis.setText(R.string.btn_start_diagnosis);
+                binding.sliderDuration.setEnabled(true);
+                binding.progressBarAudio.setVisibility(View.GONE);
+                binding.progressBarAudio.setIndeterminate(false);
+                binding.tvRecordingStatus.setText("Błąd: " + state.getErrorMessage());
+
+                Toast.makeText(this, state.getErrorMessage(), Toast.LENGTH_LONG).show();
+                break;
+        }
+    }
+
+    private void renderSuccessCard(DiagnosticUiState state) {
+        DiagnosticModel model = state.getCompletedDiagnostic();
+        ClassificationResult result = state.getClassificationResult();
+
+        if (model == null || result == null) return;
+
+        binding.cardResult.setVisibility(View.VISIBLE);
+        binding.tvResultHddName.setText(model.getHddName());
+        binding.tvResultClass.setText(model.getPredictedClass().toUpperCase(Locale.US));
+
+        if (model.hasAnomaly()) {
+            binding.ivResultIcon.setImageResource(R.drawable.ic_warning);
+            binding.tvResultBadge.setText("AWARIA");
+            binding.tvResultBadge.setBackground(ContextCompat.getDrawable(this, R.drawable.bg_badge_anomaly));
+            binding.tvResultBadge.setTextColor(ContextCompat.getColor(this, R.color.status_fault_text));
+        } else {
+            binding.ivResultIcon.setImageResource(R.drawable.ic_check_circle);
+            binding.tvResultBadge.setText("SPRAWNY");
+            binding.tvResultBadge.setBackground(ContextCompat.getDrawable(this, R.drawable.bg_badge_normal));
+            binding.tvResultBadge.setTextColor(ContextCompat.getColor(this, R.color.status_normal_text));
+        }
+
+        binding.tvResultConfidence.setText(String.format(Locale.US,
+            "Pewność: %.1f%% (czas inferencji: %d ms)",
+            model.getConfidence() * 100.0f, result.getInferenceTimeMs()));
+
+        binding.tvResultRecommendation.setText(result.getRecommendation());
+
+        // Rozkład prawdopodobieństw Softmax
+        Map<String, Float> probs = result.getProbabilities();
+        float probNormal = probs.getOrDefault("normal", 0.0f);
+        float probClicking = probs.getOrDefault("clicking", 0.0f);
+        float probBeeping = probs.getOrDefault("beeping", 0.0f);
+        float probScratching = probs.getOrDefault("scratching", 0.0f);
+
+        binding.progressNormal.setProgress((int) (probNormal * 100.0f));
+        binding.tvProbNormal.setText(String.format(Locale.US, "%.1f%%", probNormal * 100.0f));
+
+        binding.progressClicking.setProgress((int) (probClicking * 100.0f));
+        binding.tvProbClicking.setText(String.format(Locale.US, "%.1f%%", probClicking * 100.0f));
+
+        binding.progressBeeping.setProgress((int) (probBeeping * 100.0f));
+        binding.tvProbBeeping.setText(String.format(Locale.US, "%.1f%%", probBeeping * 100.0f));
+
+        binding.progressScratching.setProgress((int) (probScratching * 100.0f));
+        binding.tvProbScratching.setText(String.format(Locale.US, "%.1f%%", probScratching * 100.0f));
+
+        // Podgląd wygenerowanego spektrogramu Mel
+        if (state.getSpectrogramBitmap() != null) {
+            binding.ivSpectrogramPreview.setImageBitmap(state.getSpectrogramBitmap());
+        }
+        if (model.getSpectrogramPath() != null) {
+            binding.tvSpectrogramPath.setText(model.getSpectrogramPath());
+        }
+    }
+
+    private void showClearHistoryConfirmationDialog() {
+        new MaterialAlertDialogBuilder(this)
+            .setTitle("Wyczyścić historię badań?")
+            .setMessage("Spowoduje to trwałe usunięcie wszystkich wpisów z lokalnej bazy SQLite oraz powiązanych plików spektrogramów.")
+            .setPositiveButton("Usuń wszystko", (dialog, which) -> viewModel.clearAllHistory())
+            .setNegativeButton("Anuluj", null)
+            .show();
+    }
+
+    private void showHistoryItemDialog(DiagnosticModel item) {
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this)
+            .setTitle(item.getHddName())
+            .setMessage(String.format(Locale.US,
+                "Data badania: %s\nKlasa: %s\nPewność: %.1f%%\nStatus: %s\nPlik spektrogramu:\n%s",
+                item.getFormattedDate(),
+                item.getPredictedClass().toUpperCase(Locale.US),
+                item.getConfidence() * 100.0f,
+                item.hasAnomaly() ? "WYKRYTO AWARIĘ" : "DYSK SPRAWNY",
+                item.getSpectrogramPath() != null ? item.getSpectrogramPath() : "Brak"
+            ));
+
+        if (item.getSpectrogramPath() != null) {
+            File imgFile = new File(item.getSpectrogramPath());
+            if (imgFile.exists()) {
+                Bitmap bmp = BitmapFactory.decodeFile(imgFile.getAbsolutePath());
+                if (bmp != null) {
+                    ImageView iv = new ImageView(this);
+                    iv.setPadding(32, 16, 32, 16);
+                    iv.setImageBitmap(bmp);
+                    iv.setScaleType(ImageView.ScaleType.FIT_XY);
+                    builder.setView(iv);
+                }
+            }
+        }
+
+        builder.setPositiveButton("Zamknij", null)
+            .setNeutralButton("Usuń wpis", (dialog, which) -> viewModel.deleteHistoryItem(item))
+            .show();
+    }
+}

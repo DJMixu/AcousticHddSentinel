@@ -17,7 +17,7 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- Nagłówek -->
+            <!-- Nagłówek aplikacji -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -68,11 +68,52 @@
                             android:text="HDD WDC WD10EZEX" />
                     </com.google.android.material.textfield.TextInputLayout>
 
+                    <!-- Suwak czasu nagrywania (5-30s) -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="vertical">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Czas nagrywania (5 - 30 s):"
+                                android:textColor="@color/text_primary"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvDurationValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="10 s"
+                                android:textColor="@color/primary"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <com.google.android.material.slider.Slider
+                            android:id="@+id/sliderDuration"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:value="10.0"
+                            android:valueFrom="5.0"
+                            android:valueTo="30.0"
+                            android:stepSize="1.0" />
+                    </LinearLayout>
+
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnStartDiagnosis"
                         android:layout_width="match_parent"
                         android:layout_height="56dp"
-                        android:layout_marginTop="14dp"
+                        android:layout_marginTop="10dp"
                         android:text="@string/btn_start_diagnosis"
                         android:textAllCaps="false"
                         android:textSize="16sp"
@@ -163,6 +204,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:background="@drawable/bg_badge_normal"
+                            android:paddingHorizontal="10dp"
+                            android:paddingVertical="4dp"
                             android:text="SPRAWNY"
                             android:textColor="@color/status_normal_text"
                             android:textSize="12sp"
@@ -322,6 +365,36 @@
                             android:textSize="12sp"
                             tools:text="1%" />
                     </LinearLayout>
+
+                    <!-- Podgląd spektrogramu Mel -->
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="Wygenerowany Spektrogram Mel (DSP):"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <ImageView
+                        android:id="@+id/ivSpectrogramPreview"
+                        android:layout_width="match_parent"
+                        android:layout_height="130dp"
+                        android:layout_marginTop="6dp"
+                        android:background="#0F172A"
+                        android:contentDescription="Podgląd spektrogramu"
+                        android:scaleType="fitXY" />
+
+                    <TextView
+                        android:id="@+id/tvSpectrogramPath"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:ellipsize="middle"
+                        android:singleLine="true"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11sp"
+                        tools:text="/data/user/0/.../spectrograms/spec_1.png" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

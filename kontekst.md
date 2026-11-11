@@ -206,13 +206,13 @@ AcousticHddSentinel/
 │
 ├── exported_models/                   # Wyeksportowane modele produkcyjne ONNX i Kotlin
 │
-├── android/                           # Kompletny moduł natywnej aplikacji mobilnej (Android Studio / Gradle / Kotlin)
+├── android/                           # Kompletny moduł natywnej aplikacji mobilnej (Android Studio / Gradle / Java 17)
 │   ├── app/
 │   │   ├── src/main/assets/           # Skwantyzowany model ONNX INT8, classes.json, model_card.json
-│   │   ├── src/main/java/             # Pakiety: audio (AudioRecord), data (Room SQLite), dsp (ADR-001 DSP), ml (ONNX), ui (MVVM)
+│   │   ├── src/main/java/             # Pakiety: audio (AudioRecord), data (SQLiteOpenHelper), dsp (ADR-001 DSP), ml (ONNX), ui (MVVM & LiveData)
 │   │   ├── src/main/res/              # Zasoby UI (layouty, motywy Material 3, kolory, ikony)
-│   │   ├── src/test/java/             # Testy jednostkowe DSP (AudioPreprocessorTest)
-│   │   ├── build.gradle.kts           # Zależności: ONNX Runtime Mobile, Room, Coroutines
+│   │   ├── src/test/java/             # Testy jednostkowe DSP (AudioPreprocessorTest.java)
+│   │   ├── build.gradle.kts           # Zależności: ONNX Runtime Mobile, AndroidX AppCompat, Material 3, Lifecycle
 │   │   └── AndroidManifest.xml        # Uprawnienia RECORD_AUDIO, deklaracje aktywności
 │   ├── build.gradle.kts / settings.gradle.kts # Konfiguracja projektu Gradle
 │   ├── gradlew / gradlew.bat          # Wrapper narzędzia Gradle

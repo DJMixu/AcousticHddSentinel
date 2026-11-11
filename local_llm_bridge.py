@@ -24,14 +24,17 @@ MODEL_ARCHITECT = "hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ3_S"
 MODEL_CODER = "qwen2.5-coder:14b"
 
 
-def query_ollama(model_name: str, messages: list, stream: bool = True, keep_alive: str = "0s") -> str:
+def query_ollama(model_name: str, messages: list, stream: bool = True, keep_alive: str = "0s", num_ctx: int = 16384) -> str:
     """Wysyła zapytanie do API czatu Ollama z automatycznym zwalnianiem VRAM."""
     url = f"{OLLAMA_API_URL}/chat"
     payload = {
         "model": model_name,
         "messages": messages,
         "stream": stream,
-        "keep_alive": keep_alive
+        "keep_alive": keep_alive,
+        "options": {
+            "num_ctx": num_ctx
+        }
     }
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
@@ -49,6 +52,10 @@ def query_ollama(model_name: str, messages: list, stream: bool = True, keep_aliv
                     response_text += msg
                     if chunk.get("done", False):
                         break
+    except urllib.error.HTTPError as e:
+        err_msg = e.read().decode("utf-8", errors="ignore")
+        print(f"\n[BŁĄD HTTP {e.code}] {err_msg}", file=sys.stderr)
+        return ""
     except urllib.error.URLError as e:
         print(f"\n[BŁĄD] Nie można połączyć się z Ollama: {e}", file=sys.stderr)
         return ""
@@ -70,7 +77,7 @@ def unload_model(model_name: str):
         pass
 
 
-def run_pipeline(task_description: str, context_file: str = None, output_file: str = None):
+def run_pipeline(task_description: str, context_file: str = None, output_file: str = None, num_ctx: int = 32768):
     """Uruchamia sekwencyjną współpracę Architekta (27B) i Programisty (Coder 14B)."""
     context_content = ""
     if context_file:
@@ -103,7 +110,7 @@ Zadanie do zrealizowania:
         {"role": "user", "content": architect_prompt}
     ]
 
-    spec_output = query_ollama(MODEL_ARCHITECT, architect_messages, stream=True, keep_alive="0s")
+    spec_output = query_ollama(MODEL_ARCHITECT, architect_messages, stream=True, keep_alive="0s", num_ctx=num_ctx)
     
     # Upewniamy się, że VRAM został natychmiast zwolniony przed załadowaniem Codera
     unload_model(MODEL_ARCHITECT)
@@ -129,7 +136,7 @@ Kod musi zawierać pełną obsługę błędów, poprawne typowanie i nie zawiera
         {"role": "user", "content": coder_prompt}
     ]
 
-    code_output = query_ollama(MODEL_CODER, coder_messages, stream=True, keep_alive="0s")
+    code_output = query_ollama(MODEL_CODER, coder_messages, stream=True, keep_alive="0s", num_ctx=num_ctx)
     unload_model(MODEL_CODER)
 
     if output_file:
@@ -147,9 +154,10 @@ def main():
     parser.add_argument("--task", type=str, required=True, help="Opis zadania do zrealizowania przez tandem")
     parser.add_argument("--context", type=str, default=None, help="Ścieżka do opcjonalnego pliku kontekstu (np. kontekst.md)")
     parser.add_argument("--output", type=str, default=None, help="Ścieżka do pliku wyjściowego, gdzie zapisać rezultat")
+    parser.add_argument("--ctx", type=int, default=32768, help="Rozmiar okna kontekstowego (domyślnie 32768, wspiera do 131072 / 128k)")
     args = parser.parse_args()
 
-    run_pipeline(args.task, args.context, args.output)
+    run_pipeline(args.task, args.context, args.output, num_ctx=args.ctx)
 
 
 if __name__ == "__main__":

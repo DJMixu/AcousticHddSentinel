@@ -28,7 +28,10 @@ Zainstalowane i w pełni zintegrowane są dwa wyspecjalizowane modele open-weigh
    - Etap 2: Qwen 2.5 Coder 14B implementuje gotowy kod na bazie specyfikacji.
    - Etap 3: Agent AGY weryfikuje kod, uruchamia testy i integruje go z repozytorium.
 
-2. **Rygorystyczny niezmiennik pamięci VRAM (16 GB):**
-   - Karta AMD Radeon RX 9060 XT posiada 16 GB VRAM. Modele 27B (12 GB) oraz 14B (9 GB) **nigdy nie mogą rezydować w VRAM równocześnie**.
+2. **Rygorystyczny niezmiennik pamięci VRAM (16 GB) i architektura sprzętowa:**
+   - **Konfiguracja GPU:** System operacyjny, monitor i środowisko graficzne działają na zintegrowanym układzie procesora (**iGPU Ryzen 7 7700**).
+   - Karta **AMD Radeon RX 9060 XT (16 GB VRAM)** jest w 100% wolna od narzutu systemowego (pełne ~15.9 GB dostępne na obliczenia AI/ROCm).
+   - **Maksymalny kontekst:** Dzięki FlashAttention i kwantyzacji Q4_0 KV Cache w Ollama, model Qwen 3.8 27B (12 GB) może bezpiecznie przyjmować kontekst **aż do 128k (`131072` tokenów)** w całości mieszcząc się w pamięci VRAM GPU!
+   - Modele 27B (12 GB) oraz 14B (9 GB) **nigdy nie mogą rezydować w VRAM równocześnie**.
    - Skrypt `local_llm_bridge.py` zwalnia pamięć (`keep_alive=0`) natychmiast po wygenerowaniu odpowiedzi.
    - Przed uruchomieniem dowolnego treningu PyTorch (`train_cnn.py`, `train_testy.py`) agent **bezwzględnie sprawdza** `ollama ps` i w razie potrzeby wyładowuje modele (`ollama stop <nazwa>`), aby trening dysponował pełną pamięcią 16 GB VRAM.

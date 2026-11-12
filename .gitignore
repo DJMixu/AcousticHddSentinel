@@ -26,6 +26,8 @@ Thumbs.db
 stress_test_output/
 .idea/
 .vscode/
+models_backup/
+tests/adversarial_lab/samples/
 
 # Artefakty i pliki tymczasowe projektu mobilnego Android
 android/.gradle/

@@ -1,0 +1,39 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-11-12T16:18:00Z",
+  "scraped_domains_and_endpoints": {
+    "acsdata.com/sounds/ (Wayback Archive)": {
+      "status": "COMPLETED",
+      "files_downloaded": 21,
+      "notes": "Archiwum nagran laboratoryjnych uszkodzen glowic, zatarcia silnika, head crash"
+    },
+    "freesound.org": {
+      "status": "COMPLETED",
+      "files_downloaded": 42,
+      "queries_checked": [
+        "hard drive failure",
+        "failing hard drive",
+        "broken hard drive",
+        "dying hard drive",
+        "hard drive click",
+        "hdd click of death",
+        "hard drive beep",
+        "hard drive scratching",
+        "head crash hard drive"
+      ]
+    },
+    "datacent.com/hard_drive_sounds.php": {
+      "status": "COMPLETED_DUPLICATES_SKIPPED",
+      "notes": "Zbadano wrapper SWF - nagrania pokrywaja sie z istniejaca baza Northwind"
+    },
+    "drivesaversdatarecovery.com": {
+      "status": "EXAMINED_SYNTHETIC_LOOPS",
+      "notes": "Zbadano zasoby simulatora - dzwieki w JS to syntetyczne petle ambientowe"
+    },
+    "hddguru.com/forum": {
+      "status": "PROTECTED_CLOUDFLARE_CAPTCHA",
+      "notes": "Dostep zablokowany bramka Cloudflare Bot Challenge"
+    }
+  },
+  "total_unique_audio_files": 241
+}

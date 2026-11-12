@@ -203,3 +203,17 @@ W systemie użytkownika działa lokalna instalacja Ollama (`http://localhost:114
 - **Niezmiennik VRAM (16 GB) i architektura iGPU + dGPU:**
   Monitor i pulpit Linux działają na iGPU (Ryzen 7 7700), dzięki czemu karta **AMD Radeon RX 9060 XT (16 GB)** ma 100% VRAM (15.9 GB) wolne na czyste obliczenia AI. Dzięki FlashAttention i Q4_0 KV Cache w Ollama, model Qwen 3.8 27B obsługuje bezpiecznie kontekst **aż do 128k (`131072`)** bez wycieku do RAM CPU.
   Modele 27B i 14B nie mogą znajdować się w VRAM równocześnie. Skrypt `local_llm_bridge.py` automatycznie wyładowuje modele (`keep_alive=0`). Przed rozpoczęciem jakiegokolwiek treningu PyTorch na GPU agent **MUSI** upewnić się, że VRAM jest zwolniony (`ollama ps` puste).
+
+
+---
+
+## 7. Autonomiczne Zarządzanie Subagentami AI (Subagents & Parallel Workers)
+Agent AGY (Antigravity) posiada pełne uprawnienie i zalecenie do autonomicznego tworzenia i orkiestracji niezależnych subagentów AI:
+1. **Subagenci `self` (Klonowanie agenta głównego):**
+   - Agent może w dowolnym momencie powoływać niezależnych subagentów `self` dziedziczących pełne uprawnienia, prompt, narzędzia i środowisko.
+   - Stosować do długotrwałych zadań równoległych (np. wielogodzinny crawling archiwów, scraping forów dyskowych, generowanie syntetycznych ataków adversarial, niezależny audyt kodu).
+2. **Subagenci wyspecjalizowani (`define_subagent`):**
+   - Tworzenie dedykowanych workerów zadaniowych z precyzyjnie dobranym system promptem i zakresem uprawnień (np. `hdd-archive-scraper`, `dsp-verifier`, `code-reviewer`).
+3. **Zasady koordynacji:**
+   - Subagenci raportują wyniki asynchronicznie poprzez system wiadomości (`send_message`).
+   - Agent główny nie polluje w pętli – oczekuje reaktywnie na powiadomienia o zakończeniu prac subagentów.

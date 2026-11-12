@@ -1,0 +1,572 @@
+{
+  "archive_ipod_dead_hdd_01": {
+    "title": "Clicking iPod 1.8 inch HDD Spinup Fail and Spindown",
+    "source": "Internet Archive (dead_ipod_01)",
+    "url": "https://archive.org/download/dead_ipod_01/dead_ipod_01.wav",
+    "file": "archive_ipod_dead_hdd_01.wav",
+    "duration_s": 21.168,
+    "rms": 0.007546,
+    "md5": "c750c5539159d099d7eed9de1d63a068",
+    "category_hint": "clicking"
+  },
+  "archive_hdd_clicking_failure": {
+    "title": "Hard Drive Disk Repetitive Clicking Death",
+    "source": "Internet Archive (HddClicking)",
+    "url": "https://archive.org/download/HddClicking/HddClicking.mp3",
+    "file": "archive_hdd_clicking_failure.wav",
+    "duration_s": 27.492,
+    "rms": 0.009134,
+    "md5": "fb3fd0b1af0eba398455b4a1b07b8de9",
+    "category_hint": "clicking"
+  },
+  "archive_slowly_degenerating_hdd": {
+    "title": "Slowly Degenerating HDD Acoustic Breakdown",
+    "source": "Internet Archive (rp_20250308_20250308_1318)",
+    "url": "https://archive.org/download/rp_20250308_20250308_1318/delete.mp3",
+    "file": "archive_slowly_degenerating_hdd.wav",
+    "duration_s": 300.312,
+    "rms": 0.150031,
+    "md5": "f28e5960d1463636faddbf9b380b33c7",
+    "category_hint": "scratching"
+  },
+  "archive_hdd3_drive_noises": {
+    "title": "Hard Drive Mechanical Noises",
+    "source": "Internet Archive (hdd-3)",
+    "url": "https://archive.org/download/hdd-3/HDD2.mp3",
+    "file": "archive_hdd3_drive_noises.wav",
+    "duration_s": 52.846,
+    "rms": 0.057812,
+    "md5": "36b48363de8bb617ce589a222ebd5a2d",
+    "category_hint": "normal"
+  },
+  "github_hdds_access": {
+    "title": "HDDSynth HDD Access Head Clicks",
+    "source": "GitHub (MaverickUK/HDDSynth)",
+    "url": "https://raw.githubusercontent.com/MaverickUK/HDDSynth/main/samples/original/hdd_access.wav",
+    "file": "github_hdds_access.wav",
+    "duration_s": 2.367,
+    "rms": 0.028361,
+    "md5": "7b93dbd92217ebc2bc6a58857077c0c7",
+    "category_hint": "normal"
+  },
+  "github_hdds_idle": {
+    "title": "HDDSynth HDD Idle Platter Whir",
+    "source": "GitHub (MaverickUK/HDDSynth)",
+    "url": "https://raw.githubusercontent.com/MaverickUK/HDDSynth/main/samples/original/hdd_idle.wav",
+    "file": "github_hdds_idle.wav",
+    "duration_s": 0.554,
+    "rms": 0.019113,
+    "md5": "9261991a91d003601a00a2ae16838ad1",
+    "category_hint": "normal"
+  },
+  "github_hdds_idle_long": {
+    "title": "HDDSynth HDD Long Idle Rotation",
+    "source": "GitHub (MaverickUK/HDDSynth)",
+    "url": "https://raw.githubusercontent.com/MaverickUK/HDDSynth/main/samples/original/hdd_idle_long.wav",
+    "file": "github_hdds_idle_long.wav",
+    "duration_s": 3.424,
+    "rms": 0.019229,
+    "md5": "798a70a5d97f09a9c53246b0f97abb07",
+    "category_hint": "normal"
+  },
+  "github_hdds_spinup": {
+    "title": "HDDSynth HDD Platter Spinup Cycle",
+    "source": "GitHub (MaverickUK/HDDSynth)",
+    "url": "https://raw.githubusercontent.com/MaverickUK/HDDSynth/main/samples/original/hdd_spinup.wav",
+    "file": "github_hdds_spinup.wav",
+    "duration_s": 13.596,
+    "rms": 0.018358,
+    "md5": "14258c878172bb46ff2d8f8542b7c6d7",
+    "category_hint": "normal"
+  },
+  "github_winchester_boot-1999-head": {
+    "title": "Winchester Real HDD Acoustic boot-1999-head.m4a",
+    "source": "GitHub (glandais/winchester)",
+    "url": "/tmp/winchester_repo/docs/writing/simulating-a-hard-disk/media/boot-1999-head.m4a",
+    "file": "github_winchester_boot-1999-head.wav",
+    "duration_s": 20.0,
+    "rms": 0.017724,
+    "md5": "58875d84852207523a454884409c7770",
+    "category_hint": "normal"
+  },
+  "github_winchester_boot-1999-spindle": {
+    "title": "Winchester Real HDD Acoustic boot-1999-spindle.m4a",
+    "source": "GitHub (glandais/winchester)",
+    "url": "/tmp/winchester_repo/docs/writing/simulating-a-hard-disk/media/boot-1999-spindle.m4a",
+    "file": "github_winchester_boot-1999-spindle.wav",
+    "duration_s": 20.0,
+    "rms": 0.011425,
+    "md5": "59f18e42752e2c2226dd5a21318242d4",
+    "category_hint": "normal"
+  },
+  "github_winchester_boot-1999": {
+    "title": "Winchester Real HDD Acoustic boot-1999.m4a",
+    "source": "GitHub (glandais/winchester)",
+    "url": "/tmp/winchester_repo/docs/writing/simulating-a-hard-disk/media/boot-1999.m4a",
+    "file": "github_winchester_boot-1999.wav",
+    "duration_s": 20.0,
+    "rms": 0.020925,
+    "md5": "740a651612ec029b033e302a3bd02d8a",
+    "category_hint": "normal"
+  },
+  "github_winchester_boot-xp-2003": {
+    "title": "Winchester Real HDD Acoustic boot-xp-2003.m4a",
+    "source": "GitHub (glandais/winchester)",
+    "url": "/tmp/winchester_repo/docs/writing/simulating-a-hard-disk/media/boot-xp-2003.m4a",
+    "file": "github_winchester_boot-xp-2003.wav",
+    "duration_s": 15.0,
+    "rms": 0.015279,
+    "md5": "05858c1384b525282d3f963d0a3749ca",
+    "category_hint": "normal"
+  },
+  "github_winchester_defrag-dos-1993": {
+    "title": "Winchester Real HDD Acoustic defrag-dos-1993.m4a",
+    "source": "GitHub (glandais/winchester)",
+    "url": "/tmp/winchester_repo/docs/writing/simulating-a-hard-disk/media/defrag-dos-1993.m4a",
+    "file": "github_winchester_defrag-dos-1993.wav",
+    "duration_s": 15.0,
+    "rms": 0.040906,
+    "md5": "28c7cbc02ef8fda42fe874983fd625e5",
+    "category_hint": "normal"
+  },
+  "github_winchester_defrag-frontier-1993": {
+    "title": "Winchester Real HDD Acoustic defrag-frontier-1993.m4a",
+    "source": "GitHub (glandais/winchester)",
+    "url": "/tmp/winchester_repo/docs/writing/simulating-a-hard-disk/media/defrag-frontier-1993.m4a",
+    "file": "github_winchester_defrag-frontier-1993.wav",
+    "duration_s": 15.0,
+    "rms": 0.032906,
+    "md5": "42511b07afafd3497ff13f4dfc497d5d",
+    "category_hint": "normal"
+  },
+  "github_winchester_spindle-1996-ball": {
+    "title": "Winchester Real HDD Acoustic spindle-1996-ball.m4a",
+    "source": "GitHub (glandais/winchester)",
+    "url": "/tmp/winchester_repo/docs/writing/simulating-a-hard-disk/media/spindle-1996-ball.m4a",
+    "file": "github_winchester_spindle-1996-ball.wav",
+    "duration_s": 10.0,
+    "rms": 0.01399,
+    "md5": "13e220020b66b400872943fd211b7467",
+    "category_hint": "normal"
+  },
+  "github_winchester_spindle-2003-fluid": {
+    "title": "Winchester Real HDD Acoustic spindle-2003-fluid.m4a",
+    "source": "GitHub (glandais/winchester)",
+    "url": "/tmp/winchester_repo/docs/writing/simulating-a-hard-disk/media/spindle-2003-fluid.m4a",
+    "file": "github_winchester_spindle-2003-fluid.wav",
+    "duration_s": 10.0,
+    "rms": 0.00716,
+    "md5": "215bbc871dd5216a65b56c3d37866a99",
+    "category_hint": "normal"
+  },
+  "331710": {
+    "title": "Hard Drive Spin Up",
+    "user": "DailyMediaGroup",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/DailyMediaGroup/sounds/331710/",
+    "file": "freesound_331710_Hard_Drive_Spin_Up.wav",
+    "duration_s": 11.146,
+    "rms": 0.043319,
+    "md5": "fac652eb644414ad0529e1036f224207"
+  },
+  "538927": {
+    "title": "hard drive Hum.wav",
+    "user": "Federico_Casazza",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/Federico_Casazza/sounds/538927/",
+    "file": "freesound_538927_hard_drive_Hum_wav.wav",
+    "duration_s": 29.656,
+    "rms": 0.0073,
+    "md5": "ae4d895379f8dced2fc827282ddb2a96"
+  },
+  "465592": {
+    "title": "Hard Drive 7200RPM Spin Up, Idle and Spin Down (wav)",
+    "user": "conath",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/conath/sounds/465592/",
+    "file": "freesound_465592_Hard_Drive_7200RPM_Spin_Up__Idle_an.wav",
+    "duration_s": 33.121,
+    "rms": 0.007484,
+    "md5": "f5097cf0e2588e2bda61a2b8bc2b345b"
+  },
+  "166439": {
+    "title": "Hard Disk Drive (turns on and spins up to speed)",
+    "user": "ultradust",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/ultradust/sounds/166439/",
+    "file": "freesound_166439_Hard_Disk_Drive__turns_on_and_spins.wav",
+    "duration_s": 22.314,
+    "rms": 0.008045,
+    "md5": "36245c859b3bf2eda69d3a2be24fdd99"
+  },
+  "553328": {
+    "title": "External Hard Drive 1.wav",
+    "user": "Julian_Eftei",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/Julian_Eftei/sounds/553328/",
+    "file": "freesound_553328_External_Hard_Drive_1_wav.wav",
+    "duration_s": 10.75,
+    "rms": 0.002183,
+    "md5": "a7de4bd1b5d82f75da4e7d2f8d5d39a0"
+  },
+  "182366": {
+    "title": "Maxtor Atlas 10K V - 10000rpm - FDB",
+    "user": "Klerrp",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/Klerrp/sounds/182366/",
+    "file": "freesound_182366_Maxtor_Atlas_10K_V_-_10000rpm_-_FDB.wav",
+    "duration_s": 26.725,
+    "rms": 0.018874,
+    "md5": "90d4750d2317f7e5b2d50bf7f7228fe3"
+  },
+  "51152": {
+    "title": "External Harddisk Starting Up.wav",
+    "user": "RutgerMuller",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/RutgerMuller/sounds/51152/",
+    "file": "freesound_51152_External_Harddisk_Starting_Up_wav.wav",
+    "duration_s": 19.805,
+    "rms": 0.050134,
+    "md5": "d5660a6f0477ef380704b95cef78429a"
+  },
+  "829473": {
+    "title": "1TB Seagate HDD Writing or Reading Sounds",
+    "user": "madaesthetic1082",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/madaesthetic1082/sounds/829473/",
+    "file": "freesound_829473_1TB_Seagate_HDD_Writing_or_Reading_.wav",
+    "duration_s": 11.55,
+    "rms": 0.039051,
+    "md5": "28a740691bcc8b4e32d69ca7158cda24"
+  },
+  "734539": {
+    "title": "my HDD",
+    "user": "MintyOwU",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/MintyOwU/sounds/734539/",
+    "file": "freesound_734539_my_HDD.wav",
+    "duration_s": 9.819,
+    "rms": 0.002874,
+    "md5": "e7e21bc4b0bfa166f87f305a3c3374f1"
+  },
+  "594042": {
+    "title": "HDD spinup/spindown on inductor mic",
+    "user": "SamsterBirdies",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/SamsterBirdies/sounds/594042/",
+    "file": "freesound_594042_HDD_spinup_spindown_on_inductor_mic.wav",
+    "duration_s": 19.653,
+    "rms": 0.03474,
+    "md5": "f6682ed5e4285721f7c49e910c6d856b"
+  },
+  "569760": {
+    "title": "hdd2_mixdown2.wav",
+    "user": "gecop",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/gecop/sounds/569760/",
+    "file": "freesound_569760_hdd2_mixdown2_wav.wav",
+    "duration_s": 24.48,
+    "rms": 0.031269,
+    "md5": "7042b98bef1a01e101e3f4c2c0967bec"
+  },
+  "779113": {
+    "title": "Dual hard disk startup and shutdown",
+    "user": "JerboaApp",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/JerboaApp/sounds/779113/",
+    "file": "freesound_779113_Dual_hard_disk_startup_and_shutdown.wav",
+    "duration_s": 52.895,
+    "rms": 0.003066,
+    "md5": "1984282cc32d857a3d5309b15df66e6f"
+  },
+  "865667": {
+    "title": "Computer starting up/down &amp; Hard drive spin up/sp...",
+    "user": "AyaDrevis",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/AyaDrevis/sounds/865667/",
+    "file": "freesound_865667_Computer_starting_up_down__amp__Har.wav",
+    "duration_s": 34.303,
+    "rms": 0.004285,
+    "md5": "4d7e523961e8da04d9e88151004e2f7c"
+  },
+  "422244": {
+    "title": "seagate hdd click",
+    "user": "mrJvfreesound",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/mrJvfreesound/sounds/422244/",
+    "file": "freesound_422244_seagate_hdd_click.wav",
+    "duration_s": 2.471,
+    "rms": 0.085397,
+    "md5": "8994850590bb22d8cae97da5a02e552c"
+  },
+  "401271": {
+    "title": "Toshiba HDD.wav",
+    "user": "eardeer",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/eardeer/sounds/401271/",
+    "file": "freesound_401271_Toshiba_HDD_wav.wav",
+    "duration_s": 61.808,
+    "rms": 0.025039,
+    "md5": "fe242bd2b51c08887438295acc3264df"
+  },
+  "825619": {
+    "title": "DataCenter HDD Click / Fan buzzing sounds",
+    "user": "Sanedish",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/Sanedish/sounds/825619/",
+    "file": "freesound_825619_DataCenter_HDD_Click___Fan_buzzing_.wav",
+    "duration_s": 11.751,
+    "rms": 0.063366,
+    "md5": "a2ec459749042ec55dec229c3eb0c3e0"
+  },
+  "432147": {
+    "title": "HardDriveSpinup.ogg",
+    "user": "Danwardvs",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/Danwardvs/sounds/432147/",
+    "file": "freesound_432147_HardDriveSpinup_ogg.wav",
+    "duration_s": 6.095,
+    "rms": 0.026956,
+    "md5": "4d23b33afa494bdd5fd2ab3e4abf5ef9"
+  },
+  "637063": {
+    "title": "Hard drive spin up and head alignment",
+    "user": "micropolis",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/micropolis/sounds/637063/",
+    "file": "freesound_637063_Hard_drive_spin_up_and_head_alignme.wav",
+    "duration_s": 19.809,
+    "rms": 0.006512,
+    "md5": "0ebc80cf8f27c67b69016fc75751cb6d"
+  },
+  "418430": {
+    "title": "Hard Drive start/ide/stop",
+    "user": "cgiFox9",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/cgiFox9/sounds/418430/",
+    "file": "freesound_418430_Hard_Drive_start_ide_stop.wav",
+    "duration_s": 29.358,
+    "rms": 0.010108,
+    "md5": "266fb681349e331e1f7ae82bbeececea"
+  },
+  "554672": {
+    "title": "Old Hard Drive Spin Up and Spin Down",
+    "user": "Exacom",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/Exacom/sounds/554672/",
+    "file": "freesound_554672_Old_Hard_Drive_Spin_Up_and_Spin_Dow.wav",
+    "duration_s": 69.822,
+    "rms": 0.039582,
+    "md5": "4ef0fbba757e5b73f3da8ed5f8d51114"
+  },
+  "569612": {
+    "title": "hdd_mixdown.wav",
+    "user": "gecop",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/gecop/sounds/569612/",
+    "file": "freesound_569612_hdd_mixdown_wav.wav",
+    "duration_s": 56.668,
+    "rms": 0.017668,
+    "md5": "210002e445f4c5f7899d9f1d2fe0bdc1"
+  },
+  "170849": {
+    "title": "hdd spinning.wav",
+    "user": "samchitto",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/samchitto/sounds/170849/",
+    "file": "freesound_170849_hdd_spinning_wav.wav",
+    "duration_s": 81.812,
+    "rms": 0.022087,
+    "md5": "f4a1441e2467353399b01b37a412b539"
+  },
+  "262956": {
+    "title": "harddrive spin up.wav",
+    "user": "parabolix",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/parabolix/sounds/262956/",
+    "file": "freesound_262956_harddrive_spin_up_wav.wav",
+    "duration_s": 25.543,
+    "rms": 0.026485,
+    "md5": "02246bcc4a085683c53e713cc7763c48"
+  },
+  "718351": {
+    "title": "Hard drive in office (SonicRhythm 004)",
+    "user": "alexarje",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/alexarje/sounds/718351/",
+    "file": "freesound_718351_Hard_drive_in_office__SonicRhythm_0.wav",
+    "duration_s": 60.0,
+    "rms": 0.020556,
+    "md5": "ad7b51f5048a6ad51677cb1df58a3bd4"
+  },
+  "250217": {
+    "title": "hdd_laptop_spindown.wav",
+    "user": "nickijupiter",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/nickijupiter/sounds/250217/",
+    "file": "freesound_250217_hdd_laptop_spindown_wav.wav",
+    "duration_s": 2.733,
+    "rms": 0.228594,
+    "md5": "5b3efbfc26f252e138bd29125357ddfe"
+  },
+  "325703": {
+    "title": "HDD_Load_Unload.wav",
+    "user": "mcschin1",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/mcschin1/sounds/325703/",
+    "file": "freesound_325703_HDD_Load_Unload_wav.wav",
+    "duration_s": 4.356,
+    "rms": 0.006745,
+    "md5": "693fcfaba299c75fcca35b69b1e6f7c8"
+  },
+  "166641": {
+    "title": "Seagate Barracuda 7200.14 - Slow Spinup - FDB",
+    "user": "Klerrp",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/Klerrp/sounds/166641/",
+    "file": "freesound_166641_Seagate_Barracuda_7200_14_-_Slow_Sp.wav",
+    "duration_s": 59.855,
+    "rms": 0.035941,
+    "md5": "601719979241bdac40d430246e6d68b8"
+  },
+  "466711": {
+    "title": "HDD 01 Contact.wav",
+    "user": "tombenedict",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/tombenedict/sounds/466711/",
+    "file": "freesound_466711_HDD_01_Contact_wav.wav",
+    "duration_s": 42.151,
+    "rms": 0.116951,
+    "md5": "88fedd1b80636284c326c64c13269ea6"
+  },
+  "493891": {
+    "title": "Vintage Hard Drive Read and Idle",
+    "user": "Crinkem",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/Crinkem/sounds/493891/",
+    "file": "freesound_493891_Vintage_Hard_Drive_Read_and_Idle.wav",
+    "duration_s": 26.258,
+    "rms": 0.006176,
+    "md5": "7c616111a21c9e7f2bbb23bcd192e84d"
+  },
+  "426060": {
+    "title": "interference radio TV data computer hard drive.wav",
+    "user": "JavierZumer",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/JavierZumer/sounds/426060/",
+    "file": "freesound_426060_interference_radio_TV_data_computer.wav",
+    "duration_s": 118.656,
+    "rms": 0.031037,
+    "md5": "40aa2bec35acb4958c1c4930dc9235c6"
+  },
+  "625266": {
+    "title": "1.5 GB HDD from IBM ThinkPad 365XD (1996) - Warm ...",
+    "user": "ffb.soffa",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/ffb.soffa/sounds/625266/",
+    "file": "freesound_625266_1_5_GB_HDD_from_IBM_ThinkPad_365XD_.wav",
+    "duration_s": 22.549,
+    "rms": 0.003119,
+    "md5": "c54ae0722cda56d8ad7eaa53f5206e23"
+  },
+  "829472": {
+    "title": "1TB Seagate HDD Idle Sound",
+    "user": "madaesthetic1082",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/madaesthetic1082/sounds/829472/",
+    "file": "freesound_829472_1TB_Seagate_HDD_Idle_Sound.wav",
+    "duration_s": 1.798,
+    "rms": 0.010632,
+    "md5": "1e20f3b56a517d95ca0e2cc1942a452a"
+  },
+  "118258": {
+    "title": "Hard Drive Hum.wav",
+    "user": "pwausc1",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/pwausc1/sounds/118258/",
+    "file": "freesound_118258_Hard_Drive_Hum_wav.wav",
+    "duration_s": 38.613,
+    "rms": 0.079075,
+    "md5": "d05f2d88046b0aa53acc7f74c21d8028"
+  },
+  "137209": {
+    "title": "Write To Hard drive.WAV",
+    "user": "jobro",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/jobro/sounds/137209/",
+    "file": "freesound_137209_Write_To_Hard_drive_WAV.wav",
+    "duration_s": 27.1,
+    "rms": 0.304143,
+    "md5": "30c4579878b7485af54e8749618ee771"
+  },
+  "712383": {
+    "title": "external hard drive being accessed",
+    "user": "Andron827",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/Andron827/sounds/712383/",
+    "file": "freesound_712383_external_hard_drive_being_accessed.wav",
+    "duration_s": 62.833,
+    "rms": 0.007849,
+    "md5": "14fae4576ed1b4a91fc5775da29a4830"
+  },
+  "543831": {
+    "title": "Hard Drive Electromagnetic Sounds.wav",
+    "user": "vero.marengere",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/vero.marengere/sounds/543831/",
+    "file": "freesound_543831_Hard_Drive_Electromagnetic_Sounds_w.wav",
+    "duration_s": 52.0,
+    "rms": 0.024789,
+    "md5": "79353f25560081dff222f775e6bbaa78"
+  },
+  "663453": {
+    "title": "R4_00373_ElectromagneticHardDrive.wav",
+    "user": "kevp888",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/kevp888/sounds/663453/",
+    "file": "freesound_663453_R4_00373_ElectromagneticHardDrive_w.wav",
+    "duration_s": 75.714,
+    "rms": 0.032221,
+    "md5": "bc5593df688dff76ab940ff1313f3dd8"
+  },
+  "663490": {
+    "title": "R4_00374_ElectromagneticHardDrive.wav",
+    "user": "kevp888",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/kevp888/sounds/663490/",
+    "file": "freesound_663490_R4_00374_ElectromagneticHardDrive_w.wav",
+    "duration_s": 61.7,
+    "rms": 0.158806,
+    "md5": "10ae325418e7b50d7016db0caa104170"
+  },
+  "250214": {
+    "title": "hdd_external_folder-access_long.wav",
+    "user": "nickijupiter",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/nickijupiter/sounds/250214/",
+    "file": "freesound_250214_hdd_external_folder-access_long_wav.wav",
+    "duration_s": 2.659,
+    "rms": 0.078798,
+    "md5": "b67059f934a94fd8049a6415c4030115"
+  },
+  "168049": {
+    "title": "ExternalHDD PowerCycling hint of 1stYears",
+    "user": "zigzagzen",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/zigzagzen/sounds/168049/",
+    "file": "freesound_168049_ExternalHDD_PowerCycling_hint_of_1s.wav",
+    "duration_s": 65.55,
+    "rms": 0.004526,
+    "md5": "46c67b9c1d7372f0e10d7357fd0f7f4e"
+  },
+  "272347": {
+    "title": "hitachi_laptop_60gb_nospin_buzzing.mp3",
+    "user": "Ghostcodex_Dansedestroy_101010",
+    "source": "Freesound.org",
+    "url": "https://freesound.org/people/Ghostcodex_Dansedestroy_101010/sounds/272347/",
+    "file": "freesound_272347_hitachi_laptop_60gb_nospin_buzzing_.wav",
+    "duration_s": 12.579,
+    "rms": 0.003301,
+    "md5": "49c4b7560bd03d780c32c7db4246922a"
+  }
+}

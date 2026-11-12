@@ -15,6 +15,7 @@ import com.acoustichddsentinel.data.DiagnosticModel;
 import com.acoustichddsentinel.data.DiagnosticRepository;
 import com.acoustichddsentinel.dsp.AudioPreprocessor;
 import com.acoustichddsentinel.dsp.DspConstants;
+import com.acoustichddsentinel.dsp.RpmHarmonicsAnalyzer;
 import com.acoustichddsentinel.dsp.SpectrogramImageSaver;
 import com.acoustichddsentinel.ml.AcousticClassifier;
 import com.acoustichddsentinel.ml.ClassificationResult;
@@ -39,6 +40,7 @@ public class MainViewModel extends AndroidViewModel {
 
     private final AudioRecorder audioRecorder;
     private final AudioPreprocessor audioPreprocessor;
+    private final RpmHarmonicsAnalyzer rpmHarmonicsAnalyzer;
     private final DiagnosticRepository repository;
     private final ExecutorService backgroundExecutor;
 
@@ -48,6 +50,7 @@ public class MainViewModel extends AndroidViewModel {
         super(application);
         this.audioRecorder = new AudioRecorder();
         this.audioPreprocessor = new AudioPreprocessor();
+        this.rpmHarmonicsAnalyzer = new RpmHarmonicsAnalyzer();
         this.repository = new DiagnosticRepository(application);
         this.backgroundExecutor = Executors.newFixedThreadPool(2);
 
@@ -74,12 +77,25 @@ public class MainViewModel extends AndroidViewModel {
     }
 
     /**
-     * Uruchamia procedurę diagnozy: rejestracja audio mikrofonem sprzętowym, DSP i klasyfikacja.
+     * Uruchamia procedurę diagnozy w adaptacyjnym stylu Shazam:
+     * - Strumieniowa rejestracja audio mikrofonem sprzętowym
+     * - Wnioskowanie w locie co 1.5 sekundy (od t = 3.0s)
+     * - Wczesne zatrzymanie (Early Stopping), jeśli wynik jest jednoznaczny (pewność >= 80%)
+     * - Do 5 okien weryfikacyjnych (max ~9.0s) z głosowaniem konsensusowym
      *
-     * @param hddName         nazwa lub model badanego dysku HDD
-     * @param durationSeconds czas nagrywania (od 5 do 30 sekund)
+     * @param hddName nazwa lub model badanego dysku HDD
      */
-    public void startDiagnosis(String hddName, int durationSeconds) {
+    public void startDiagnosis(String hddName) {
+        startDiagnosis(hddName, 9);
+    }
+
+    /**
+     * Uruchamia procedurę diagnozy z określonym maksymalnym czasem nasłuchu.
+     *
+     * @param hddName    nazwa lub model badanego dysku HDD
+     * @param maxSeconds maksymalny czas nasłuchu (np. 9 sekund dla 5 okien)
+     */
+    public void startDiagnosis(String hddName, int maxSeconds) {
         final String effectiveHddName = (hddName == null || hddName.trim().isEmpty())
             ? "HDD Generic"
             : hddName.trim();
@@ -89,17 +105,115 @@ public class MainViewModel extends AndroidViewModel {
             return;
         }
 
-        uiState.setValue(DiagnosticUiState.recording(0, durationSeconds * 1000, 0.0f));
+        uiState.setValue(DiagnosticUiState.recording(0, maxSeconds * 1000, 0.0f, "Słucham dźwięków dysku... Zbliż telefon do HDD"));
 
-        audioRecorder.startRecording(durationSeconds, new AudioRecorder.RecordCallback() {
+        List<ClassificationResult> windowResults = new ArrayList<>();
+        List<AudioChunk> windowChunks = new ArrayList<>();
+        final String[] detectedRpmContainer = new String[1];
+        final boolean[] hasAnomalyContainer = new boolean[1];
+        final ClassificationResult[] bestAnomalyContainer = new ClassificationResult[1];
+        final AudioChunk[] repChunkContainer = new AudioChunk[1];
+
+        audioRecorder.startAdaptiveListening(maxSeconds, new AudioRecorder.AdaptiveStreamCallback() {
             @Override
-            public void onProgress(int elapsedMs, int totalMs, float currentRms) {
-                uiState.postValue(DiagnosticUiState.recording(elapsedMs, totalMs, currentRms));
+            public void onProgress(int elapsedMs, int maxMs, float currentRms) {
+                DiagnosticUiState current = uiState.getValue();
+                String msg = current != null ? current.getStatusMessage() : null;
+                uiState.postValue(DiagnosticUiState.recording(elapsedMs, maxMs, currentRms, msg));
             }
 
             @Override
-            public void onRecordingComplete(List<AudioChunk> chunks, float overallRms) {
-                if (chunks == null || chunks.isEmpty()) {
+            public boolean onWindowReady(int windowIndex, AudioChunk chunk) {
+                try {
+                    float[] samples = chunk.getSamples();
+                    float maxAbs = 0f;
+                    for (float s : samples) {
+                        float abs = Math.abs(s);
+                        if (abs > maxAbs) maxAbs = abs;
+                    }
+                    float crestFactor = maxAbs / (chunk.getRms() + 1e-9f);
+
+                    RpmHarmonicsAnalyzer.RpmResult rpmRes = rpmHarmonicsAnalyzer.analyzeChunk(samples);
+                    if (rpmRes.hasRotation && rpmRes.detectedRpm != null) {
+                        detectedRpmContainer[0] = rpmRes.nominalRpm + " RPM";
+                    }
+
+                    float[] flatTensor = audioPreprocessor.processAudioChunkToFlatTensor(samples);
+                    ClassificationResult res = classifier.classifyChunk(flatTensor);
+
+                    windowResults.add(res);
+                    windowChunks.add(chunk);
+
+                    if (repChunkContainer[0] == null) {
+                        repChunkContainer[0] = chunk;
+                    }
+
+                    boolean isAnomaly = res.isAnomaly();
+                    String dominantClass = res.getDominantClass();
+                    float confidence = res.getConfidence();
+
+                    // Bezpiecznik fizyczny: clicking bez wysokiego Crest Factora (< 3.0) i bez wysokiej pewności
+                    if (isAnomaly && "clicking".equals(dominantClass) && crestFactor < 3.0f && confidence < 0.75f) {
+                        isAnomaly = false;
+                        dominantClass = "normal";
+                    }
+
+                    if (isAnomaly) {
+                        hasAnomalyContainer[0] = true;
+                        if (bestAnomalyContainer[0] == null || confidence > bestAnomalyContainer[0].getConfidence()) {
+                            bestAnomalyContainer[0] = new ClassificationResult(
+                                dominantClass, confidence, res.getProbabilities(), true,
+                                res.getInferenceTimeMs(), detectedRpmContainer[0], null
+                            );
+                            repChunkContainer[0] = chunk;
+                        }
+                    }
+
+                    // ===============================================================
+                    // LOGIKA EARLY STOPPING (Jak w prawdziwym Shazam):
+                    // ===============================================================
+
+                    // 1. Ewidentna awaria mechaniczna (Clicking, Beeping, Scratching) z wysoką pewnością (>= 75%)
+                    if (isAnomaly && confidence >= 0.75f) {
+                        Log.i(TAG, "Early Stopping: Wykryto ewidentną awarię (" + dominantClass + ", " + (confidence * 100) + "%) w oknie " + windowIndex);
+                        return true;
+                    }
+
+                    // 2. Ewidentny dysk sprawny lub dźwięk obcy (Normal) z wysoką pewnością (>= 80%)
+                    if (!isAnomaly && confidence >= 0.80f) {
+                        Log.i(TAG, "Early Stopping: Jednoznaczny stan sprawny/normalny (" + (confidence * 100) + "%) w oknie " + windowIndex);
+                        return true;
+                    }
+
+                    // 3. Spójność dwóch kolejnych okien (Consensus Voting)
+                    if (windowIndex >= 1) {
+                        ClassificationResult prevRes = windowResults.get(windowIndex - 1);
+                        if (dominantClass.equals(prevRes.getDominantClass()) && confidence >= 0.60f && prevRes.getConfidence() >= 0.60f) {
+                            Log.i(TAG, "Early Stopping: Konsensus 2 kolejnych okien (" + dominantClass + ") w oknie " + windowIndex);
+                            return true;
+                        }
+                    }
+
+                    // Jeśli wynik wciąż niejednoznaczny (np. zakłócenie na początku) i są kolejne okna:
+                    if (windowIndex < 4) {
+                        int nextWindow = windowIndex + 2;
+                        int elapsedMs = (windowIndex + 1) * 1500 + 1500;
+                        uiState.postValue(DiagnosticUiState.recording(
+                            elapsedMs, maxSeconds * 1000, chunk.getRms(),
+                            "Słucham dalej dla potwierdzenia... (okno " + nextWindow + "/5)"
+                        ));
+                    }
+
+                    return false; // Słuchamy dalej
+                } catch (Exception e) {
+                    Log.e(TAG, "Błąd analizy okna " + windowIndex, e);
+                    return false;
+                }
+            }
+
+            @Override
+            public void onStreamComplete(List<AudioChunk> evaluatedChunks, float overallRms, boolean stoppedEarly) {
+                if (evaluatedChunks == null || evaluatedChunks.isEmpty()) {
                     uiState.postValue(DiagnosticUiState.error("Nie zarejestrowano wystarczającej ilości danych audio."));
                     return;
                 }
@@ -113,8 +227,9 @@ public class MainViewModel extends AndroidViewModel {
                     return;
                 }
 
-                uiState.postValue(DiagnosticUiState.processing("Przetwarzanie DSP (STFT, Mel, Delta) oraz inferencja CNN..."));
-                processAndClassifyChunks(effectiveHddName, chunks);
+                uiState.postValue(DiagnosticUiState.processing("Finalizowanie diagnozy i generowanie raportu..."));
+                finalizeDiagnostic(effectiveHddName, windowResults, windowChunks, repChunkContainer[0],
+                    hasAnomalyContainer[0], bestAnomalyContainer[0], detectedRpmContainer[0]);
             }
 
             @Override
@@ -125,56 +240,49 @@ public class MainViewModel extends AndroidViewModel {
     }
 
     /**
-     * Analityczny potok wielookienkowy w tle:
-     * Jeżeli w KTÓRYMKOLWIEK oknie 3.0s wystąpi anomalia (clicking, beeping, scratching),
-     * całe badanie klasyfikowane jest jako anomalia (has_anomaly = 1).
+     * Finalizuje badanie: agreguje prawdopodobieństwa, zapisuje spektrogram oraz wynik do bazy SQLite.
      */
-    private void processAndClassifyChunks(String hddName, List<AudioChunk> chunks) {
+    private void finalizeDiagnostic(String hddName,
+                                    List<ClassificationResult> windowResults,
+                                    List<AudioChunk> windowChunks,
+                                    AudioChunk representativeChunk,
+                                    boolean hasMechanicalAnomaly,
+                                    ClassificationResult bestAnomalyResult,
+                                    String detectedRpmOverall) {
         backgroundExecutor.execute(() -> {
             try {
-                boolean hasAnyAnomaly = false;
-                ClassificationResult bestAnomalyResult = null;
-                AudioChunk representativeChunk = chunks.get(0);
-                long totalInferenceTime = 0;
-
-                Map<String, Float> accumulatedProbs = new HashMap<>();
-                for (String cName : AcousticClassifier.CLASS_NAMES) {
-                    accumulatedProbs.put(cName, 0.0f);
+                if (windowResults.isEmpty() || representativeChunk == null) {
+                    uiState.postValue(DiagnosticUiState.error("Brak danych analitycznych do wystawienia diagnozy."));
+                    return;
                 }
 
-                for (AudioChunk chunk : chunks) {
-                    float[] flatTensor = audioPreprocessor.processAudioChunkToFlatTensor(chunk.getSamples());
-                    ClassificationResult res = classifier.classifyChunk(flatTensor);
-                    totalInferenceTime += res.getInferenceTimeMs();
+                int numWindows = windowResults.size();
+                Map<String, Float> avgProbs = new HashMap<>();
+                long totalInfTime = 0;
 
-                    for (Map.Entry<String, Float> entry : res.getProbabilities().entrySet()) {
-                        accumulatedProbs.put(entry.getKey(), accumulatedProbs.get(entry.getKey()) + entry.getValue());
+                for (ClassificationResult wr : windowResults) {
+                    totalInfTime += wr.getInferenceTimeMs();
+                    for (Map.Entry<String, Float> e : wr.getProbabilities().entrySet()) {
+                        avgProbs.put(e.getKey(), avgProbs.getOrDefault(e.getKey(), 0.0f) + e.getValue() / numWindows);
                     }
-
-                    if (res.isAnomaly()) {
-                        hasAnyAnomaly = true;
-                        if (bestAnomalyResult == null || res.getConfidence() > bestAnomalyResult.getConfidence()) {
-                            bestAnomalyResult = res;
-                            representativeChunk = chunk;
-                        }
-                    }
-                }
-
-                int numChunks = chunks.size();
-                Map<String, Float> averageProbs = new HashMap<>();
-                for (Map.Entry<String, Float> entry : accumulatedProbs.entrySet()) {
-                    averageProbs.put(entry.getKey(), entry.getValue() / numChunks);
                 }
 
                 String finalDominantClass;
                 float finalConfidence;
+                String customRecommendation;
 
-                if (hasAnyAnomaly && bestAnomalyResult != null) {
+                if (hasMechanicalAnomaly && bestAnomalyResult != null) {
                     finalDominantClass = bestAnomalyResult.getDominantClass();
                     finalConfidence = bestAnomalyResult.getConfidence();
+                    customRecommendation = ClassificationResult.generateRecommendation(finalDominantClass, true);
                 } else {
                     finalDominantClass = "normal";
-                    finalConfidence = averageProbs.getOrDefault("normal", 0.99f);
+                    finalConfidence = avgProbs.getOrDefault("normal", 0.90f);
+                    if (detectedRpmOverall != null) {
+                        customRecommendation = "Dysk sprawny (" + detectedRpmOverall + "). Prawidłowa prędkość obrotowa, brak uszkodzeń głowic.";
+                    } else {
+                        customRecommendation = "Dźwięk prawidłowy / otoczenie. Sieć neuronowa nie wykryła żadnych sygnatur uszkodzeń HDD.";
+                    }
                 }
 
                 // Generowanie spektrogramu Mel dla reprezentatywnego okna
@@ -185,15 +293,17 @@ public class MainViewModel extends AndroidViewModel {
                 ClassificationResult overallResult = new ClassificationResult(
                     finalDominantClass,
                     finalConfidence,
-                    averageProbs,
-                    hasAnyAnomaly,
-                    totalInferenceTime / numChunks
+                    avgProbs,
+                    hasMechanicalAnomaly,
+                    totalInfTime / numWindows,
+                    detectedRpmOverall,
+                    customRecommendation
                 );
 
                 DiagnosticModel diagnosticModel = new DiagnosticModel(
                     hddName,
                     System.currentTimeMillis(),
-                    hasAnyAnomaly,
+                    hasMechanicalAnomaly,
                     specPath,
                     finalDominantClass,
                     finalConfidence
@@ -208,10 +318,16 @@ public class MainViewModel extends AndroidViewModel {
                 uiState.postValue(DiagnosticUiState.success(diagnosticModel, overallResult, specBitmap));
 
             } catch (Exception e) {
-                Log.e(TAG, "Błąd podczas przetwarzania wycinków audio", e);
-                uiState.postValue(DiagnosticUiState.error("Błąd przetwarzania: " + e.getMessage()));
+                Log.e(TAG, "Błąd podczas finalizowania diagnozy", e);
+                uiState.postValue(DiagnosticUiState.error("Błąd diagnozy: " + e.getMessage()));
             }
         });
+    }
+
+    public void stopRecording() {
+        if (audioRecorder.isRecording()) {
+            audioRecorder.stopRecording();
+        }
     }
 
     public void cancelRecording() {

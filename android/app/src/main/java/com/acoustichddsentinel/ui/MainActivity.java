@@ -60,15 +60,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupViews() {
-        // Konfiguracja suwaka czasu nagrywania
-        binding.sliderDuration.addOnChangeListener((slider, value, fromUser) -> {
-            int seconds = (int) value;
-            binding.tvDurationValue.setText(String.format(Locale.US, "%d s", seconds));
-        });
-
-        // Przycisk rozpoczęcia badania
-        binding.btnStartDiagnosis.setOnClickListener(v -> checkPermissionAndStart());
-        binding.btnHeroShazam.setOnClickListener(v -> checkPermissionAndStart());
+        // Czysta interakcja w stylu Shazam - pojedynczy przycisk Hero
+        binding.btnHeroShazam.setOnClickListener(v -> handleHeroClick());
 
         // Przycisk czyszczenia historii
         binding.btnClearHistory.setOnClickListener(v -> showClearHistoryConfirmationDialog());
@@ -91,6 +84,18 @@ public class MainActivity extends AppCompatActivity {
         binding.rvHistory.setAdapter(adapter);
     }
 
+    private void handleHeroClick() {
+        DiagnosticUiState currentState = viewModel.getUiState().getValue();
+        if (currentState != null && currentState.getStatus() == DiagnosticUiState.Status.RECORDING) {
+            // Ponowne kliknięcie podczas słuchania zatrzymuje nagrywanie i natychmiast diagnozuje
+            viewModel.stopRecording();
+        } else {
+            // Start nowego badania - schowaj poprzednią kartę wyniku
+            binding.cardResult.setVisibility(View.GONE);
+            checkPermissionAndStart();
+        }
+    }
+
     private void checkPermissionAndStart() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             startRecordingFromUi();
@@ -103,8 +108,8 @@ public class MainActivity extends AppCompatActivity {
         String hddName = binding.etHddName.getText() != null
             ? binding.etHddName.getText().toString().trim()
             : "";
-        int durationSeconds = (int) binding.sliderDuration.getValue();
-        viewModel.startDiagnosis(hddName, durationSeconds);
+        // Adaptacyjny tryb Shazam (Early Stopping po 3.0s lub do 9.0s z głosowaniem konsensusowym)
+        viewModel.startDiagnosis(hddName);
     }
 
     private void observeViewModel() {
@@ -163,20 +168,17 @@ public class MainActivity extends AppCompatActivity {
             case IDLE:
                 stopPulseAnimation();
                 binding.btnHeroShazam.setEnabled(true);
-                binding.btnStartDiagnosis.setEnabled(true);
-                binding.btnStartDiagnosis.setText(R.string.btn_start_diagnosis);
-                binding.sliderDuration.setEnabled(true);
+                binding.tvHeroHint.setText("Stuknij, aby zbadać stan HDD");
                 binding.progressBarAudio.setVisibility(View.GONE);
                 binding.progressBarAudio.setIndeterminate(false);
-                binding.tvRecordingStatus.setText(R.string.status_idle);
+                binding.tvRecordingStatus.setText("Gotowy do badania (Shazam Mode)");
                 break;
 
             case RECORDING:
+                binding.cardResult.setVisibility(View.GONE);
                 startPulseAnimation();
-                binding.btnHeroShazam.setEnabled(false);
-                binding.btnStartDiagnosis.setEnabled(false);
-                binding.btnStartDiagnosis.setText("Nasłuchiwanie HDD...");
-                binding.sliderDuration.setEnabled(false);
+                binding.btnHeroShazam.setEnabled(true);
+                binding.tvHeroHint.setText("Słucham dźwięków dysku... Zbliż telefon do HDD");
                 binding.progressBarAudio.setVisibility(View.VISIBLE);
                 binding.progressBarAudio.setIndeterminate(false);
                 int progress = state.getRecordingTotalMs() > 0
@@ -187,10 +189,10 @@ public class MainActivity extends AppCompatActivity {
                 break;
 
             case PROCESSING:
+                binding.cardResult.setVisibility(View.GONE);
                 stopPulseAnimation();
                 binding.btnHeroShazam.setEnabled(false);
-                binding.btnStartDiagnosis.setEnabled(false);
-                binding.sliderDuration.setEnabled(false);
+                binding.tvHeroHint.setText("Analizowanie sygnatury akustycznej...");
                 binding.progressBarAudio.setVisibility(View.VISIBLE);
                 binding.progressBarAudio.setIndeterminate(true);
                 binding.tvRecordingStatus.setText(state.getStatusMessage());
@@ -199,9 +201,7 @@ public class MainActivity extends AppCompatActivity {
             case SUCCESS:
                 stopPulseAnimation();
                 binding.btnHeroShazam.setEnabled(true);
-                binding.btnStartDiagnosis.setEnabled(true);
-                binding.btnStartDiagnosis.setText(R.string.btn_start_diagnosis);
-                binding.sliderDuration.setEnabled(true);
+                binding.tvHeroHint.setText("Stuknij, aby zbadać ponownie");
                 binding.progressBarAudio.setVisibility(View.GONE);
                 binding.progressBarAudio.setIndeterminate(false);
                 binding.tvRecordingStatus.setText("Diagnoza zakończona pomyślnie.");
@@ -212,9 +212,7 @@ public class MainActivity extends AppCompatActivity {
             case ERROR:
                 stopPulseAnimation();
                 binding.btnHeroShazam.setEnabled(true);
-                binding.btnStartDiagnosis.setEnabled(true);
-                binding.btnStartDiagnosis.setText(R.string.btn_start_diagnosis);
-                binding.sliderDuration.setEnabled(true);
+                binding.tvHeroHint.setText("Stuknij, aby spróbować ponownie");
                 binding.progressBarAudio.setVisibility(View.GONE);
                 binding.progressBarAudio.setIndeterminate(false);
                 binding.tvRecordingStatus.setText("Błąd: " + state.getErrorMessage());

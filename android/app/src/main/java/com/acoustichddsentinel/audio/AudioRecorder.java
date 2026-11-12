@@ -15,8 +15,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Rejestrator sygnału audio z mikrofonu sprzętowego smartfona (android.media.AudioRecord).
- * Obsługuje rejestrację od 5 do 30 sekund, próbkowanie 22050 Hz (z automatycznym fallbackiem do 44100 Hz),
- * przeliczanie RMS w czasie rzeczywistym oraz podział na 3-sekundowe wycinki analityczne.
+ * Obsługuje:
+ * 1. Adaptacyjny nasłuch strumieniowy w stylu Shazam (Early Stopping & Multi-Window Voting)
+ * 2. Próbkowanie 22050 Hz z antyaliasingową decymacją 2:1 w czasie rzeczywistym przy fallbacku 44100 Hz
+ * 3. Analizę krokową 3-sekundowych okien z 50% zakładką (krok 1.5 s)
+ * 4. Płynne raportowanie RMS oraz wczesne przerywanie po uzyskaniu pewnego wyniku.
  */
 public class AudioRecorder {
 
@@ -25,6 +28,19 @@ public class AudioRecorder {
     public interface RecordCallback {
         void onProgress(int elapsedMs, int totalMs, float currentRms);
         void onRecordingComplete(List<AudioChunk> chunks, float overallRms);
+        void onError(String message);
+    }
+
+    public interface AdaptiveStreamCallback {
+        void onProgress(int elapsedMs, int maxMs, float currentRms);
+        /**
+         * Wywoływane natychmiast w locie, gdy w buforze audio dostępny jest kolejny pełny 3-sekundowy wycinek (66150 próbek).
+         * @param windowIndex numer okna (0, 1, 2...)
+         * @param chunk obiekt AudioChunk zawierający 66150 próbek przy 22050 Hz
+         * @return true jeśli wnioskowanie jest jednoznaczne i należy natychmiast zatrzymać nagrywanie (Early Stopping), false jeśli słuchamy dalej
+         */
+        boolean onWindowReady(int windowIndex, AudioChunk chunk);
+        void onStreamComplete(List<AudioChunk> evaluatedChunks, float overallRms, boolean stoppedEarly);
         void onError(String message);
     }
 
@@ -37,16 +53,28 @@ public class AudioRecorder {
     }
 
     /**
-     * Rozpoczyna rejestrację audio w osobnym wątku roboczym.
+     * Uruchamia adaptacyjny nasłuch wielookienkowy w stylu Shazam (od 3.0s do maxSeconds z krokiem 1.5s).
      *
-     * @param durationSeconds żądany czas rejestracji (5 do 30 sekund)
-     * @param callback        odbiornik zdarzeń postępu i wyniku
+     * @param maxSeconds maksymalny czas nasłuchu (np. 9 sekund)
+     * @param callback   interfejs zdarzeń dla kolejnych okien i zakończenia strumienia
      */
     @SuppressLint("MissingPermission")
-    public synchronized void startRecording(int durationSeconds, RecordCallback callback) {
-        if (isRecording.get()) {
-            callback.onError("Rejestracja jest już w toku.");
-            return;
+    public synchronized void startAdaptiveListening(int maxSeconds, AdaptiveStreamCallback callback) {
+        // Zabezpieczenie przed wiszącym poprzednim wątkiem lub niezwolnionym deskryptorem mikrofonu
+        if (isRecording.get() || (recordingThread != null && recordingThread.isAlive())) {
+            Log.w(TAG, "Wykryto aktywną sesję lub wątek - wymuszanie bezpiecznego resetu przed nowym badaniem.");
+            isRecording.set(false);
+            stopInternal();
+            if (recordingThread != null) {
+                try {
+                    recordingThread.join(400);
+                } catch (InterruptedException ignored) {}
+                recordingThread = null;
+            }
+            try {
+                // Odczekanie 120 ms na zwolnienie sesji sprzętowej przez AudioFlinger / Android HAL
+                Thread.sleep(120);
+            } catch (InterruptedException ignored) {}
         }
 
         int targetSr = DspConstants.SAMPLE_RATE; // 22050 Hz
@@ -56,7 +84,6 @@ public class AudioRecorder {
 
         int minBufferSize = AudioRecord.getMinBufferSize(hardwareSr, channelConfig, audioFormat);
         if (minBufferSize == AudioRecord.ERROR || minBufferSize == AudioRecord.ERROR_BAD_VALUE) {
-            // Sprzęt może nie wspierać natywnie 22050 Hz - fallback do 44100 Hz
             hardwareSr = DspConstants.FALLBACK_SAMPLE_RATE;
             minBufferSize = AudioRecord.getMinBufferSize(hardwareSr, channelConfig, audioFormat);
         }
@@ -99,84 +126,166 @@ public class AudioRecorder {
                 return;
             }
 
-            int totalTargetSamples = durationSeconds * DspConstants.SAMPLE_RATE;
-            int totalExpectedHardwareSamples = durationSeconds * finalHardwareSr;
+            int windowSize = DspConstants.CHUNK_SAMPLES; // 66150 próbek (3.0s)
+            int step = windowSize / 2;                   // 33075 próbek (1.5s - 50% overlap)
+            int maxWindows = 5;
+            int maxCapacity = maxSeconds * targetSr + 16384;
 
-            List<Float> collectedHardwareSamples = new ArrayList<>(totalExpectedHardwareSamples);
+            float[] sampleBuffer = new float[maxCapacity];
+            int sampleCount = 0;
+
             short[] readBuffer = new short[bufferSize / 2];
             long startTime = System.currentTimeMillis();
-            long totalDurationMs = durationSeconds * 1000L;
+            long maxDurationMs = maxSeconds * 1000L;
 
-            while (isRecording.get() && (System.currentTimeMillis() - startTime) < totalDurationMs) {
+            List<AudioChunk> evaluatedChunks = new ArrayList<>();
+            int nextWindowIndex = 0;
+            boolean stoppedEarly = false;
+            boolean hasLeftover = false;
+            float leftover = 0.0f;
+
+            while (isRecording.get() && (System.currentTimeMillis() - startTime) < maxDurationMs) {
                 int readShorts = audioRecord.read(readBuffer, 0, readBuffer.length);
                 if (readShorts > 0) {
                     float sumSq = 0.0f;
-                    for (int i = 0; i < readShorts; i++) {
-                        // Konwersja 16-bit PCM [-32768, 32767] do float [-1.0, 1.0]
-                        float sample = readBuffer[i] / 32768.0f;
-                        collectedHardwareSamples.add(sample);
-                        sumSq += sample * sample;
+
+                    if (finalHardwareSr == DspConstants.FALLBACK_SAMPLE_RATE) {
+                        // Decymacja 2:1 z 44100 Hz do 22050 Hz w czasie rzeczywistym
+                        for (int i = 0; i < readShorts; i++) {
+                            float s = readBuffer[i] / 32768.0f;
+                            sumSq += s * s;
+                            if (hasLeftover) {
+                                if (sampleCount < maxCapacity) {
+                                    sampleBuffer[sampleCount++] = 0.5f * (leftover + s);
+                                }
+                                hasLeftover = false;
+                            } else {
+                                leftover = s;
+                                hasLeftover = true;
+                            }
+                        }
+                    } else {
+                        // Natywny sygnał 22050 Hz
+                        for (int i = 0; i < readShorts; i++) {
+                            float s = readBuffer[i] / 32768.0f;
+                            sumSq += s * s;
+                            if (sampleCount < maxCapacity) {
+                                sampleBuffer[sampleCount++] = s;
+                            }
+                        }
                     }
 
                     float currentRms = (float) Math.sqrt(sumSq / readShorts);
                     int elapsedMs = (int) (System.currentTimeMillis() - startTime);
-                    callback.onProgress(elapsedMs, (int) totalDurationMs, currentRms);
+                    callback.onProgress(elapsedMs, (int) maxDurationMs, currentRms);
+
+                    // Sprawdzenie, czy zgromadzono wystarczającą liczbę próbek dla kolejnego okna 3.0s
+                    int neededSamples = windowSize + nextWindowIndex * step;
+                    while (sampleCount >= neededSamples && isRecording.get() && nextWindowIndex < maxWindows) {
+                        int start = nextWindowIndex * step;
+                        float[] windowSamples = new float[windowSize];
+                        System.arraycopy(sampleBuffer, start, windowSamples, 0, windowSize);
+                        float windowRms = AudioPreprocessor.computeRms(windowSamples);
+                        AudioChunk chunk = new AudioChunk(nextWindowIndex, windowSamples, targetSr, windowRms, System.currentTimeMillis());
+                        evaluatedChunks.add(chunk);
+
+                        boolean shouldStopEarly = callback.onWindowReady(nextWindowIndex, chunk);
+                        nextWindowIndex++;
+
+                        if (shouldStopEarly) {
+                            stoppedEarly = true;
+                            isRecording.set(false);
+                            break;
+                        }
+
+                        if (nextWindowIndex >= maxWindows) {
+                            isRecording.set(false);
+                            break;
+                        }
+
+                        neededSamples = windowSize + nextWindowIndex * step;
+                    }
                 } else if (readShorts < 0) {
                     Log.w(TAG, "AudioRecord błąd odczytu próbek: " + readShorts);
                     break;
                 }
             }
 
-            // Zatrzymanie sprzętu
+            // Zwolnienie sprzętu
             stopInternal();
 
-            if (collectedHardwareSamples.isEmpty()) {
+            if (sampleCount == 0) {
                 callback.onError("Nie zarejestrowano żadnych próbek audio.");
                 return;
             }
 
-            // Konwersja z List<Float> do float[]
-            float[] recordedSamples = new float[collectedHardwareSamples.size()];
-            for (int i = 0; i < recordedSamples.length; i++) {
-                recordedSamples[i] = collectedHardwareSamples.get(i);
+            // Jeśli zatrzymano przed ukończeniem pierwszego pełnego okna 3.0s (np. ręczne przerwanie po 2.2s)
+            if (evaluatedChunks.isEmpty()) {
+                if (sampleCount >= targetSr * 2) {
+                    float[] windowSamples = new float[windowSize];
+                    System.arraycopy(sampleBuffer, 0, windowSamples, 0, Math.min(sampleCount, windowSize));
+                    float windowRms = AudioPreprocessor.computeRms(windowSamples);
+                    AudioChunk chunk = new AudioChunk(0, windowSamples, targetSr, windowRms, System.currentTimeMillis());
+                    evaluatedChunks.add(chunk);
+                    callback.onWindowReady(0, chunk);
+                } else {
+                    callback.onError("Nagranie zbyt krótkie (wymagane min. 2-3 sekundy do analizy).");
+                    return;
+                }
             }
 
-            // Decymacja 2:1 z 44100 Hz do 22050 Hz jeśli nagrywano na 44100 Hz
-            float[] final22kSamples;
-            if (finalHardwareSr == DspConstants.FALLBACK_SAMPLE_RATE) {
-                final22kSamples = resample44kTo22k(recordedSamples);
-            } else {
-                final22kSamples = recordedSamples;
-            }
+            float overallRms = AudioPreprocessor.computeRms(sampleBuffer, sampleCount);
+            callback.onStreamComplete(evaluatedChunks, overallRms, stoppedEarly);
 
-            float overallRms = AudioPreprocessor.computeRms(final22kSamples);
-
-            // Weryfikacja bramki ciszy (RMS Gate >= 0.002)
-            if (overallRms < DspConstants.RMS_SILENCE_THRESHOLD) {
-                Log.w(TAG, "Ostrzeżenie: Poziom RMS " + overallRms + " < " + DspConstants.RMS_SILENCE_THRESHOLD);
-            }
-
-            // Podział nagrania na 3-sekundowe okna analityczne (66150 próbek każde)
-            List<AudioChunk> chunks = sliceInto3sChunks(final22kSamples);
-            callback.onRecordingComplete(chunks, overallRms);
-
-        }, "AudioRecorderThread");
+        }, "AdaptiveAudioRecorderThread");
 
         recordingThread.start();
     }
 
     /**
-     * Zatrzymuje bieżącą rejestrację audio.
+     * Zgodność wsteczna: Uruchamia rejestrację na określony stały czas trwania.
      */
-    public synchronized void stopRecording() {
-        if (!isRecording.get()) {
-            return;
-        }
-        isRecording.set(false);
-        stopInternal();
+    public synchronized void startRecording(int durationSeconds, RecordCallback callback) {
+        startAdaptiveListening(durationSeconds, new AdaptiveStreamCallback() {
+            @Override
+            public void onProgress(int elapsedMs, int maxMs, float currentRms) {
+                callback.onProgress(elapsedMs, maxMs, currentRms);
+            }
+
+            @Override
+            public boolean onWindowReady(int windowIndex, AudioChunk chunk) {
+                // W trybie tradycyjnym nie przerywamy przedwcześnie
+                return false;
+            }
+
+            @Override
+            public void onStreamComplete(List<AudioChunk> evaluatedChunks, float overallRms, boolean stoppedEarly) {
+                callback.onRecordingComplete(evaluatedChunks, overallRms);
+            }
+
+            @Override
+            public void onError(String message) {
+                callback.onError(message);
+            }
+        });
     }
 
-    private void stopInternal() {
+    /**
+     * Zatrzymuje bieżącą rejestrację audio (wywoływane np. przy ponownym stuknięciu w przycisk Hero).
+     */
+    public synchronized void stopRecording() {
+        isRecording.set(false);
+        stopInternal();
+        if (recordingThread != null && recordingThread.isAlive()) {
+            try {
+                recordingThread.join(350);
+            } catch (InterruptedException ignored) {}
+            recordingThread = null;
+        }
+    }
+
+    private synchronized void stopInternal() {
+        isRecording.set(false);
         if (audioRecord != null) {
             try {
                 if (audioRecord.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING) {
@@ -189,55 +298,5 @@ public class AudioRecorder {
                 audioRecord = null;
             }
         }
-    }
-
-    /**
-     * Decymacja antyaliasingowa 2:1 z 44.1 kHz do 22.05 kHz.
-     */
-    private static float[] resample44kTo22k(float[] input44k) {
-        int outLen = input44k.length / 2;
-        float[] out22k = new float[outLen];
-        for (int i = 0; i < outLen; i++) {
-            // Prosty 2-punktowy filtr uśredniający (Box filter / Anti-Aliasing)
-            out22k[i] = 0.5f * (input44k[2 * i] + input44k[2 * i + 1]);
-        }
-        return out22k;
-    }
-
-    /**
-     * Dzieli sygnał o długości 5-30s na 3-sekundowe wycinki (66150 próbek).
-     * Jeśli końcówka jest krótsza niż 3s, jest dopełniana zerami lub pomijana.
-     */
-    private static List<AudioChunk> sliceInto3sChunks(float[] samples) {
-        List<AudioChunk> chunks = new ArrayList<>();
-        int chunkSize = DspConstants.CHUNK_SAMPLES; // 66150 próbek
-        int step = chunkSize; // Czyste okna bez nakładania w ewaluacji
-
-        int totalLen = samples.length;
-        int windowIndex = 0;
-
-        for (int start = 0; start + chunkSize <= totalLen; start += step) {
-            float[] chunkSamples = new float[chunkSize];
-            System.arraycopy(samples, start, chunkSamples, 0, chunkSize);
-            float chunkRms = AudioPreprocessor.computeRms(chunkSamples);
-            chunks.add(new AudioChunk(windowIndex++, chunkSamples, DspConstants.SAMPLE_RATE, chunkRms, System.currentTimeMillis()));
-        }
-
-        // Jeżeli sygnał miał np. 5 sekund, pierwsze okno to [0..3s], drugie okno to [2..5s] lub z resztą
-        if (chunks.isEmpty() && totalLen > 0) {
-            float[] chunkSamples = new float[chunkSize];
-            System.arraycopy(samples, 0, chunkSamples, 0, Math.min(totalLen, chunkSize));
-            float chunkRms = AudioPreprocessor.computeRms(chunkSamples);
-            chunks.add(new AudioChunk(0, chunkSamples, DspConstants.SAMPLE_RATE, chunkRms, System.currentTimeMillis()));
-        } else if (totalLen > chunkSize && (totalLen % chunkSize) > (DspConstants.SAMPLE_RATE * 1.5f)) {
-            // Jeśli została resztka > 1.5s, pobierz ostatnie 3.0s jako okno końcowe
-            int start = totalLen - chunkSize;
-            float[] chunkSamples = new float[chunkSize];
-            System.arraycopy(samples, start, chunkSamples, 0, chunkSize);
-            float chunkRms = AudioPreprocessor.computeRms(chunkSamples);
-            chunks.add(new AudioChunk(windowIndex, chunkSamples, DspConstants.SAMPLE_RATE, chunkRms, System.currentTimeMillis()));
-        }
-
-        return chunks;
     }
 }

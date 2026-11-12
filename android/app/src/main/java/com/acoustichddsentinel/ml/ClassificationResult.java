@@ -14,15 +14,22 @@ public final class ClassificationResult {
     private final boolean isAnomaly;
     private final long inferenceTimeMs;
     private final String recommendation;
+    private final String detectedRpm;
 
     public ClassificationResult(String dominantClass, float confidence, Map<String, Float> probabilities,
                                 boolean isAnomaly, long inferenceTimeMs) {
+        this(dominantClass, confidence, probabilities, isAnomaly, inferenceTimeMs, null, null);
+    }
+
+    public ClassificationResult(String dominantClass, float confidence, Map<String, Float> probabilities,
+                                boolean isAnomaly, long inferenceTimeMs, String detectedRpm, String customRecommendation) {
         this.dominantClass = dominantClass;
         this.confidence = confidence;
         this.probabilities = probabilities != null ? Collections.unmodifiableMap(probabilities) : Collections.emptyMap();
         this.isAnomaly = isAnomaly;
         this.inferenceTimeMs = inferenceTimeMs;
-        this.recommendation = generateRecommendation(dominantClass, isAnomaly);
+        this.detectedRpm = detectedRpm;
+        this.recommendation = customRecommendation != null ? customRecommendation : generateRecommendation(dominantClass, isAnomaly);
     }
 
     public String getDominantClass() {
@@ -47,6 +54,10 @@ public final class ClassificationResult {
 
     public String getRecommendation() {
         return recommendation;
+    }
+
+    public String getDetectedRpm() {
+        return detectedRpm;
     }
 
     public String getFormattedConfidence() {

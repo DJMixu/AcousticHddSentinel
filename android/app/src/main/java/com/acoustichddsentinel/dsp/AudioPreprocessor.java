@@ -139,11 +139,21 @@ public final class AudioPreprocessor {
      */
     public static float computeRms(float[] signal) {
         if (signal == null || signal.length == 0) return 0.0f;
+        return computeRms(signal, signal.length);
+    }
+
+    /**
+     * Obliczenie wartości skutecznej energii RMS dla pierwszych 'length' próbek.
+     */
+    public static float computeRms(float[] signal, int length) {
+        if (signal == null || length <= 0) return 0.0f;
+        int len = Math.min(signal.length, length);
         double sumSq = 0.0;
-        for (float s : signal) {
+        for (int i = 0; i < len; i++) {
+            float s = signal[i];
             sumSq += s * s;
         }
-        return (float) Math.sqrt(sumSq / signal.length);
+        return (float) Math.sqrt(sumSq / len);
     }
 
     /**

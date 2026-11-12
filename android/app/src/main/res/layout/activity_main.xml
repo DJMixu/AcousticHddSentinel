@@ -68,55 +68,14 @@
                             android:text="HDD WDC WD10EZEX" />
                     </com.google.android.material.textfield.TextInputLayout>
 
-                    <!-- Suwak czasu nagrywania (5-30s) -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:orientation="vertical">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal">
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="Czas nagrywania (5 - 30 s):"
-                                android:textColor="@color/text_primary"
-                                android:textSize="13sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/tvDurationValue"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="10 s"
-                                android:textColor="@color/primary"
-                                android:textSize="13sp"
-                                android:textStyle="bold" />
-                        </LinearLayout>
-
-                        <com.google.android.material.slider.Slider
-                            android:id="@+id/sliderDuration"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:value="10.0"
-                            android:valueFrom="5.0"
-                            android:valueTo="30.0"
-                            android:stepSize="1.0" />
-                    </LinearLayout>
-
-                    <!-- Sekcja Shazam Hero Listening Button -->
+                    <!-- Sekcja Shazam Hero Listening Button (Czysty interfejs Shazam) -->
                     <FrameLayout
                         android:id="@+id/layoutHeroShazam"
-                        android:layout_width="140dp"
-                        android:layout_height="140dp"
+                        android:layout_width="160dp"
+                        android:layout_height="160dp"
                         android:layout_gravity="center_horizontal"
-                        android:layout_marginTop="12dp"
-                        android:layout_marginBottom="6dp">
+                        android:layout_marginTop="20dp"
+                        android:layout_marginBottom="10dp">
 
                         <View
                             android:id="@+id/viewPulseRing"
@@ -127,12 +86,12 @@
 
                         <ImageButton
                             android:id="@+id/btnHeroShazam"
-                            android:layout_width="100dp"
-                            android:layout_height="100dp"
+                            android:layout_width="112dp"
+                            android:layout_height="112dp"
                             android:layout_gravity="center"
                             android:background="@drawable/bg_shazam_button"
                             android:contentDescription="Stuknij, aby zbadać HDD"
-                            android:elevation="6dp"
+                            android:elevation="8dp"
                             android:src="@drawable/ic_mic_shazam" />
                     </FrameLayout>
 
@@ -141,24 +100,11 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_gravity="center_horizontal"
-                        android:layout_marginBottom="12dp"
-                        android:text="Stuknij mikrofon, aby zbadać stan HDD"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="12sp"
-                        android:textStyle="italic" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnStartDiagnosis"
-                        android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:layout_marginTop="2dp"
-                        android:text="@string/btn_start_diagnosis"
-                        android:textAllCaps="false"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        app:cornerRadius="12dp"
-                        app:icon="@drawable/ic_mic_shazam"
-                        app:iconGravity="textStart" />
+                        android:layout_marginBottom="16dp"
+                        android:text="Stuknij, aby zbadać stan HDD"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
 
                     <ProgressBar
                         android:id="@+id/progressBarAudio"

@@ -24,7 +24,8 @@ import java.util.Map;
 public class AcousticClassifier implements AutoCloseable {
 
     private static final String TAG = "AcousticClassifier";
-    private static final String MODEL_ASSET_NAME = "best_hdd_cnn_model_int8.onnx";
+    private static final String MODEL_ASSET_FP32 = "best_hdd_cnn_model.onnx";
+    private static final String MODEL_ASSET_INT8 = "best_hdd_cnn_model_int8.onnx";
     private static final String INPUT_NODE_NAME = "input_audio_tensor";
 
     public static final String[] CLASS_NAMES = {
@@ -40,12 +41,21 @@ public class AcousticClassifier implements AutoCloseable {
     public AcousticClassifier(Context context) throws IOException, OrtException {
         this.environment = OrtEnvironment.getEnvironment();
 
-        byte[] modelBytes = readAssetToByteArray(context, MODEL_ASSET_NAME);
         OrtSession.SessionOptions options = new OrtSession.SessionOptions();
         options.setIntraOpNumThreads(Math.max(1, Runtime.getRuntime().availableProcessors() / 2));
 
+        byte[] modelBytes;
+        String loadedName;
+        try {
+            modelBytes = readAssetToByteArray(context, MODEL_ASSET_FP32);
+            loadedName = MODEL_ASSET_FP32;
+        } catch (IOException e) {
+            modelBytes = readAssetToByteArray(context, MODEL_ASSET_INT8);
+            loadedName = MODEL_ASSET_INT8;
+        }
+
         this.session = environment.createSession(modelBytes, options);
-        Log.i(TAG, "Załadowano model ONNX INT8: " + MODEL_ASSET_NAME + " (" + modelBytes.length + " bajtów)");
+        Log.i(TAG, "Pomyślnie załadowano model ONNX: " + loadedName + " (" + modelBytes.length + " bajtów)");
     }
 
     /**

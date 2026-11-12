@@ -47,9 +47,13 @@ public final class DiagnosticUiState {
     }
 
     public static DiagnosticUiState recording(int elapsedMs, int totalMs, float rms) {
-        return new DiagnosticUiState(Status.RECORDING, elapsedMs, totalMs, rms,
-            String.format(java.util.Locale.US, "Rejestracja... %d s / %d s (RMS: %.4f)", elapsedMs / 1000, totalMs / 1000, rms),
-            null, null, null, null);
+        return recording(elapsedMs, totalMs, rms, null);
+    }
+
+    public static DiagnosticUiState recording(int elapsedMs, int totalMs, float rms, String customMessage) {
+        String msg = customMessage != null ? customMessage :
+            String.format(java.util.Locale.US, "Słucham... %d s / %d s (RMS: %.4f)", elapsedMs / 1000, totalMs / 1000, rms);
+        return new DiagnosticUiState(Status.RECORDING, elapsedMs, totalMs, rms, msg, null, null, null, null);
     }
 
     public static DiagnosticUiState processing(String message) {

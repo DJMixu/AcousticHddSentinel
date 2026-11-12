@@ -69,7 +69,7 @@ AcousticHddSentinel/
 │   ├── start_services.sh              # Skrypt uruchamiania usług Ollama i Open WebUI
 │   └── stop_services.sh               # Skrypt zatrzymywania usług Ollama i Open WebUI
 │
-├── android/                           # 📱 Kompletny moduł natywnej aplikacji mobilnej (Android Studio / Gradle / Java 17)
+├── android/                           # 📱 Kompletny moduł natywnej aplikacji mobilnej (Android Studio / Gradle / Java 17, UI w stylu Shazam)
 │   ├── app/
 │   │   ├── src/main/assets/           # Skwantyzowany model ONNX INT8, classes.json, model_card.json
 │   │   ├── src/main/java/             # Pakiety: audio (AudioRecord), data (SQLiteOpenHelper), dsp (ADR-001 DSP), ml (ONNX), ui (MVVM & LiveData)
@@ -182,9 +182,14 @@ cd android && ./gradlew test
 ---
 
 ## 6. Automatyczna Integracja z Lokalnymi Modelami LLM (Ollama & RX 9060 XT)
-W systemie użytkownika działa lokalna instalacja Ollama (`http://localhost:11434` oraz Open WebUI na `http://localhost:8080`) z dwoma modelami open-weights:
-1. **Architekt / Planista (128k kontekstu, 12 GB VRAM):** `hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ3_S`
-2. **Programista Wykonawczy / Coder (9 GB VRAM):** `qwen2.5-coder:14b`
+W systemie użytkownika działa lokalna instalacja Ollama (`http://localhost:11434` oraz Open WebUI na `http://localhost:8080`) z dwoma modelami open-weights zoptymalizowanymi pod architekturę RDNA4:
+1. **Architekt / Planista (128k kontekstu, 12 GB VRAM):** `hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ3_S` (alias Ollama: `qwen3.8-architect`)
+   - **Rola:** Główny Architekt Oprogramowania & DSP. Analizuje zadania, weryfikuje niezmienniki ADR-001, projektuje sygnatury i pseudokod.
+   - **Parametry generowania:** `temperature: 0.2`, `top_p: 0.95`, `repeat_penalty: 1.05`, `num_ctx: do 131072`, `num_predict: -1` (brak limitu długości).
+   - **Reasoning Stream:** Model typu RCO z kanałem myślenia (`thinking`), separowany od właściwej specyfikacji (`content`).
+2. **Programista Wykonawczy / Coder (9 GB VRAM):** `qwen2.5-coder:14b` (alias Ollama: `qwen2.5-coder-expert`)
+   - **Rola:** Senior Staff Software Engineer (PyTorch / DSP). Pisze gotowy do wdrożenia kod w Pythonie bez skrótów i placeholderów.
+   - **Parametry generowania:** `temperature: 0.1` (deterministyczna), `top_p: 0.90`, `repeat_penalty: 1.05`, `num_predict: -1`.
 
 ### Zasady automatycznego wykorzystania przez każdego agenta:
 - **Uruchomienie usług LLM w razie potrzeby:**
@@ -194,6 +199,7 @@ W systemie użytkownika działa lokalna instalacja Ollama (`http://localhost:114
   ```bash
   python scripts/local_llm_bridge.py --task "<opis zadania>" [--context <plik_kontekstu>] [--output <plik_wyjścia>]
   ```
+  *Skrypt automatycznie wstrzykuje kluczowe niezmienniki ADR-001 z AGENTS.md, obsługuje strumieniowanie myślenia Architekta i natychmiast zwalnia pamięć VRAM.*
 - **Niezmiennik VRAM (16 GB) i architektura iGPU + dGPU:**
   Monitor i pulpit Linux działają na iGPU (Ryzen 7 7700), dzięki czemu karta **AMD Radeon RX 9060 XT (16 GB)** ma 100% VRAM (15.9 GB) wolne na czyste obliczenia AI. Dzięki FlashAttention i Q4_0 KV Cache w Ollama, model Qwen 3.8 27B obsługuje bezpiecznie kontekst **aż do 128k (`131072`)** bez wycieku do RAM CPU.
   Modele 27B i 14B nie mogą znajdować się w VRAM równocześnie. Skrypt `local_llm_bridge.py` automatycznie wyładowuje modele (`keep_alive=0`). Przed rozpoczęciem jakiegokolwiek treningu PyTorch na GPU agent **MUSI** upewnić się, że VRAM jest zwolniony (`ollama ps` puste).

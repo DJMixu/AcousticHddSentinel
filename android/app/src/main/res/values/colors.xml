@@ -12,6 +12,8 @@
     <color name="status_normal_text">#15803D</color>
     <color name="status_danger_bg">#FEE2E2</color>
     <color name="status_danger_text">#B91C1C</color>
+    <color name="status_fault_bg">#FEE2E2</color>
+    <color name="status_fault_text">#B91C1C</color>
     <color name="status_warning_bg">#FEF3C7</color>
     <color name="status_warning_text">#B45309</color>
 

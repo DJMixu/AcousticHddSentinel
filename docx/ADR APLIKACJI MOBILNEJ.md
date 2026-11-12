@@ -56,10 +56,10 @@ Natywna aplikacja mobilna na platformę Android, która przy użyciu wbudowanego
 
 ## 3. Architecture Decision Records (ADR) — Decyzje Techniczne
 
-### ADR-A: Język programowania — Kotlin vs Java
-- **Kontekst:** Wstępny szkic zakładał czystą Javę, natomiast oficjalny sylabus `Projekt_AM.pdf` wskazuje: *„Kotlin jako rekomendowany język”*.
-- **Decyzja:** Wybrano **Kotlin**.
-- **Uzasadnienie:** Kotlin jest oficjalnym standardem Google dla Androida, eliminuje błędy `NullPointerException`, a dzięki `Coroutines` (`Dispatchers.IO`, `Dispatchers.Default`) pozwala na bezblokujące nagrywanie audio i przeliczanie FFT w tle bez zamrażania wątku głównego (UI).
+### ADR-A: Język programowania — Czysta Java (Java 17, minSdk 26)
+- **Kontekst:** Wymóg pełnej niezależności, eliminacji dodatkowych runtime'ów oraz ścisłej zgodności z architekturą obiektową Java i stabilnością kompilacji.
+- **Decyzja:** Wybrano **100% Czystą Javę (Java 17, minSdk 26)**.
+- **Uzasadnienie:** Standard Java 17 zapewnia maksymalną stabilność, eliminuje narzut kompilatora Kotlin/KSP, a asynchroniczność realizowana jest za pośrednictwem `ExecutorService` (`Executors.newSingleThreadExecutor()`, `Executors.newFixedThreadPool(2)`) z bezpiecznym powiadamianiem wątku UI przez `Handler(Looper.getMainLooper())` oraz Android Architecture Components `LiveData`.
 
 ### ADR-B: Silnik wnioskowania AI/ML na urządzeniu mobilnym
 - **Kontekst:** Wybór formatu modelu i runtime dla płytkiej sieci 2D CNN (PyTorch Mobile vs ONNX Runtime Mobile).
@@ -73,21 +73,33 @@ Natywna aplikacja mobilna na platformę Android, która przy użyciu wbudowanego
 - **Kontekst:** Dobór klasy systemowej oraz parametrów próbkowania audio.
 - **Decyzja:** Klasa `android.media.AudioRecord` w trybie `MediaRecorder.AudioSource.MIC`, format **16-bit PCM, Mono**.
 - **Częstotliwość próbkowania:**
-  - Standard studyjny i sprzętowy smartfonów: **44.1 kHz** lub **22.05 kHz**.
+  - Standard studyjny i sprzętowy smartfonów: **22.05 kHz** (domyślnie) z automatycznym fallbackiem do **44.1 kHz** (z antyaliasingową decymacją 2:1 do 22.05 kHz).
   - W potoku DSP sygnał jest dekodowany z zachowaniem pasma do 10 000 Hz, co pozwala bezstratnie uchwycić zarówno tarcie głowic o talerz (do 9.9 kHz), jak i impulsowe uderzenia ogranicznika (*Click of Death*).
 
 ### ADR-D: Przetwarzanie sygnału (DSP) i Chunking
 - **Kontekst:** Jak przetwarzać zmienny czas nagrania (5–30s) i generować wejście do sieci CNN?
 - **Decyzja:** 
-  1. Surowy bufor PCM jest dzielony w pętli na stałe okna (chunking).
-  2. Każde okno podlega normalizacji szczytowej (Peak Normalization do $[-1.0, 1.0]$).
-  3. Wyliczana jest transformata STFT z oknem Hanna ($N_{FFT} = 1024, HOP = 256$) oraz filtracja bankiem 128 filtrów Mel.
-  4. Wygenerowany Mel-spektrogram (obraz cech) jest zapisywany w `Internal Storage` jako plik referencyjny, a jego tensor podawany na wejście modelu CNN.
+  1. Surowy bufor PCM jest dzielony w pętli na stałe okna (chunking 3.0s = 66150 próbek).
+  2. Każde okno podlega normalizacji szczytowej (Peak Normalization do $[-1.0, 1.0]$) z usunięciem DC offsetu.
+  3. Wyliczana jest transformata STFT z oknem Hanna ($N_{FFT} = 1024, HOP = 256$, reflect padding 512) oraz filtracja bankiem 128 filtrów Mel ze skalą Slaney.
+  4. Wyznaczane są kanały Delta (1. pochodna) i Delta-Delta (2. pochodna) za pomocą filtrów Savitzky-Golay ($N=9$).
+  5. Standaryzacja Z-Score niezależnie dla każdego kanału: $(X - \mu) / (\sigma + 10^{-6})$.
+  6. Wygenerowany Mel-spektrogram jest zapisywany w `Internal Storage` jako plik graficzny PNG (paleta Inferno), a spłaszczony tensor `float[99456]` podawany na wejście modelu ONNX.
 
 ### ADR-E: Architektura Bazy Danych i Magazyn Plików
 - **Kontekst:** Zgodnie z wymaganiem `Projekt_AM.pdf` aplikacja musi posiadać trwałe dane w SQLite oraz nie przeciążać bazy plikami binarnymi.
-- **Decyzja:** Wykorzystanie bazy SQLite (poprzez Android Jetpack **Room** z natywnym interfejsem DAO i pełną zgodnością ze strukturą `SQLiteOpenHelper`).
-- **Separacja danych:** Obrazy spektrogramów trafiają do katalogu prywatnego aplikacji (`Internal Storage`). Baza danych przechowuje w kolumnie `spectrogram_path` wyłącznie ścieżkę absolutną do pliku.
+- **Decyzja:** Wykorzystanie natywnego `SQLiteOpenHelper` (klasa `DiagnosticDbHelper` i `DiagnosticRepository`).
+- **Separacja danych:** Obrazy spektrogramów trafiają do katalogu prywatnego aplikacji (`context.getFilesDir() + "/spectrograms/"`). Baza danych przechowuje w kolumnie `spectrogram_path` wyłącznie ścieżkę absolutną do pliku PNG.
+
+### ADR-F: Wzorzec Interfejsu Użytkownika (UI/UX) — Wzorowanie na Shazam
+- **Kontekst:** Jak zapewnić maksymalną ergonomię, intuicyjność i profesjonalizm badania akustycznego w warunkach laboratoryjnych i serwerowych?
+- **Decyzja:** Zastosowanie wzorca **Shazam Hero Listening Interface**:
+  1. **Hero Pulse Button (Centralny Przycisk Akustyczny):** Duży, okrągły, centralny przycisk badania z animacją pierścieni (audio ripple) pulsujących w rytm energii RMS w czasie rzeczywistym.
+  2. **Single-Screen Focus (Jednoekranowe Płynne Przejścia):**
+     - Stan czuwania (IDLE): Czysty, nowoczesny ekran z polem identyfikacji dysku i suwakiem czasu (5–30s).
+     - Stan nasłuchiwania (RECORDING): Immersyjny tryb nasłuchiwania dźwięków mechanicznych dysku.
+     - Stan odsłonięcia diagnozy (SUCCESS / REVEAL): Efektowne odsłonięcie karty w stylu Shazam ze spektrogramem termowizyjnym (Acoustic Fingerprint), odznaką stanu (SPRAWNY / AWARIA), pewnością w % i rozkładem klas Softmax.
+  3. **Biblioteka Badań (Shazam Library Shelf):** Elegancka historia badań (RecyclerView) z miniaturkami spektrogramów, datami, odznakami statusu oraz możliwością powiększenia i usuwania wpisów.
 
 ---
 

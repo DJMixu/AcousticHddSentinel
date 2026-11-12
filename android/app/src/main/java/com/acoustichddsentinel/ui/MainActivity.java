@@ -68,6 +68,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Przycisk rozpoczęcia badania
         binding.btnStartDiagnosis.setOnClickListener(v -> checkPermissionAndStart());
+        binding.btnHeroShazam.setOnClickListener(v -> checkPermissionAndStart());
 
         // Przycisk czyszczenia historii
         binding.btnClearHistory.setOnClickListener(v -> showClearHistoryConfirmationDialog());
@@ -121,11 +122,47 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private android.animation.ObjectAnimator pulseAnimatorX;
+    private android.animation.ObjectAnimator pulseAnimatorY;
+
+    private void startPulseAnimation() {
+        if (pulseAnimatorX == null || pulseAnimatorY == null) {
+            pulseAnimatorX = android.animation.ObjectAnimator.ofFloat(binding.viewPulseRing, "scaleX", 1.0f, 1.35f);
+            pulseAnimatorY = android.animation.ObjectAnimator.ofFloat(binding.viewPulseRing, "scaleY", 1.0f, 1.35f);
+
+            pulseAnimatorX.setDuration(800);
+            pulseAnimatorY.setDuration(800);
+
+            pulseAnimatorX.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+            pulseAnimatorY.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+
+            pulseAnimatorX.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+            pulseAnimatorY.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+        }
+        binding.viewPulseRing.setVisibility(View.VISIBLE);
+        if (!pulseAnimatorX.isRunning()) {
+            pulseAnimatorX.start();
+            pulseAnimatorY.start();
+        }
+    }
+
+    private void stopPulseAnimation() {
+        if (pulseAnimatorX != null && pulseAnimatorX.isRunning()) {
+            pulseAnimatorX.cancel();
+            pulseAnimatorY.cancel();
+        }
+        binding.viewPulseRing.setScaleX(1.0f);
+        binding.viewPulseRing.setScaleY(1.0f);
+        binding.viewPulseRing.setVisibility(View.INVISIBLE);
+    }
+
     private void renderUiState(DiagnosticUiState state) {
         if (state == null) return;
 
         switch (state.getStatus()) {
             case IDLE:
+                stopPulseAnimation();
+                binding.btnHeroShazam.setEnabled(true);
                 binding.btnStartDiagnosis.setEnabled(true);
                 binding.btnStartDiagnosis.setText(R.string.btn_start_diagnosis);
                 binding.sliderDuration.setEnabled(true);
@@ -135,8 +172,10 @@ public class MainActivity extends AppCompatActivity {
                 break;
 
             case RECORDING:
+                startPulseAnimation();
+                binding.btnHeroShazam.setEnabled(false);
                 binding.btnStartDiagnosis.setEnabled(false);
-                binding.btnStartDiagnosis.setText("Nagrywanie w toku...");
+                binding.btnStartDiagnosis.setText("Nasłuchiwanie HDD...");
                 binding.sliderDuration.setEnabled(false);
                 binding.progressBarAudio.setVisibility(View.VISIBLE);
                 binding.progressBarAudio.setIndeterminate(false);
@@ -148,6 +187,8 @@ public class MainActivity extends AppCompatActivity {
                 break;
 
             case PROCESSING:
+                stopPulseAnimation();
+                binding.btnHeroShazam.setEnabled(false);
                 binding.btnStartDiagnosis.setEnabled(false);
                 binding.sliderDuration.setEnabled(false);
                 binding.progressBarAudio.setVisibility(View.VISIBLE);
@@ -156,6 +197,8 @@ public class MainActivity extends AppCompatActivity {
                 break;
 
             case SUCCESS:
+                stopPulseAnimation();
+                binding.btnHeroShazam.setEnabled(true);
                 binding.btnStartDiagnosis.setEnabled(true);
                 binding.btnStartDiagnosis.setText(R.string.btn_start_diagnosis);
                 binding.sliderDuration.setEnabled(true);
@@ -167,6 +210,8 @@ public class MainActivity extends AppCompatActivity {
                 break;
 
             case ERROR:
+                stopPulseAnimation();
+                binding.btnHeroShazam.setEnabled(true);
                 binding.btnStartDiagnosis.setEnabled(true);
                 binding.btnStartDiagnosis.setText(R.string.btn_start_diagnosis);
                 binding.sliderDuration.setEnabled(true);

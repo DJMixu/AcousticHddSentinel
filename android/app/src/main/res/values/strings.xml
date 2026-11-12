@@ -3,10 +3,10 @@
     <string name="title_diagnostic">Diagnostyka Akustyczna HDD</string>
     <string name="subtitle_diagnostic">Detekcja i klasyfikacja uszkodzeń głowic, silnika i talerzy (2D CNN)</string>
     <string name="hint_hdd_name">Oznaczenie / Model dysku (np. Seagate Barracuda 2TB)</string>
-    <string name="btn_start_diagnosis">Rozpocznij diagnozę HDD (3s)</string>
+    <string name="btn_start_diagnosis">Rozpocznij diagnozę HDD</string>
     <string name="btn_stop_diagnosis">Zatrzymaj nagrywanie</string>
     <string name="status_idle">Gotowy do badania akustycznego</string>
-    <string name="status_recording_fmt">Nagrywanie: %.1fs / 3.0s (RMS: %.4f)</string>
+    <string name="status_recording_fmt">Nagrywanie: %1$.1fs / %2$.1fs (RMS: %3$.4f)</string>
     <string name="status_analyzing">Analiza spektrogramu...</string>
     <string name="status_running_inference">Przetwarzanie DSP (Log-Mel + Delta) &amp; ONNX...</string>
     <string name="status_ready">Diagnoza zakończona</string>

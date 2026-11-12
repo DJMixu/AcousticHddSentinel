@@ -73,38 +73,48 @@ Wymagania inżynieryjne i wyzwania:
 
 ### Obszar D: Warstwa trwałości danych (Persystencja)
 
-- **Opcja D1: Surowy SQLite / pliki tekstowe JSON.**
-  - *Wady:* Podatność na błędy parsowania, brak weryfikacji zapytań SQL w czasie kompilacji, brak natywnego wsparcia dla strumieni reaktywnych.
-- **Opcja D2 (Wybrana): Android Jetpack Room Database (SQLite ORM).**
+- **Opcja D1 (Wybrana): Natywny SQLiteOpenHelper bez zewnętrznych bibliotek ORM.**
   - *Zalety:*
-    - Sprawdzanie spójności schematu bazy danych w czasie kompilacji (KSP).
-    - Reaktywne strumienie `Flow<List<DiagnosticEntity>>` automatycznie aktualizujące listę historii w interfejsie użytkownika.
-    - Zgodność ze specyfikacją tabeli `diagnostics` z `docx/specs.txt`.
+    - 0 dodatkowych zależności w pliku `build.gradle.kts`.
+    - 100% zgodności ze specyfikacją sylabusa laboratoryjnego i ograniczeniami środowiska Android.
+    - Asynchroniczna obsługa zapytań w tle z użyciem dedykowanego `ExecutorService` i powiadomień wątku głównego.
+- **Opcja D2: Android Jetpack Room Database (SQLite ORM).**
+  - *Wady:* Zwiększony narzut kompilatora KSP/KAPT i rozmiaru aplikacji.
+
+---
+
+### Obszar E: Interfejs Użytkownika (UI/UX) — Wzorzec Shazam Hero Interface
+
+- **Koncepcja wizualna i ergonomia:**
+  - **Hero Pulse Button:** Duży, centralny przycisk badania wzorowany na ikonie Shazam. W trakcie nagrywania mikrofonem (5–30s) wokół przycisku generowane są pulsujące pierścienie (ripple animation) reagujące na bieżący poziom energii RMS dźwięku dysku.
+  - **Acoustic Fingerprint (Akustyczny Odcisk Palca):** Wizualizacja spektrogramu Mel w termowizyjnej palecie Inferno (259 x 128 pikseli), prezentująca unikalny podpis częstotliwościowy pracy badanego napędu.
+  - **Shazam Reveal Transition:** Płynne przejście ze stanu nasłuchiwania do karty wyniku diagnozy (duża odznaka stanu SPRAWNY / AWARIA, pewność %, rozkład prawdopodobieństw klas i laboratoryjna rekomendacja techniczna).
+  - **Biblioteka Badań (Shazam Library Shelf):** Elegancka lista RecyclerView z zaokrąglonymi kartami poprzednich diagnoz, podglądem spektrogramów i szybkim usuwaniem wpisów.
 
 ---
 
 ## 3. Podjęte decyzje architektoniczne
 
-Przyjmuje się następującą architekturę modułu mobilnego zaimplementowaną w katalogu `android/`:
+Przyjmuje się następującą architekturę modułu mobilnego zaimplementowaną w katalogu `android/` (w 100% w czystej Javie 17, minSdk 26):
 
 ```
 android/
 ├── app/
-│   ├── build.gradle.kts             # Zależności: ONNX Runtime, Room, Coroutines, Material 3
-│   ├── proguard-rules.pro           # Reguły ProGuard dla ONNX i Room
+│   ├── build.gradle.kts             # Zależności: ONNX Runtime Mobile, Material 3, Lifecycle, JUnit 4
+│   ├── proguard-rules.pro           # Reguły ProGuard dla ONNX Runtime
 │   └── src/
 │       ├── main/
-│       │   ├── AndroidManifest.xml  # Uprawnienia RECORD_AUDIO, brak uprawnień INTERNET
-│       │   ├── assets/              # best_hdd_cnn_model_int8.onnx (1.17 MB), classes.json
+│       │   ├── AndroidManifest.xml  # Uprawnienia RECORD_AUDIO, brak uprawnień INTERNET (100% OFFLINE)
+│       │   ├── assets/              # best_hdd_cnn_model_int8.onnx (1.17 MB), classes.json, model_card.json
 │       │   ├── java/com/acoustichddsentinel/
-│       │   │   ├── AcousticSentinelApp.kt
-│       │   │   ├── audio/           # AudioRecorder, AudioChunk, AudioRecordState
-│       │   │   ├── data/            # Room: AppDatabase, DiagnosticEntity, DiagnosticDao, Repository
-│       │   │   ├── dsp/             # AudioPreprocessor, MelFilterBank, StftTransformer, DspConstants
-│       │   │   ├── ml/              # AcousticClassifier, ClassificationResult
-│       │   │   └── ui/              # MainActivity, MainViewModel, DiagnosticHistoryAdapter
-│       │   └── res/                 # Layouty XML, stringi, kolory, motywy Material 3
-│       └── test/                    # Testy jednostkowe AudioPreprocessorTest
+│       │   │   ├── AcousticSentinelApp.java # Klasa Application Singleton
+│       │   │   ├── audio/           # AudioRecorder (AudioRecord 22050/44100 Hz), AudioChunk
+│       │   │   ├── data/            # DiagnosticDbHelper (SQLite), DiagnosticModel, DiagnosticRepository
+│       │   │   ├── dsp/             # AudioPreprocessor, MelFilterBank, StftTransformer, SpectrogramImageSaver, DspConstants
+│       │   │   ├── ml/              # AcousticClassifier (ONNX INT8), ClassificationResult
+│       │   │   └── ui/              # MainActivity, MainViewModel, DiagnosticAdapter, DiagnosticUiState
+│       │   └── res/                 # Layouty XML, stringi, kolory Material 3, rysunki XML
+│       └── test/                    # Testy jednostkowe AudioPreprocessorTest.java
 └── build.gradle.kts / settings.gradle.kts
 ```
 

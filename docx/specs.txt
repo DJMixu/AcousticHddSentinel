@@ -1,17 +1,26 @@
 # [Kontekst: Acoustic HDD Sentinel — Wstępne założenia projektowe]
-# UWAGA: Dokument historyczny/szkicowy. Pełna i obowiązująca specyfikacja architektoniczna
-# została sformalizowana w:
+# UWAGA: Obowiązująca specyfikacja architektoniczna została sformalizowana w:
 # - docx/adr/adr.md (ADR-001: Architektura DSP i enkodowania)
 # - docx/adr/adr-002-mobile-architecture.md (ADR-002: Architektura aplikacji mobilnej Android)
+# - docx/ADR APLIKACJI MOBILNEJ.md (ADR Aplikacji Mobilnej: Wzorzec Shazam UI)
 
 [Kontekst: Acoustic HDD Sentinel]
 
-    Tech: Android (Kotlin), API 26+, MVVM z Repository, Coroutines & StateFlow.
+    Tech: Natywny Android w czystej Javie 17 (API 26+), wzorzec architektoniczny MVVM z Repository, LiveData & ViewBinding.
 
-    Audio: Mikrofon (AudioRecord), 22.05 kHz, 16-bit PCM, Mono. Sztywne okno 3.0s (66 150 próbek) -> konwersja do 3-kanałowego tensora [Log-Mel, Delta, Delta-Delta].
+    UI / UX (Wzorowanie na Shazam):
+    - Centralny przycisk badania (Shazam-style Hero Pulse Button): Duży, dominujący, okrągły przycisk w centrum ekranu ("Stuknij, aby zbadać HDD") z dynamiczną animacją fal dźwiękowych / pierścieni pulsujących w rytm energii RMS w czasie rzeczywistym.
+    - Sterowanie czasem badania: Dyskretny suwak wyboru długości nagrania (5 - 30 sekund; domyślnie 10 s).
+    - Ekran pojedynczego skupienia (Single-Screen Focus): Płynne przejście między stanami IDLE (czuwanie) -> RECORDING (nasłuchiwanie i animacja fal) -> PROCESSING (analiza DSP & CNN) -> REVEAL (odsłonięcie karty diagnozy w stylu karty utworu z Shazam).
+    - Akustyczny Odcisk Palca (Acoustic Fingerprint): Wyświetlanie barwnego spektrogramu Log-Mel (paleta cieplna Inferno) jako wizualnego podpisu akustycznego pracy nośnika.
+    - Biblioteka Badań (Shazam Library Style): Przeglądanie i zarządzanie historią diagnoz (karty z zaokrąglonymi rogami, miniaturki spektrogramów, odznaki statusu, usuwanie wpisów).
 
-    ML: ONNX Runtime Mobile (.onnx INT8, 1.17 MB). 2D CNN (4 bloki ze SpatialDropout). Wejście: tensor (1, 3, 128, 259). Wyjście: wieloklasowe (beeping, clicking, normal, scratching).
+    Audio: Sprzętowy mikrofon (AudioRecord), 16-bit PCM Mono, częstotliwość 22050 Hz (z automatycznym fallbackiem do 44100 Hz i decymacją antyaliasingową 2:1). Bramka szumu RMS >= 0.002. Podział na okna 3.0s (66 150 próbek).
 
-    DB: SQLite (Room ORM). Tabela diagnostics: id (PK), hdd_name (TEXT), timestamp (INT, ms), predicted_class (TEXT), confidence (REAL), has_anomaly (INT, 0/1), spectrogram_path (TEXT), audio_path (TEXT).
+    DSP: STFT z oknem Hanna (N_FFT=1024, HOP=256, reflect padding 512), 128-pasmowy bank filtrów Mel (Slaney norm), Log-Mel power_to_db (top_db=80.0), pochodne czasowe Delta i Delta-Delta (N=9, Savitzky-Golay), niezależny Z-score per kanał tensora.
 
-    Pliki i Prywatność: 100% lokalne przetwarzanie na urządzeniu (brak uprawnień INTERNET). Spektrogramy i próbki zapisywane w pamięci wewnętrznej aplikacji.
+    ML: Silnik ONNX Runtime Mobile (.onnx INT8, 1.17 MB). 2D CNN z wejściem (1, 3, 128, 259) i 4 klasami wyjściowymi (beeping, clicking, normal, scratching). Czas inferencji na CPU ARM < 25 ms. Logika decyzyjna: anomalia w >= 1 oknie oznacza has_anomaly = 1.
+
+    DB: Czysty SQLiteOpenHelper (brak ciężkich bibliotek ORM). Tabela Diagnostics: id (INTEGER PK), hdd_name (TEXT), timestamp (INTEGER), has_anomaly (INTEGER), spectrogram_path (TEXT), predicted_class (TEXT), confidence (REAL).
+
+    Pliki i Prywatność: 100% lokalne przetwarzanie na urządzeniu (brak uprawnień INTERNET, brak chmury). Pliki spektrogramów PNG zapisywane w pamięci wewnętrznej aplikacji (context.getFilesDir() + "/spectrograms/").

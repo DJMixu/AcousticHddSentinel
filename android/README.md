@@ -12,6 +12,11 @@ Projekt zrealizowany w ramach przedmiotu **Projekt - Aplikacje Mobilne** (prowad
 - **Wzorzec architektoniczny:** MVVM (Model-View-ViewModel) z Repository Pattern, `LiveData` oraz ViewBinding.
 - **Komponent Hardware:** Wbudowany mikrofon urządzenia (`android.media.AudioRecord`, 16-bit PCM Mono, sampling 22050 Hz z automatycznym fallbackiem do 44100 Hz i decymacją 2:1).
 - **Zmienny czas nagrania:** Płynna regulacja suwakiem od **5 do 30 sekund** (domyślnie 10s) z podziałem na okna analityczne 3.0s (66 150 próbek).
+- **Interfejs UI/UX (Wzorowany na Shazam):**
+  - **Hero Pulse Button:** Centralny, okrągły przycisk nasłuchiwania dźwięków dysku z animacją pulsowania i wskaźnikiem energii RMS.
+  - **Acoustic Fingerprint:** Wizualizacja spektrogramu Mel w palecie cieplnej Inferno (termowizja) jako unikalny akustyczny podpis pracy głowic i łożysk.
+  - **Karta Diagnozy (Shazam Reveal Card):** Natychmiastowe odsłonięcie statusu dysku (duża odznaka SPRAWNY / AWARIA), pewność w %, rozkład Softmax 4 klas i laboratoryjne zalecenia techniczne.
+  - **Biblioteka Badań (Shazam Library Style):** Przeglądanie historii w liście z kartami zaokrąglonymi, podglądem spektrogramów i zarządzaniem wpisami.
 - **Decyzja wielookienkowa:** Jeżeli w **którymkolwiek** oknie zostanie wykryta anomalia mechaniczna (`clicking`, `beeping`, `scratching`), cały test klasyfikowany jest jako uszkodzenie (`has_anomaly = 1`).
 - **Silnik uczenia maszynowego (Edge AI):** **ONNX Runtime Mobile dla Java** (`ai.onnxruntime.*`).
 - **Skwantyzowany model ONNX:** `best_hdd_cnn_model_int8.onnx` (1.17 MB) zoptymalizowany pod urządzenia brzegowe (lokalizacja: `app/src/main/assets/`). Czas inferencji okna: 10–14 ms.

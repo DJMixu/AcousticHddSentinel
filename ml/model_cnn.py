@@ -116,6 +116,15 @@ class AcousticHddSentinelCNN(nn.Module):
         # =========================================================================
         self.predictions = nn.Linear(128, num_classes)
 
+        # =========================================================================
+        # OOD PROTOTYPE REJECTION (Open-Set Recognition wewnątrz sieci)
+        # Bufory dla znanych klas uszkodzeń: [beeping (0), clicking (1), scratching (3)]
+        # =========================================================================
+        self.use_open_set: bool = False
+        self.register_buffer("fault_prototypes", torch.zeros((3, 128), dtype=torch.float32))
+        self.register_buffer("fault_thresholds", torch.full((3,), 0.40, dtype=torch.float32))
+        self.register_buffer("gamma", torch.tensor(12.0, dtype=torch.float32))
+
     def forward(self, x: torch.Tensor, return_logits: bool = False) -> torch.Tensor:
         """
         Forward pass sieci.
@@ -183,20 +192,82 @@ class AcousticHddSentinelCNN(nn.Module):
         x = torch.flatten(x, 1)
 
         # Dense projection
-        x = self.dense_features(x)
-        x = self.bn_dense(x)
-        x = self.relu_dense(x)
-        x = self.dense_dropout(x)
+        feat = self.dense_features(x)
+        feat = self.bn_dense(feat)
+        feat = self.relu_dense(feat)
+        dense_feat = feat
+
+        # Regularyzacja dropout (aktywna tylko w treningu)
+        feat = self.dense_dropout(feat)
 
         # Klasyfikator
-        logits = self.predictions(x)
+        logits = self.predictions(feat)
 
         if return_logits:
             return logits
 
+        # OOD Open-Set Rejection w fazie inferencji (działa również natywnie w ONNX!)
+        if self.use_open_set and not self.training:
+            # 1. Normalizacja cech L2
+            z_norm = F.normalize(dense_feat, p=2, dim=1)
+            p_norm = F.normalize(self.fault_prototypes, p=2, dim=1)
+            # 2. Podobieństwo cosinusowe do 3 prototypów wad [beeping(0), clicking(1), scratching(3)]
+            cos_sim = torch.matmul(z_norm, p_norm.t())  # (B, 3)
+            # 3. Bramka OOD Sigmoid: jeśli cos_sim < threshold, gating -> 0
+            gating = torch.sigmoid(self.gamma * (cos_sim - self.fault_thresholds))  # (B, 3)
+            # 4. Tłumienie logitów uszkodzeń (log(0.0001) = -9.21)
+            suppression = torch.log(gating + 1e-4)  # (B, 3)
+
+            # Indeksy klas w logitach: 0: beeping, 1: clicking, 2: normal, 3: scratching
+            b_supp = suppression[:, 0:1]
+            c_supp = suppression[:, 1:2]
+            s_supp = suppression[:, 2:3]
+            zero_pad = torch.zeros_like(b_supp)
+
+            full_suppression = torch.cat([b_supp, c_supp, zero_pad, s_supp], dim=1)  # (B, 4)
+            mod_logits = logits + full_suppression
+            return F.softmax(mod_logits, dim=-1)
+
         if self.num_classes == 1:
             return torch.sigmoid(logits)
         return F.softmax(logits, dim=-1)
+
+    def extract_features(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Zwraca wektor cech 128-d (penultimate layer) przed klasyfikatorem.
+        """
+        if x.ndim == 4 and x.shape[-1] == 3 and x.shape[1] != 3:
+            x = x.permute(0, 3, 1, 2)
+        elif x.ndim == 3 and x.shape[-1] == 3:
+            x = x.permute(2, 0, 1).unsqueeze(0)
+        elif x.ndim == 3 and x.shape[0] == 3:
+            x = x.unsqueeze(0)
+
+        x = self.relu1_2(self.bn1_2(self.conv1_2(self.relu1_1(self.bn1_1(self.conv1_1(x))))))
+        x = self.pool1(x)
+        x = self.relu2_2(self.bn2_2(self.conv2_2(self.relu2_1(self.bn2_1(self.conv2_1(x))))))
+        x = self.pool2(x)
+        x = self.relu3_2(self.bn3_2(self.conv3_2(self.relu3_1(self.bn3_1(self.conv3_1(x))))))
+        x = self.pool3(x)
+        x = self.relu4_2(self.bn4_2(self.conv4_2(self.relu4_1(self.bn4_1(self.conv4_1(x))))))
+        x = self.pool4(x)
+
+        x = self.global_avg_pool(x)
+        x = torch.flatten(x, 1)
+        x = self.dense_features(x)
+        x = self.bn_dense(x)
+        x = self.relu_dense(x)
+        return x
+
+    def set_fault_prototypes(self, prototypes: torch.Tensor, thresholds: torch.Tensor, gamma: float = 12.0):
+        """
+        Inicjalizuje prototypy cech dla znanych klas uszkodzeń (beeping, clicking, scratching)
+        oraz progi podobieństwa cosinusowego do odrzucania próbek Out-Of-Distribution (OOD).
+        """
+        self.fault_prototypes.copy_(prototypes)
+        self.fault_thresholds.copy_(thresholds)
+        self.gamma.copy_(torch.tensor(gamma, dtype=torch.float32))
+        self.use_open_set = True
 
     @torch.no_grad()
     def predict_proba(self, x: Union[np.ndarray, torch.Tensor]) -> np.ndarray:

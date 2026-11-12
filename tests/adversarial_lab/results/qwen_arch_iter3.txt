@@ -1,0 +1,1531 @@
+# SPECYFIKACJA TECHNICZNA  
+## ADR-001 / EXT-003: Obrona przed przesterowaniem mikrofonu smartfona, dystorsją kanału akustycznego i sanityzacją predykcji
+
+---
+
+## 1. CEL I ZAKRES
+
+### 1.1 Cel modułu
+
+Celem zadania jest rozszerzenie systemu **AcousticHddSentinel** o warstwę DSP i sanityzacji predykcji, która:
+
+1. **Wykrywa przesterowanie mikrofonu MEMS / toru ADC/AGC smartfona**  
+   - flat-top clipping,
+   - nasycone próbki,
+   - obniżony Crest Factor,
+   - asymetrię histogramu,
+   - ryzyko spłaszczenia impulsów przez AGC.
+
+2. **Odróżnia sztuczne harmoniczne THD powstałe w wyniku przesterowania mikrofonu**  
+   od autentycznego mechanicznego tarcia głowicy HDD:
+   - `scratching`,
+   - `friction`,
+   - `grinding`.
+
+3. **Kompensuje statyczną odpowiedź kanału akustycznego**  
+   bez łamania niezmiennika tensora:
+   - na dysku: `(128, 259, 3)`,
+   - w PyTorch: `(B, 3, 128, 259)`.
+
+4. **Sanityzuje predykcje modelu**  
+   tak, aby przesterowany sygnał nie był błędnie klasyfikowany jako `scratching`, a spłaszczone impulsy AGC nie były fałszywie odrzucane lub nadmiernie ufane.
+
+---
+
+### 1.2 Zakres implementacji
+
+Moduł musi zostać zaimplementowany jako osobny komponent DSP, np.:
+
+```text
+ml/mic_clipping_guard.py
+ml/acoustic_channel_compensator.py
+```
+
+lub jako jeden spójny moduł:
+
+```text
+ml/acoustic_sanity.py
+```
+
+Zakres obejmuje:
+
+- analizę surowej fali czasowej przed enkodowaniem,
+- raport DSP `ClippingReport`,
+- decyzję sanityzacyjną `SanityDecision`,
+- kompensację kanału akustycznego na tensorze `(128, 259, 3)`,
+- reguły modyfikacji predykcji modelu,
+- obsługę corner-case’ów,
+- izolację pamięci CPU/GPU,
+- pełną zgodność z ADR-001.
+
+---
+
+### 1.3 Poza zakresem
+
+Niedozwolone jest w ramach tego zadania:
+
+- zmiana architektury `AcousticHddSentinelCNN`,
+- zmiana parametrów ADR-001,
+- zmiana podziału danych na `train / validate / test`,
+- losowe pociąganie okien `.npy` bez zachowania podziału na poziomie plików,
+- duplikowanie funkcji:
+  - `encode_audio_chunk`,
+  - `normalize_waveform_peak`,
+  - `normalize_tensor_zscore`,
+- zmiana kształtu tensora wejściowego modelu,
+- wprowadzanie globalnych statystyk z całego datasetu do normalizacji pojedynczego chunka.
+
+---
+
+## 2. NIEZMIENNIKI I MODEL DANYCH
+
+### 2.1 Niezmienniki ADR-001
+
+Moduł musi bezwzględnie przestrzegać poniższych parametrów:
+
+| Parametr | Wartość | Komentarz |
+|---|---:|---|
+| `TARGET_SR` | `22050 Hz` | częstotliwość próbkowania |
+| `N_FFT` | `1024` | okno FFT |
+| `HOP_LENGTH` | `256` | krok FFT |
+| `N_MELS` | `128` | liczba binów mel |
+| `FMIN` | `50.0 Hz` | dolna granica pasma |
+| `FMAX` | `10000.0 Hz` | górna granica pasma |
+| `CHUNK_DURATION` | `3.0 s` | długość chunka |
+| `EXPECTED_SAMPLES` | `66150` | `3.0 * 22050` |
+| `RMS_FLOOR` | `0.002` | próg odrzucania ciszy / szumu tła |
+
+---
+
+### 2.2 Kształty tensorów
+
+#### Na dysku, pliki `.npy`
+
+```text
+shape = (128, 259, 3)
+dtype = float32
+layout = Channel-Last
+```
+
+Interpretacja:
+
+```text
+axis 0: 128 binów mel
+axis 1: 259 klatek czasowych
+axis 2: 3 kanały cech
+```
+
+#### W pamięci modelu PyTorch
+
+```text
+shape = (B, 3, 128, 259)
+dtype = float32
+layout = Channel-First
+```
+
+Interpretacja:
+
+```text
+axis 0: batch size B
+axis 1: 3 kanały cech
+axis 2: 128 binów mel
+axis 3: 259 klatek czasowych
+```
+
+---
+
+### 2.3 Zakładany układ 3 kanałów tensora
+
+Dla celów kompensacji kanału akustycznego przyjmujemy następujący domyślny layout:
+
+```text
+channel 0: log-mel spectrogram
+channel 1: delta / first-order temporal derivative
+channel 2: delta-delta / second-order temporal derivative
+```
+
+Jeżeli istniejący `encode_audio_chunk` używa innego layoutu, moduł kompensacji musi być konfigurowalny przez:
+
+```python
+log_mel_channel: int = 0
+recompute_deltas: bool = True
+```
+
+Do czasu weryfikacji layoutu produkcyjnego zalecany jest tryb bezpieczny:
+
+```python
+mode = "safe_mms"
+```
+
+który nie zakłada, że kanały 1 i 2 to delta/delta-delta.
+
+---
+
+### 2.4 Typy danych i zakresy wartości
+
+#### Surowa fala czasowa
+
+Wejście do detektora clippingu:
+
+```text
+waveform: np.ndarray
+shape = (N,)
+dtype = float32 lub float64
+sr = 22050 Hz
+N = 66150 dla pełnego chunka ADR-001
+```
+
+Wymagania:
+
+- sygnał mono,
+- wartości skończone,
+- brak `NaN` / `Inf`,
+- po normalizacji peakowej:
+  ```text
+  max(abs(x)) <= 1.0 + epsilon
+  ```
+
+#### Tensor wejściowy modelu
+
+```text
+dtype = float32
+shape = (128, 259, 3) lub (B, 3, 128, 259)
+wszystkie wartości skończone
+```
+
+Po `normalize_tensor_zscore` oczekiwany jest tensor znormalizowany per chunk:
+
+```text
+mean ≈ 0.0
+std ≈ 1.0
+```
+
+Moduł kompensacji nie może wprowadzać:
+
+- `NaN`,
+- `Inf`,
+- zmiany kształtu,
+- zmiany dtype’u na inny niż `float32` po wyjściu z modułu.
+
+---
+
+### 2.5 Zakaz data leakage
+
+Wszystkie statystyki używane w:
+
+- detekcji clippingu,
+- detekcji THD,
+- CMS / MMS,
+- sanityzacji predykcji,
+
+muszą być obliczane **wyłącznie na poziomie pojedynczego chunka lub pojedynczego pliku źródłowego**.
+
+Zakazane jest:
+
+- uśrednianie statystyk przez cały batch treningowy,
+- uśrednianie przez cały split `train`,
+- użycie statystyk z `test` do modyfikacji `train`,
+- użycie globalnych średnich mel-binów z całego datasetu.
+
+---
+
+## 3. ARCHITEKTURA KLAS I SYGNATURY METOD
+
+Poniżej znajduje się formalny kontrakt API.
+
+```python
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import (
+    Any,
+    Dict,
+    FrozenSet,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Union,
+)
+
+import numpy as np
+import torch
+
+
+Status = Literal[
+    "ok",
+    "silence",
+    "invalid",
+    "clipped",
+    "distorted",
+]
+
+CompensationMode = Literal[
+    "none",
+    "safe_mms",
+    "mms",
+    "cms",
+]
+
+
+@dataclass(frozen=True)
+class ClippingGuardConfig:
+    """
+    Formalne progi detektora przesterowania i dystorsji kanału akustycznego.
+    """
+
+    # --- Parametry ADR-001 ---
+    sr: int = 22050
+    n_fft: int = 1024
+    hop_length: int = 256
+    fmin: float = 50.0
+    fmax: float = 10000.0
+    n_mels: int = 128
+    chunk_duration: float = 3.0
+    expected_samples: int = 66150
+    rms_floor: float = 0.002
+
+    # --- Próg nasycenia / clippingu ---
+    sat_rel: float = 0.98
+    sat_abs_floor: float = 0.02
+    min_flat_run: int = 4
+    min_flat_samples: int = 8
+    min_sat_ratio: float = 0.0002
+    strong_sat_ratio: float = 0.001
+    strong_flat_samples: int = 64
+
+    # --- Pasma dla analizy THD ---
+    low_band_max_hz: float = 1000.0
+    high_band_min_hz: float = 4000.0
+    harmonic_k_max: int = 10
+
+    # --- Progi dystorsji / sztucznych harmonicznych ---
+    comb_ratio_threshold: float = 0.35
+    hnr_db_threshold: float = 12.0
+    flatness_threshold: float = 0.15
+    corr_threshold: float = 0.60
+
+    # --- Ryzyko spłaszczenia impulsów przez AGC ---
+    crest_db_impulse_risk: float = 8.0
+
+    # --- Progi decyzji sanityzacyjnej ---
+    artifact_strong: float = 0.50
+    artifact_moderate: float = 0.30
+
+    penalty_high_freq_strong: float = 0.20
+    penalty_high_freq_moderate: float = 0.50
+    penalty_impulse_risk: float = 0.70
+
+    # --- Mapowanie klas ---
+    high_freq_classes: Tuple[str, ...] = (
+        "scratching",
+        "scratch",
+        "friction",
+        "grinding",
+    )
+    impulse_classes: Tuple[str, ...] = (
+        "clicking",
+        "click",
+        "impact",
+        "tap",
+    )
+
+
+@dataclass
+class ClippingReport:
+    """
+    Raport DSP dla pojedynczego chunka 3-sekundowego.
+    """
+
+    status: Status
+    source: Literal["raw", "tensor_approx"] = "raw"
+
+    # --- Metryki czasowe ---
+    rms: float = 0.0
+    peak: float = 0.0
+    dc_offset: float = 0.0
+    crest_factor_db: float = 0.0
+
+    # --- Clipping ---
+    saturation_ratio: float = 0.0
+    flat_top_samples: int = 0
+    max_flat_run: int = 0
+    flat_top_runs: int = 0
+    histogram_asymmetry: float = 0.0
+    clip_score: float = 0.0
+
+    # --- THD / kanał akustyczny ---
+    high_band_energy: float = 0.0
+    comb_ratio: float = 0.0
+    hnr_db: float = 0.0
+    spectral_flatness_high: float = 0.0
+    low_high_correlation: float = 0.0
+    distortion_score: float = 0.0
+
+    # --- Synteza ryzyka ---
+    artifact_likelihood: float = 0.0
+
+    flags: List[str] = field(default_factory=list)
+
+
+@dataclass
+class SanityDecision:
+    """
+    Decyzja sanityzacyjna dla predykcji modelu.
+    """
+
+    accepted: bool
+    original_class: Optional[str]
+    sanitized_class: str
+    original_confidence: Optional[float]
+    sanitized_confidence: float
+    flags: List[str]
+    report: ClippingReport
+
+
+class MicrophoneClippingGuard:
+    """
+    Główny detektor przesterowania mikrofonu i dystorsji kanału akustycznego.
+    """
+
+    def __init__(
+        self,
+        config: Optional[ClippingGuardConfig] = None,
+    ) -> None:
+        self.cfg: ClippingGuardConfig = config or ClippingGuardConfig()
+
+    def analyze_raw_waveform(
+        self,
+        waveform: np.ndarray,
+        sr: Optional[int] = None,
+        strict: bool = True,
+    ) -> ClippingReport:
+        """
+        Analizuje surową falę czasową.
+
+        Args:
+            waveform: mono waveform, shape (N,) lub (N, channels).
+            sr: częstotliwość próbkowania wejściowa.
+                Jeśli None, przyjmuje self.cfg.sr.
+            strict:
+                True  -> wymusza N = 66150,
+                False -> zero-padding / truncation do 66150.
+
+        Returns:
+            ClippingReport
+        """
+        ...
+
+    def is_clipped_or_distorted(
+        self,
+        report: ClippingReport,
+    ) -> bool:
+        """
+        Zwraca True, jeśli report wskazuje clipping lub dystorsję.
+        """
+        return report.status in {"clipped", "distorted"}
+
+    def is_microphone_clipped_or_distorted(
+        self,
+        waveform: np.ndarray,
+        prediction: Optional[Dict[str, Any]] = None,
+        sr: Optional[int] = None,
+        strict: bool = True,
+    ) -> SanityDecision:
+        """
+        Główna funkcja sanityzacyjna.
+
+        Args:
+            waveform: surowa fala czasowa.
+            prediction: słownik predykcji, np.:
+                {
+                    "class": "scratching",
+                    "confidence": 0.87,
+                }
+            sr: częstotliwość próbkowania.
+            strict: tryb ścisły dla chunków ADR-001.
+
+        Returns:
+            SanityDecision
+        """
+        ...
+
+    def sanitize_prediction(
+        self,
+        prediction: Dict[str, Any],
+        report: ClippingReport,
+    ) -> Dict[str, Any]:
+        """
+        Zwraca zsanityzowaną predykcję w formie słownika.
+
+        Expected input keys:
+            "class": str
+            "confidence": float
+
+        Returns:
+            {
+                "original_class": str | None,
+                "original_confidence": float | None,
+                "sanitized_class": str,
+                "sanitized_confidence": float,
+                "accepted": bool,
+                "flags": List[str],
+            }
+        """
+        ...
+
+
+class AcousticChannelCompensator:
+    """
+    Kompensacja statycznej odpowiedzi kanału akustycznego.
+
+    Obsługiwane wejścia:
+        - np.ndarray shape (128, 259, 3)
+        - np.ndarray shape (B, 128, 259, 3)
+        - torch.Tensor shape (B, 3, 128, 259)
+
+    Wyjście:
+        - ten sam layout co wejście,
+        - dtype float32,
+        - kształt niezmienny.
+    """
+
+    def __init__(
+        self,
+        mode: CompensationMode = "cms",
+        log_mel_channel: int = 0,
+        recompute_deltas: bool = True,
+    ) -> None:
+        self.mode = mode
+        self.log_mel_channel = log_mel_channel
+        self.recompute_deltas = recompute_deltas
+
+    def apply_numpy(
+        self,
+        tensor: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Zwraca skompensowany tensor numpy o tym samym kształcie.
+        """
+        ...
+
+    def apply_torch(
+        self,
+        tensor: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Zwraca skompensowany tensor torch o tym samym kształcie.
+
+        Jeśli wejście jest na GPU, przetwarzanie odbywa się na CPU.
+        Wyjście jest zwracane na CPU.
+        """
+        ...
+```
+
+---
+
+### 3.1 Wymagany pipeline inferencyjny
+
+Kolejność wywołań musi być następująca:
+
+```python
+from ml.hdd_audio_encoder import (
+    encode_audio_chunk,
+    normalize_waveform_peak,
+    normalize_tensor_zscore,
+)
+
+raw = load_mono_waveform(path, sr=22050)
+
+report = guard.analyze_raw_waveform(raw, strict=True)
+
+if report.status in {"invalid", "silence"}:
+    # odrzuć chunk lub oznacz jako nieufny
+    ...
+
+normalized_raw = normalize_waveform_peak(raw)
+
+tensor = encode_audio_chunk(normalized_raw)          # (128, 259, 3)
+tensor = compensator.apply_numpy(tensor)            # (128, 259, 3)
+tensor = normalize_tensor_zscore(tensor)            # (128, 259, 3)
+
+model_input = torch.from_numpy(
+    np.moveaxis(tensor, -1, 1)
+).float()                                           # (1, 3, 128, 259)
+
+prediction = model.predict(model_input)
+
+decision = guard.is_microphone_clipped_or_distorted(
+    waveform=raw,
+    prediction=prediction,
+    sr=22050,
+    strict=True,
+)
+```
+
+---
+
+## 4. LOGIKA ALGORYTMICZNA KROK PO KROKU
+
+---
+
+# 4.1 Detekcja przesterowania mikrofonu
+
+Cel: niezawodne wykrycie:
+
+- hard clipping / flat-top,
+- nasycenia ADC,
+- asymetrii histogramu,
+- obniżonego Crest Factor,
+- ryzyka spłaszczenia impulsów przez AGC.
+
+---
+
+## 4.1.1 Przygotowanie fali czasowej
+
+Wejście:
+
+```python
+x = np.asarray(waveform)
+```
+
+Kroki:
+
+1. Jeśli `x.ndim == 2`:
+   - jeśli `x.shape[1] == 1`: spłaszcz do mono,
+   - jeśli `x.shape[1] == 2`: uśrednij kanały stereo,
+   - inaczej: `ValueError`.
+
+2. Spłaszcz do 1D:
+
+```python
+x = x.astype(np.float64).ravel()
+```
+
+3. Obsługa wartości nieskończonych:
+
+```python
+non_finite_mask = ~np.isfinite(x)
+non_finite_ratio = float(non_finite_mask.mean()) if x.size > 0 else 1.0
+```
+
+Jeśli:
+
+```python
+non_finite_ratio > 0.001
+```
+
+zwróć:
+
+```python
+status = "invalid"
+flags.append("non_finite_input")
+```
+
+W przeciwnym razie:
+
+```python
+x = np.nan_to_num(x, nan=0.0, posinf=0.0, neginf=0.0)
+flags.append("non_finite_sanitized")
+```
+
+4. Resampling do `22050 Hz`, jeśli `sr != 22050`:
+
+```python
+if sr is None:
+    sr = cfg.sr
+
+if sr != cfg.sr:
+    x = librosa.resample(
+        x,
+        orig_sr=sr,
+        target_sr=cfg.sr,
+    )
+```
+
+5. Normalizacja długości do `66150` próbek:
+
+```python
+N_expected = int(round(cfg.chunk_duration * cfg.sr))  # 66150
+```
+
+Jeśli `strict=True`:
+
+```python
+if x.size != N_expected:
+    raise ValueError(
+        f"Expected {N_expected} samples, got {x.size}"
+    )
+```
+
+Jeśli `strict=False`:
+
+```python
+if x.size < N_expected:
+    x = np.pad(x, (0, N_expected - x.size), mode="constant")
+    flags.append("length_padded")
+elif x.size > N_expected:
+    x = x[:N_expected]
+    flags.append("length_truncated")
+```
+
+---
+
+## 4.1.2 Metryki podstawowe
+
+Oblicz:
+
+```python
+N = x.size
+
+dc_offset = float(np.mean(x))
+x_ac = x - dc_offset
+
+rms = float(np.sqrt(np.mean(x_ac ** 2)))
+peak = float(np.max(np.abs(x))) if N > 0 else 0.0
+```
+
+Crest Factor:
+
+```python
+if rms > 1e-12 and peak > 1e-12:
+    crest_factor_db = float(20.0 * np.log10(peak / rms))
+else:
+    crest_factor_db = 0.0
+```
+
+---
+
+## 4.1.3 Próg nasycenia
+
+Definicja progu:
+
+```python
+T = max(cfg.sat_rel * peak, cfg.sat_abs_floor)
+```
+
+Dla ADR-001:
+
+```python
+sat_rel = 0.98
+sat_abs_floor = 0.02
+```
+
+Maska nasyconych próbek:
+
+```python
+sat_mask = np.abs(x) >= T
+```
+
+Metryki:
+
+```python
+saturation_ratio = float(np.mean(sat_mask)) if N > 0 else 0.0
+saturated_count = int(np.sum(sat_mask))
+```
+
+---
+
+## 4.1.4 Flat-top clipping detection
+
+Flat-top oznacza sekwencję kolejnych próbek o wartości bliskiej maksimum.
+
+Zdefiniuj:
+
+```python
+MIN_FLAT_RUN = cfg.min_flat_run          # 4 próbki
+MIN_FLAT_SAMPLES = cfg.min_flat_samples  # 8 próbek łącznie
+```
+
+Algorytm:
+
+```python
+flat_top_samples = 0
+max_flat_run = 0
+flat_top_runs = 0
+
+current_run = 0
+
+for value in sat_mask:
+    if value:
+        current_run += 1
+    else:
+        if current_run >= MIN_FLAT_RUN:
+            flat_top_runs += 1
+            flat_top_samples += current_run
+            max_flat_run = max(max_flat_run, current_run)
+        current_run = 0
+
+if current_run >= MIN_FLAT_RUN:
+    flat_top_runs += 1
+    flat_top_samples += current_run
+    max_flat_run = max(max_flat_run, current_run)
+```
+
+Uzasadnienie:
+
+- pojedyncza próbka przy maksimum nie jest jeszcze dowodem clippingu,
+- sekwencja 4 próbek przy `22050 Hz` trwa około `0.18 ms`,
+- typowy flat-top clipping tworzy wiele takich sekwencji.
+
+---
+
+## 4.1.5 Asymetria histogramu
+
+Oblicz średnie wartości nasyconych próbek dodatnich i ujemnych:
+
+```python
+pos_sat = x[x >= T]
+neg_sat = x[x <= -T]
+
+pos_mean = float(np.mean(pos_sat)) if pos_sat.size > 0 else 0.0
+neg_mean = float(np.mean(neg_sat)) if neg_sat.size > 0 else 0.0
+
+denom = abs(pos_mean) + abs(neg_mean) + 1e-12
+histogram_asymmetry = float(abs(pos_mean - neg_mean) / denom)
+```
+
+Jeśli:
+
+```python
+histogram_asymmetry > 0.30
+```
+
+dodaj flagę:
+
+```python
+flags.append("asymmetric_clipping")
+```
+
+---
+
+## 4.1.6 Score clippingu
+
+Zdefiniuj:
+
+```python
+flat_score = min(
+    1.0,
+    flat_top_samples / cfg.strong_flat_samples
+)
+
+ratio_score = min(
+    1.0,
+    saturation_ratio / cfg.strong_sat_ratio
+)
+
+clip_score = float(0.6 * flat_score + 0.4 * ratio_score)
+```
+
+Domyślne progi:
+
+| Parametr | Wartość |
+|---|---:|
+| `strong_flat_samples` | `64` |
+| `strong_sat_ratio` | `0.001` |
+
+Interpretacja:
+
+- `clip_score < 0.30` — niskie ryzyko,
+- `0.30 <= clip_score < 0.50` — umiarkowane ryzyko,
+- `clip_score >= 0.50` — wysokie ryzyko clippingu.
+
+---
+
+## 4.1.7 Warunek twardego clippingu
+
+Status `clipped` jest nadawany, gdy spełnione są wszystkie warunki:
+
+```python
+is_clipped = (
+    flat_top_samples >= cfg.min_flat_samples
+    and saturation_ratio >= cfg.min_sat_ratio
+    and max_flat_run >= cfg.min_flat_run
+)
+```
+
+Domyślne progi:
+
+| Parametr | Wartość |
+|---|---:|
+| `min_flat_samples` | `8` |
+| `min_sat_ratio` | `0.0002` |
+| `min_flat_run` | `4` |
+
+Dodatkowe flagi:
+
+```python
+if is_clipped:
+    flags.append("flat_top_clipping")
+
+if saturation_ratio >= cfg.strong_sat_ratio:
+    flags.append("high_saturation")
+
+if crest_factor_db < 6.0 and is_clipped:
+    flags.append("low_crest_factor_clipping")
+```
+
+---
+
+## 4.1.8 Ryzyko AGC / spłaszczenia impulsów
+
+AGC może nie powodować twardego clippingu, ale obniża Crest Factor i spłaszcza impulsy `clicking`.
+
+Warunek ryzyka:
+
+```python
+agc_risk = (
+    crest_factor_db < cfg.crest_db_impulse_risk
+    and rms > 0.01
+    and saturation_ratio < cfg.min_sat_ratio
+)
+```
+
+Domyślny próg:
+
+```python
+crest_db_impulse_risk = 8.0
+```
+
+Jeśli warunek spełniony:
+
+```python
+flags.append("agc_compression_risk")
+```
+
+---
+
+## 4.1.9 Status ciszy / invalid
+
+Kolejność decyzji:
+
+```python
+if x.size == 0 or peak < 1e-8:
+    status = "invalid"
+elif abs(dc_offset) > 0.1:
+    status = "invalid"
+    flags.append("dc_offset")
+elif rms < cfg.rms_floor and not is_clipped:
+    status = "silence"
+else:
+    # dalej analiza THD / distorted
+```
+
+Uwaga:
+
+- jeśli `rms < 0.002`, ale wykryto silny clipping, nie traktuj chunka jako ciszy,
+- DC offset powyżej `0.1` jest traktowany jako invalid, ponieważ może fałszywo nasycić tor ADC.
+
+---
+
+# 4.2 Detekcja sztucznych harmonicznych THD i odróżnianie od HDD scratching
+
+Cel: odróżnić:
+
+```text
+sztuczne harmoniczne z przesterowania mikrofonu
+```
+
+od:
+
+```text
+autentyczne tarcie głowicy HDD / scratching
+```
+
+---
+
+## 4.2.1 STFT zgodny z ADR-001
+
+Użyj parametrów:
+
+```python
+N_FFT = 1024
+HOP_LENGTH = 256
+sr = 22050
+window = np.hanning(N_FFT)
+```
+
+Oblicz magnitude spectrogram:
+
+```python
+n_frames = max(1, 1 + (x.size - N_FFT) // HOP_LENGTH)
+
+M = np.empty((N_FFT // 2 + 1, n_frames), dtype=np.float64)
+
+window_sum = float(np.sum(window))
+
+for i in range(n_frames):
+    start = i * HOP_LENGTH
+    segment = x[start:start + N_FFT] * window
+    M[:, i] = np.abs(np.fft.rfft(segment)) / window_sum
+```
+
+Częstotliwości binów:
+
+```python
+freqs = np.fft.rfftfreq(N_FFT, d=1.0 / cfg.sr)
+```
+
+---
+
+## 4.2.2 Maska pasm
+
+Niskie pasmo źródłowe:
+
+```python
+low_mask = (freqs >= cfg.fmin) & (freqs <= cfg.low_band_max_hz)
+```
+
+Domyślnie:
+
+```text
+50 Hz <= f <= 1000 Hz
+```
+
+Wysokie pasmo harmoniczne:
+
+```python
+high_mask = (freqs >= cfg.high_band_min_hz) & (freqs <= cfg.fmax)
+```
+
+Domyślnie:
+
+```text
+4000 Hz <= f <= 10000 Hz
+```
+
+---
+
+## 4.2.3 Energia pasm
+
+Oblicz energię per klatka:
+
+```python
+low_energy = np.sum(M[low_mask, :] ** 2, axis=0)
+high_energy = np.sum(M[high_mask, :] ** 2, axis=0)
+```
+
+Aktywne klatki:
+
+```python
+active_threshold = max(
+    1e-8,
+    0.25 * float(np.median(low_energy))
+)
+
+active_frames = low_energy > active_threshold
+```
+
+Jeśli nie ma aktywnych klatek:
+
+```python
+comb_ratio = 0.0
+hnr_db = 0.0
+spectral_flatness_high = 1.0
+low_high_correlation = 0.0
+distortion_score = 0.0
+```
+
+---
+
+## 4.2.4 Harmonic comb score
+
+Cel: zmierzyć, ile energii w paśmie `4-10 kHz` znajduje się na harmonicznych niskoczęstotliwościowych sygnału.
+
+Algorytm:
+
+1. Dla każdej aktywnej klatki `t`:
+   - weź magnitudę w paśmie niskim:
+     ```python
+     low_mag = M[low_mask, t]
+     ```
+   - znajdź lokalne maksima:
+     ```python
+     peaks, _ = scipy.signal.find_peaks(
+         low_mag,
+         prominence=0.1 * float(np.max(low_mag) + 1e-12),
+     )
+     ```
+   - wybierz do 5 najsilniejszych peaków jako kandydaty `f0`.
+
+2. Dla każdego `f0`:
+   - dla `k = 2 ... harmonic_k_max`:
+     ```python
+     f_h = k * f0
+     if f_h > cfg.fmax:
+         break
+     ```
+   - znajdź najbliższy bin częstotliwości:
+     ```python
+     bin_idx = int(np.argmin(np.abs(freqs - f_h)))
+     ```
+   - jeśli bin należy do `high_mask`, dodaj jego energię do `comb_energy[t]`.
+
+3. Aby uniknąć podwójnego liczenia, użyj maski binów harmonicznych per klatka:
+
+```python
+harmonic_bins = np.zeros(N_FFT // 2 + 1, dtype=bool)
+```
+
+4. Oblicz:
+
+```python
+comb_energy[t] = sum(M[harmonic_bins & high_mask, t] ** 2)
+```
+
+5. Ostateczny wskaźnik:
+
+```python
+eps = 1e-12
+
+comb_ratio_per_frame = comb_energy / (high_energy + eps)
+comb_ratio = float(np.mean(comb_ratio_per_frame[active_frames]))
+```
+
+Interpretacja:
+
+| `comb_ratio` | Interpretacja |
+|---:|---|
+| `< 0.20` | słaba struktura harmoniczna |
+| `0.20 - 0.35` | umiarkowana |
+| `>= 0.35` | silna struktura harmoniczna, podejrzenie THD |
+
+---
+
+## 4.2.5 Harmonic-to-Noise Ratio, HNR
+
+Dla każdej aktywnej klatki:
+
+1. Zbierz moc binów harmonicznych:
+
+```python
+harmonic_power = sum(M[harmonic_bins & high_mask, t] ** 2)
+```
+
+2. Szacuj szum tła w paśmie wysokim jako medianę mocy binów nieharmonicznych:
+
+```python
+noise_mask = high_mask & ~harmonic_bins
+noise_power = float(np.median(M[noise_mask, t] ** 2)) + eps
+```
+
+3. Oblicz stosunek:
+
+```python
+ratio = harmonic_power / noise_power
+hnr_db_frame = 10.0 * np.log10(ratio)
+```
+
+4. Uśrednij po aktywnych klatkach:
+
+```python
+hnr_db = float(np.mean(hnr_db_frames[active_frames]))
+```
+
+Próg:
+
+```python
+hnr_db_threshold = 12.0 dB
+```
+
+Interpretacja:
+
+- HNR wysokie → tonalne harmoniczne,
+- HNR niskie → bardziej szumowy / aperiodyczny sygnał.
+
+---
+
+## 4.2.6 Spectral flatness w paśmie wysokim
+
+Spectral flatness mierzy, jak „biały” jest sygnał.
+
+Dla aktywnej klatki:
+
+```python
+high_mag = M[high_mask, t] + eps
+
+flatness_t = (
+    np.exp(np.mean(np.log(high_mag))) /
+    np.mean(high_mag)
+)
+```
+
+Uśrednij:
+
+```python
+spectral_flatness_high = float(np.mean(flatness_frames[active_frames]))
+```
+
+Interpretacja:
+
+| Flatness | Interpretacja |
+|---:|---|
+| `≈ 0.0` | bardzo tonalny / pikowy |
+| `< 0.15` | podejrzenie sztucznych harmonicznych |
+| `> 0.25` | bardziej szumowy, typowe dla friction/scratching |
+
+Próg:
+
+```python
+flatness_threshold = 0.15
+```
+
+---
+
+## 4.2.7 Korelacja niskie pasmo ↔ wysokie pasmo
+
+Sztuczne harmoniczne z clippingu powinny śledzić obwiednię niskoczęstotliwościowego sygnału źródłowego.
+
+Oblicz korelację Pearsona:
+
+```python
+if np.sum(active_frames) >= 3:
+    low_high_correlation = float(
+        np.corrcoef(
+            low_energy[active_frames],
+            high_energy[active_frames],
+        )[0, 1]
+    )
+else:
+    low_high_correlation = 0.0
+```
+
+Próg:
+
+```python
+corr_threshold = 0.60
+```
+
+Interpretacja:
+
+- wysoka korelacja → harmoniczne zależne od sygnału źródłowego,
+- niska korelacja → niezależne transjenty / autentyczne tarcie.
+
+---
+
+## 4.2.8 Score dystorsji
+
+Zdefiniuj:
+
+```python
+comb_component = min(1.0, comb_ratio / 0.50)
+hnr_component = min(1.0, hnr_db / 20.0)
+flatness_component = 1.0 - min(1.0, spectral_flatness_high / 0.30)
+
+distortion_score = float(
+    0.4 * comb_component +
+    0.3 * hnr_component +
+    0.3 * flatness_component
+)
+```
+
+Interpretacja:
+
+- `distortion_score < 0.30` — niskie ryzyko,
+- `0.30 - 0.50` — umiarkowane,
+- `>= 0.50` — wysokie ryzyko sztucznej dystorsji.
+
+---
+
+## 4.2.9 Warunek twardego `distorted`
+
+Status `distorted` jest nadawany, gdy wszystkie warunki są spełnione:
+
+```python
+is_distorted = (
+    comb_ratio >= cfg.comb_ratio_threshold
+    and hnr_db >= cfg.hnr_db_threshold
+    and spectral_flatness_high <= cfg.flatness_threshold
+    and low_high_correlation >= cfg.corr_threshold
+)
+```
+
+Domyślne progi:
+
+| Parametr | Wartość |
+|---|---:|
+| `comb_ratio_threshold` | `0.35` |
+| `hnr_db_threshold` | `12.0 dB` |
+| `flatness_threshold` | `0.15` |
+| `corr_threshold` | `0.60` |
+
+Jeśli warunek spełniony:
+
+```python
+flags.append("high_thd_artifact")
+flags.append("harmonic_comb_detected")
+```
+
+---
+
+## 4.2.10 Odróżnianie od autentycznego HDD scratching
+
+Autentyczne `scratching` powinno mieć raczej:
+
+- wyższą spectral flatness w paśmie wysokim,
+- niższy harmonic comb score,
+- niższą korelację z niskim pasmem,
+- bardziej aperiodyczne transjenty.
+
+Reguła heurystyczna:
+
+```python
+authentic_scratching_likely = (
+    spectral_flatness_high > 0.25
+    and comb_ratio < 0.35
+    and low_high_correlation < 0.50
+)
+```
+
+Jeśli warunek spełniony:
+
+```python
+flags.append("authentic_scratching_likely")
+```
+
+W takim przypadku nie należy agresywnie obniżać predykcji `scratching`, nawet jeśli istnieje lekki clipping.
+
+---
+
+## 4.2.11 Artifact likelihood
+
+Łączna ocena prawdopodobieństwa, że wysokie pasmo jest artefaktem:
+
+```python
+artifact_likelihood = float(
+    0.6 * clip_score +
+    0.4 * distortion_score
+)
+```
+
+Progi decyzji:
+
+| `artifact_likelihood` | Decyzja |
+|---:|---|
+| `< 0.30` | niskie ryzyko artefaktu |
+| `0.30 - 0.50` | umiarkowane ryzyko |
+| `>= 0.50` | wysokie ryzyko artefaktu |
+
+---
+
+# 4.3 Kompensacja kanału akustycznego bez łamania kształtu tensora
+
+Cel: zastosować CMS / MMS na tensorze:
+
+```text
+(128, 259, 3)
+```
+
+lub batch:
+
+```text
+(B, 3, 128, 259)
+```
+
+bez zmiany kształtu.
+
+---
+
+## 4.3.1 Tryby kompensacji
+
+### `mode = "none"`
+
+Brak modyfikacji tensora.
+
+---
+
+### `mode = "safe_mms"`
+
+Bezpieczny tryb, gdy layout kanałów nie jest w pełni znany.
+
+Dla każdego kanału `c`:
+
+```python
+X[:, :, c] -= X[:, :, c].mean(axis=1, keepdims=True)
+```
+
+Gdzie:
+
+```text
+axis 0: 128 binów mel
+axis 1: 259 klatek czasowych
+axis 2: kanały
+```
+
+Ten tryb:
+
+- nie zakłada, że kanał 1 i 2 to delta,
+- nie przelicza delta,
+- zachowuje kształt,
+- usuwa statyczny offset czasowy każdego kanału.
+
+---
+
+### `mode = "mms"`
+
+Mel-Spectrogram Mean Subtraction.
+
+Zakłada:
+
+```text
+channel 0 = log-mel
+```
+
+Algorytm:
+
+```python
+mel = X[:, :, 0].astype(np.float64)
+mel -= mel.mean(axis=1, keepdims=True)
+X[:, :, 0] = mel.astype(np.float32)
+```
+
+Jeśli `recompute_deltas=True`:
+
+- przelicz kanał delta,
+- przelicz kanał delta-delta.
+
+---
+
+### `mode = "cms"`
+
+Cepstral Mean Subtraction.
+
+Zakłada:
+
+```text
+channel 0 = log-mel
+```
+
+Algorytm:
+
+```python
+mel = X[:, :, 0].astype(np.float64)
+
+# FFT wzdłuż osi częstotliwości mel dla każdej klatki czasowej
+cepstrum = np.fft.rfft(mel, axis=0)
+
+# Odejmij średnią cepstralną w czasie
+cepstrum -= cepstrum.mean(axis=1, keepdims=True)
+
+# Transformacja z powrotem do domeny mel
+mel_new = np.fft.irfft(cepstrum, n=128, axis=0).real
+
+X[:, :, 0] = mel_new.astype(np.float32)
+```
+
+Jeśli `recompute_deltas=True`:
+
+- przelicz delta,
+- przelicz delta-delta.
+
+---
+
+## 4.3.2 Przeliczenie delta i delta-delta
+
+Funkcja pomocnicza:
+
+```python
+def _central_delta(y: np.ndarray) -> np.ndarray:
+    """
+    y shape: (128, 259)
+    returns delta shape: (128, 259)
+    """
+    d = np.zeros_like(y, dtype=np.float64)
+
+    T = y.shape[1]
+
+    if T > 1:
+        d[:, 0] = y[:, 1] - y[:, 0]
+        d[:, -1] = y[:, -1] - y[:, -2]
+
+    if T > 2:
+        d[:, 1:-1] = (y[:, 2:] - y[:, :-2]) / 2.0
+
+    return d
+```
+
+Przeliczenie:
+
+```python
+delta = _central_delta(mel_new)
+delta2 = _central_delta(delta)
+
+X[:, :, 1] = delta.astype(np.float32)
+X[:, :, 2] = delta2.astype(np.float32)
+```
+
+Uwaga:
+
+- jeśli istniejący `encode_audio_chunk` używa innej definicji delta, tryb `cms` i `mms` z `recompute_deltas=True` musi zostać zweryfikowany testem porównawczym,
+- w razie niezgodności należy tymczasowo używać `safe_mms`.
+
+---
+
+## 4.3.3 Stabilność numeryczna
+
+Po każdej transformacji:
+
+```python
+X = np.nan_to_num(
+    X,
+    nan=0.0,
+    posinf=0.0,
+    neginf=-120.0,
+)
+```
+
+Opcjonalnie, tylko dla wartości nieskończonych:
+
+```python
+X = np.clip(X, -120.0, 120.0)
+```
+
+Nie należy agresywnie clipować normalnych wartości log-mel przed `normalize_tensor_zscore`.
+
+---
+
+## 4.3.4 Zachowanie kształtu tensora
+
+Dla pojedynczego tensora:
+
+```python
+input_shape = X.shape
+X = compensator.apply_numpy(X)
+assert X.shape == input_shape
+assert X.dtype == np.float32
+```
+
+Dla batch PyTorch:
+
+```python
+input_shape = tensor.shape
+out = compensator.apply_torch(tensor)
+assert out.shape == input_shape
+assert out.dtype == torch.float32
+```
+
+---
+
+## 4.3.5 Obsługa batcha
+
+Jeśli wejście ma kształt:
+
+```text
+(B, 3, 128, 259)
+```
+
+wykonaj:
+
+```python
+x_np = tensor.detach().cpu().numpy()
+x_cl = np.moveaxis(x_np, 1, -1)  # (B, 128, 259, 3)
+```
+
+Przetwarzaj każdy sample osobno:
+
+```python
+out_list = []
+for b in range(x_cl.shape[0]):
+    out_list.append(compensator._apply_single_numpy(x_cl[b]))
+out_cl = np.stack(out_list, axis=0)
+out_cf = np.moveaxis(out_cl, -1, 1)  # (B

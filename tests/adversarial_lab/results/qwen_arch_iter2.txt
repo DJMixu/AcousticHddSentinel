@@ -1,0 +1,2019 @@
+# SPECYFIKACJA TECHNICZNA  
+## Moduł `ml/dsp_adversarial_guard.py` — Ochrona przed OOD: szum aerodynamiczny / turbina PC / odkurzacz / suszarka  
+**Wersja:** 2.0  
+**Zgodność:** ADR-001 / AGENTS.md  
+**Rola modułu:** pre-classification guard / adversarial DSP filter  
+**Priorytet bezpieczeństwa:** `0% False Positives` na autentycznych uszkodzeniach HDD (`beeping`, `scratching`)
+
+---
+
+## 1. CEL I ZAKRES
+
+### 1.1 Cel modułu
+
+Moduł `ml/dsp_adversarial_guard.py` ma dostarczyć funkcję:
+
+```python
+is_aerodynamic_fan_noise(...)
+```
+
+która w sposób **konserwatywny, deterministyczny i audytowalny** wykrywa sygnały o charakterze:
+
+- wentylatorów PC / serwerowych,
+- turbin 1U,
+- odkurzaczy,
+- suszarek do włosów,
+- wentylatorów biurkowych,
+- ogólnego szumu aerodynamicznego / turbulentnego powietrza,
+
+i odróżnia je od autentycznych uszkodzeń HDD:
+
+- `beeping` — blokada wrzeciona, oscylacje BLDC, tonalne/periodyczne sygnały mechaniczne,
+- `scratching` — kontakt slider-platter, mikro-skrawanie, pył ferromagnetyczny, impulsowe transjenty.
+
+### 1.2 Miejsce w systemie
+
+Moduł jest **przedmodelem** i nie zastępuje CNN.
+
+Zalecany pipeline inferencyjny:
+
+```text
+raw_audio_chunk_3s
+        |
+        v
+normalize_waveform_peak()
+        |
+        v
+AerodynamicFanGuard.evaluate(waveform=...)
+        |
+        +--> AERODYNAMIC_FAN  -> oznacz jako OOD / odrzuć / nie klasyfikuj jako HDD damage
+        +--> SILENCE          -> odrzuć
+        +--> INVALID_INPUT    -> odrzuć / loguj błąd
+        +--> HDD_DAMAGE_OR_UNKNOWN -> przekaz do encode_audio_chunk() -> CNN
+```
+
+### 1.3 Zakres odpowiedzialności
+
+Moduł **MUSI**:
+
+1. Walidować kształt, typ danych, skończoność wartości i normalizację wejścia.
+2. Obliczać metryki DSP na poziomie waveform oraz — opcjonalnie — proxy-metryki na poziomie tensora mel.
+3. Zwracać decyzję tylko wtedy, gdy spełnione są **bardzo konserwatywne warunki aerodynamiczne**.
+4. W razie jakiegokolwiek sygnału uszkodzenia HDD lub niepewności zwracać `HDD_DAMAGE_OR_UNKNOWN`, nigdy `AERODYNAMIC_FAN`.
+5. Nie powodować wycieków pamięci, nie trzymać tensorów GPU dłużej niż to konieczne.
+6. Nie łamać ADR-001:
+   - brak data leakage,
+   - poprawne kształty tensorów,
+   - użycie istniejących funkcji normalizacji z `ml/hdd_audio_encoder.py`.
+
+Moduł **NIE MUSI**:
+
+- trenować modelu,
+- zmieniać etykiet treningowych,
+- wykonywać augmentacji,
+- decydować o podziale train/validate/test.
+
+---
+
+## 2. NIEZMIENNIKI I MODEL DANYCH
+
+### 2.1 Stałe systemowe z ADR-001
+
+Wszystkie obliczenia muszą być zgodne z:
+
+```python
+TARGET_SR = 22050          # Hz
+N_FFT = 1024              # okno ~46.4 ms
+HOP_LENGTH = 256          # krok ~11.6 ms
+N_MELS = 128
+FMIN = 50.0               # Hz
+FMAX = 10000.0            # Hz
+CHUNK_DURATION = 3.0      # s
+CHUNK_SAMPLES = 66150     # 22050 * 3.0
+RMS_SILENCE_THRESHOLD = 0.002
+```
+
+### 2.2 Wejścia modułu
+
+Moduł akceptuje dwa tryby wejściowe:
+
+#### Tryb A — waveform, tryb autorytatywny
+
+```python
+waveform: np.ndarray
+shape = (66150,)
+dtype = np.float32
+sr = 22050 Hz
+mono
+zakres po normalizacji peak: [-1.0, 1.0]
+```
+
+Ten tryb jest **jedynym trybem, w którym moduł może zwrócić `AERODYNAMIC_FAN` w domyślnej konfiguracji bezpiecznej**.
+
+#### Tryb B — encoded tensor, tryb proxy / konserwatywny
+
+Na dysku:
+
+```python
+encoded_disk: np.ndarray
+shape = (128, 259, 3)
+dtype = np.float32
+Channel-Last
+```
+
+W pamięci PyTorch:
+
+```python
+encoded_torch: torch.Tensor
+shape = (B, 3, 128, 259)
+dtype = torch.float32
+Channel-First
+```
+
+Moduł MUSI transparentnie akceptować oba układy wymiarów.
+
+Ważne:
+
+- encoded tensor służy wyłącznie do **proxy-metryk**,
+- domyślnie `allow_encoded_positive=False`,
+- jeśli nie ma waveform, moduł NIE ZWRACA `AERODYNAMIC_FAN`,
+- jeśli `allow_encoded_positive=True`, progi są znacznie ostrzejsze.
+
+### 2.3 Typy danych i zakresy
+
+| Obiekt | Typ | Kształt | Zakres / uwagi |
+|---|---:|---|---|
+| waveform | `np.float32` | `(66150,)` | po `normalize_waveform_peak()` w `[-1, 1]` |
+| encoded disk | `np.float32` | `(128, 259, 3)` | Channel-Last |
+| encoded torch | `torch.float32` | `(B, 3, 128, 259)` | Channel-First |
+| metryki wyjściowe | `float32` / `float64` | skalarne | wewnętrznie można używać `float64` dla log/fit |
+| indeksy | `int64` | — | tylko do adresowania ramek/binów |
+
+### 2.4 Normalizacja
+
+Zgodnie z ADR-001:
+
+- moduł NIE DUPLIKUJE kodu normalizacji,
+- MUSI importować:
+
+```python
+from ml.hdd_audio_encoder import (
+    encode_audio_chunk,
+    normalize_waveform_peak,
+    normalize_tensor_zscore,
+)
+```
+
+Zasady:
+
+1. Jeśli waveform ma `max(abs(x)) > 1.0 + 1e-6`, moduł MUSI wywołać:
+
+```python
+x = normalize_waveform_peak(x)
+```
+
+2. Progi DSP są zdefiniowane dla waveform peak-normalized.
+3. Dla encoded tensor proxy moduł oczekuje wartości nieujemnych lub bezpiecznych do użycia jako magnituda. Jeśli tensor jest z-scored i zawiera wartości ujemne, moduł MUSI:
+   - albo odrzucić tryb encoded-only,
+   - albo użyć `np.maximum(x, 0.0)` i obniżyć confidence,
+   - ale domyślnie nie zwracać pozytywnego fan decision bez waveform.
+
+### 2.5 Fizyczno-DSP niezmienniki odróżniające szum aerodynamiczny od uszkodzeń HDD
+
+#### 2.5.1 Szum aerodynamiczny / wentylator / turbina / odkurzacz
+
+Cechy oczekiwane:
+
+1. **Quasi-stacjonarność czasowa**
+   - energia zmienia się powoli,
+   - brak gwałtownych mikro-uderzeń,
+   - niski spectral flux.
+
+2. **Widmo opadające 1/f lub 1/f²**
+   - różowy / brązowy szum turbulentny,
+   - dominacja pasma niskiego i średniego,
+   - roll-off zwykle poniżej 4–5 kHz.
+
+3. **Prążki harmoniczne BPF**
+   - Blade Pass Frequency:
+     \[
+     f_{BPF} = N_{blades} \cdot \frac{RPM}{60}
+     \]
+   - typowy zakres fundamentalu i harmonicznych: 300–3000 Hz,
+   - wiele harmonicznych o stabilnym odstępie.
+
+4. **Brak impulsowych transjentów mechanicznych**
+   - niski temporal kurtosis,
+   - umiarkowany crest factor,
+   - mały udział ramek impulsowych.
+
+5. **Brak dominacji pojedynczego wąskopasmowego tonu**
+   - sygnał nie jest czystym sinusoidą,
+   - istnieje tło turbulentne,
+   - energia nie jest skupiona w 1–3 binach częstotliwościowych.
+
+#### 2.5.2 `beeping` — blokada wrzeciona / oscylacje BLDC
+
+Cechy odróżniające:
+
+1. **Wąskopasmowość**
+   - silne pojedyncze lub kilka tonów,
+   - bardzo niska spectral flatness,
+   - wysoka koncentracja energii w szczycie.
+
+2. **Brak szerokiego tła turbulentnego**
+   - energia poza maską harmoniczną jest niska,
+   - brak typowego 1/f turbulent background.
+
+3. **Możliwa modulacja amplitudy**
+   - periodyczność mechaniczna,
+   - ale nie aerodynamiczny comb BPF z szerokim tłem.
+
+4. **Czasem transjenty blokady**
+   - wzrost kurtosis / crest factor,
+   - wzrost spectral flux.
+
+#### 2.5.3 `scratching` — kontakt slider-platter / mikro-skrawanie
+
+Cechy odróżniające:
+
+1. **Impulsowość**
+   - wysokie temporal kurtosis,
+   - wysoki crest factor,
+   - wiele krótkich transjentów.
+
+2. **Szerokopasmowość i wysoka częstotliwość**
+   - energia w >4 kHz,
+   - wysoki spectral roll-off,
+   - wysoki centroid widma.
+
+3. **Niestacjonarność**
+   - duży spectral flux,
+   - zmienne ramki energii,
+   - brak stabilnego widma.
+
+4. **Brak czystego comb BPF**
+   - nawet jeśli są prążki, nie mają one charakteru aerodynamicznego z tłem turbulentnym.
+
+---
+
+## 3. ARCHITEKTURA KLAS I SYGNATURY METOD
+
+### 3.1 Wymagane importy
+
+```python
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Optional, Tuple, List, Dict, Union
+
+import numpy as np
+import torch
+
+from ml.hdd_audio_encoder import (
+    encode_audio_chunk,
+    normalize_waveform_peak,
+    normalize_tensor_zscore,
+)
+```
+
+### 3.2 Enumy
+
+```python
+class GuardStatus(str, Enum):
+    INVALID_INPUT = "INVALID_INPUT"
+    SILENCE = "SILENCE"
+    AERODYNAMIC_FAN = "AERODYNAMIC_FAN"
+    HDD_DAMAGE_OR_UNKNOWN = "HDD_DAMAGE_OR_UNKNOWN"
+```
+
+### 3.3 Progi — dataclass
+
+```python
+@dataclass(frozen=True)
+class FanGuardThresholds:
+    # --- aktywacja sygnału ---
+    rms_silence_threshold: float = 0.002
+
+    # --- pasma częstotliwościowe ---
+    fmin_hz: float = 50.0
+    fmax_hz: float = 10000.0
+    bpf_band_min_hz: float = 300.0
+    bpf_band_max_hz: float = 3000.0
+    low_mid_band_min_hz: float = 100.0
+    low_mid_band_max_hz: float = 3000.0
+    high_freq_cutoff_hz: float = 4000.0
+
+    # --- safety veto: jeśli którykolwiek warunek naruszony -> NIE FAN ---
+    crest_factor_max: float = 7.0
+    temporal_kurtosis_max: float = 8.0
+    impulse_frame_ratio_max: float = 0.04
+    max_impulse_energy_ratio_max: float = 0.12
+    spectral_flux_max: float = 0.40
+    high_freq_energy_ratio_max: float = 0.22
+    peak_concentration_nonharmonic_top10_max: float = 0.45
+    spectral_flatness_min: float = 0.005
+
+    # --- dowody aerodynamiczne ---
+    low_mid_energy_ratio_min: float = 0.55
+    roll_off_95_hz_max: float = 4800.0
+    spectral_centroid_hz_max: float = 2600.0
+
+    # --- BPF comb ---
+    bpf_comb_score_min: float = 0.65
+    min_valid_harmonics: int = 3
+    broadband_background_ratio_min: float = 0.20
+    harmonic_energy_ratio_max: float = 0.65
+    bpf_fundamental_min_hz: float = 80.0
+    bpf_fundamental_max_hz: float = 1000.0
+    harmonic_snr_min: float = 1.0
+    peak_to_baseline_min: float = 2.5
+
+    # --- turbulence score ---
+    turbulence_score_min: float = 0.75
+    slope_ideal: float = -1.2
+    slope_tolerance: float = 0.8
+    slope_r2_min: float = 0.75
+    stationarity_flux_scale: float = 0.15
+
+    # --- encoded-only conservative mode ---
+    allow_encoded_positive: bool = False
+    encoded_bpf_comb_score_min: float = 0.80
+    encoded_turbulence_score_min: float = 0.85
+    encoded_crest_factor_max: float = 6.5
+    encoded_temporal_kurtosis_max: float = 7.5
+    encoded_impulse_frame_ratio_max: float = 0.03
+    encoded_spectral_flux_max: float = 0.35
+    encoded_high_freq_energy_ratio_max: float = 0.18
+```
+
+### 3.4 Metryki — dataclass
+
+```python
+@dataclass(frozen=True)
+class GuardMetrics:
+    rms: float
+    peak: float
+    crest_factor: float
+    temporal_kurtosis: float
+
+    spectral_centroid_hz: float
+    roll_off_95_hz: float
+    spectral_flatness: float
+    spectral_slope_loglog: float
+    spectral_slope_r2: float
+
+    low_mid_energy_ratio: float
+    high_freq_energy_ratio: float
+
+    impulse_frame_ratio: float
+    max_impulse_energy_ratio: float
+    spectral_flux: float
+
+    bpf_comb_score: float
+    best_bpf_hz: float
+    valid_harmonics: int
+    harmonic_energy_ratio: float
+    broadband_background_ratio: float
+    peak_concentration_nonharmonic_top10: float
+
+    turbulence_score: float
+```
+
+### 3.5 Wynik — dataclass
+
+```python
+@dataclass(frozen=True)
+class GuardResult:
+    status: GuardStatus
+    is_fan: bool
+    confidence: float
+    metrics: Optional[GuardMetrics]
+    reasons: Tuple[str, ...]
+```
+
+### 3.6 Główna klasa
+
+```python
+class AerodynamicFanGuard:
+    def __init__(
+        self,
+        sr: int = 22050,
+        n_fft: int = 1024,
+        hop_length: int = 256,
+        thresholds: Optional[FanGuardThresholds] = None,
+    ) -> None:
+        ...
+
+    def is_aerodynamic_fan_noise(
+        self,
+        waveform: Optional[np.ndarray] = None,
+        encoded: Optional[Union[np.ndarray, torch.Tensor]] = None,
+    ) -> bool:
+        ...
+
+    def evaluate(
+        self,
+        waveform: Optional[np.ndarray] = None,
+        encoded: Optional[Union[np.ndarray, torch.Tensor]] = None,
+    ) -> GuardResult:
+        ...
+
+    def evaluate_batch(
+        self,
+        waveforms: Optional[np.ndarray] = None,
+        encoded: Optional[torch.Tensor] = None,
+        chunk_size: int = 32,
+    ) -> List[GuardResult]:
+        ...
+```
+
+### 3.7 Wewnętrzne metody — wymagane sygnatury
+
+```python
+def _validate_waveform(self, x: np.ndarray) -> Tuple[bool, str]:
+    ...
+
+def _prepare_encoded(
+    self,
+    encoded: Union[np.ndarray, torch.Tensor],
+) -> Optional[np.ndarray]:
+    ...
+
+def _stft_power(self, x: np.ndarray) -> np.ndarray:
+    ...
+
+def _band_mask(self, freqs: np.ndarray, fmin_hz: float, fmax_hz: float) -> np.ndarray:
+    ...
+
+def _spectral_metrics(self, power: np.ndarray, freqs: np.ndarray) -> Dict[str, float]:
+    ...
+
+def _temporal_impulse_metrics(self, x: np.ndarray, power: np.ndarray) -> Dict[str, float]:
+    ...
+
+def _bpf_comb_score(
+    self,
+    avg_power: np.ndarray,
+    freqs: np.ndarray,
+) -> Tuple[float, float, int, np.ndarray]:
+    ...
+
+def _turbulence_score(self, metrics: Dict[str, float]) -> float:
+    ...
+
+def _decision_from_metrics(
+    self,
+    m: GuardMetrics,
+    waveform_available: bool,
+) -> GuardResult:
+    ...
+```
+
+---
+
+## 4. LOGIKA ALGORYTMICZNA KROK PO KROKU
+
+### 4.1 Ogólny schemat
+
+```text
+INPUT: waveform optional + encoded optional
+        |
+        v
+[1] Walidacja wejścia
+        |
+        +-- brak waveform i brak encoded -> INVALID_INPUT
+        +-- zły kształt / dtype / NaN / Inf -> INVALID_INPUT
+        |
+        v
+[2] Normalizacja waveform, jeśli potrzebna
+        |
+        v
+[3] Obliczenie RMS
+        |
+        +-- RMS < 0.002 -> SILENCE
+        |
+        v
+[4] Obliczenie metryk DSP
+        |
+        v
+[5] Safety veto: czy występuje jakikolwiek marker uszkodzenia HDD?
+        |
+        +-- TAK -> HDD_DAMAGE_OR_UNKNOWN
+        |
+        v
+[6] Obliczenie dowodów aerodynamicznych:
+       - BPF comb score
+       - turbulence score
+       - energy distribution
+       - stationarity
+        |
+        v
+[7] Decyzja:
+       AERODYNAMIC_FAN tylko jeśli:
+         - sygnał aktywny,
+         - brak safety veto,
+         - silny dowód aerodynamiczny
+       inaczej HDD_DAMAGE_OR_UNKNOWN
+```
+
+---
+
+## 5. SZCZEGÓŁOWA LOGIKA DSP
+
+### 5.1 Walidacja waveform
+
+Wejście:
+
+```python
+x: np.ndarray
+```
+
+Warunki:
+
+1. `x.ndim == 1`
+2. `x.shape[0] == 66150`
+3. `x.dtype == np.float32` lub konwertowalne do `float32` bez straty
+4. wszystkie wartości skończone:
+
+```python
+np.isfinite(x).all()
+```
+
+Jeśli waveform nie jest peak-normalized:
+
+```python
+if float(np.max(np.abs(x))) > 1.0 + 1e-6:
+    x = normalize_waveform_peak(x)
+```
+
+Wynik walidacji:
+
+- OK,
+- INVALID_INPUT z powodem:
+  - `wrong_shape`,
+  - `wrong_dtype`,
+  - `non_finite_values`,
+  - `empty_input`.
+
+---
+
+### 5.2 STFT
+
+Użyj:
+
+```python
+N_FFT = 1024
+HOP_LENGTH = 256
+window = Hann
+```
+
+Dla `N = 66150`:
+
+\[
+M \approx \left\lfloor \frac{N - N_{FFT}}{H} \right\rfloor + 1 \approx 255
+\]
+
+Rozdzielczość częstotliwości:
+
+\[
+df = \frac{TARGET\_SR}{N_{FFT}} = \frac{22050}{1024} \approx 21.484375 \text{ Hz}
+\]
+
+Moc:
+
+\[
+P[k,m] = |X[k,m]|^2
+```
+
+Wewnętrznie użyj `float64` dla logarytmów i fitów, ale zwracaj metryki jako `float32`.
+
+---
+
+### 5.3 Metryki czasowe
+
+#### 5.3.1 RMS
+
+\[
+RMS = \sqrt{\frac{1}{N}\sum_{n=0}^{N-1} x_n^2}
+\]
+
+Jeśli:
+
+```python
+RMS < 0.002
+```
+
+zwróć:
+
+```python
+GuardStatus.SILENCE
+is_fan = False
+```
+
+#### 5.3.2 Peak
+
+\[
+Peak = \max_n |x_n|
+\]
+
+#### 5.3.3 Crest Factor
+
+\[
+Crest = \frac{Peak}{RMS}
+\]
+
+Interpretacja:
+
+- fan / turbulencja: zwykle umiarkowany,
+- scratching: wysoki,
+- beeping: może być umiarkowany, ale często z wąskopasmowością.
+
+Safety veto:
+
+```python
+Crest > 7.0 -> NIE FAN
+```
+
+#### 5.3.4 Temporal Kurtosis
+
+\[
+Kurt = \frac{\frac{1}{N}\sum x_n^4}{\left(\frac{1}{N}\sum x_n^2\right)^2}
+\]
+
+Interpretacja:
+
+- Gaussian: ~3,
+- czysty sinus: ~1.5,
+- turbulent fan: zwykle 3–7,
+- impulsive scratching: często >10.
+
+Safety veto:
+
+```python
+Kurt > 8.0 -> NIE FAN
+```
+
+---
+
+### 5.4 Metryki widmowe
+
+Użyj średniej mocy w czasie:
+
+\[
+\bar{P}[k] = \frac{1}{M}\sum_{m=0}^{M-1} P[k,m]
+\]
+
+#### 5.4.1 Spectral Centroid
+
+\[
+Centroid = \frac{\sum_k f_k \bar{P}[k]}{\sum_k \bar{P}[k]}
+\]
+
+Dla fan:
+
+- zwykle < 2600 Hz,
+- dla scratching często > 3000–5000 Hz.
+
+Warunek fan:
+
+```python
+Centroid <= 2600 Hz
+```
+
+#### 5.4.2 Spectral Roll-off 95%
+
+Znajdź minimalne `f`, dla którego:
+
+\[
+\sum_{k: f_k \le f} \bar{P}[k] \ge 0.95 \sum_k \bar{P}[k]
+\]
+
+Warunek fan:
+
+```python
+RollOff95 <= 4800 Hz
+```
+
+#### 5.4.3 Spectral Flatness
+
+\[
+SF = \frac{\exp\left(\frac{1}{K}\sum_{k=1}^{K} \ln(P_k + \epsilon)\right)}
+          {\frac{1}{K}\sum_{k=1}^{K} P_k}
+\]
+
+gdzie `K` to liczba binów w pasmie 50–10000 Hz, a:
+
+```python
+epsilon = 1e-12
+```
+
+Interpretacja:
+
+- czysty ton / beeping: bardzo niska SF,
+- fan z tłem turbulentnym: wyższa SF,
+- scratching: może być wysoka, ale odróżnia go impulsowość.
+
+Warunek fan:
+
+```python
+SF >= 0.005
+```
+
+Jeśli:
+
+```python
+SF < 0.005 -> NIE FAN
+```
+
+#### 5.4.4 Spectral Slope 1/f
+
+W pasmie 100–4000 Hz wykonaj fit liniowy:
+
+\[
+\ln(P) = a + m \ln(f)
+\]
+
+Idealny szum różowy / brązowy ma ujemny nachylenie.
+
+Dla fan zakładamy:
+
+```python
+ideal_slope = -1.2
+tolerance = 0.8
+r2_min = 0.75
+```
+
+Oblicz:
+
+\[
+slope\_score =
+\begin{cases}
+\max\left(0, 1 - \frac{|m - (-1.2)|}{0.8}\right), & R^2 \ge 0.75 \\
+0, & \text{inaczej}
+\end{cases}
+\]
+
+---
+
+### 5.5 Dystrybucja energii w oktawach / pasmach
+
+Zdefiniuj pasma:
+
+```text
+50–100 Hz
+100–200 Hz
+200–400 Hz
+400–800 Hz
+800–1600 Hz
+1600–3200 Hz
+3200–6400 Hz
+6400–10000 Hz
+```
+
+Oblicz:
+
+#### 5.5.1 Low-Mid Energy Ratio
+
+\[
+LowMid = \frac{E(100\text{–}3000)}{E(total)}
+\]
+
+Warunek fan:
+
+```python
+LowMid >= 0.55
+```
+
+#### 5.5.2 High-Frequency Energy Ratio
+
+\[
+HighFreq = \frac{E(>4000)}{E(total)}
+\]
+
+Warunek fan:
+
+```python
+HighFreq <= 0.22
+```
+
+Safety veto:
+
+```python
+HighFreq > 0.22 -> NIE FAN
+```
+
+#### 5.5.3 Bark scale — opcjonalnie do audytu
+
+Można obliczyć energię w pasmach Bark:
+
+\[
+z = \frac{25}{3}\operatorname{asinh}\left(\frac{f}{700}\right)
+\]
+
+Zalecane pasma audytowe:
+
+```text
+1–4 Bark
+4–8 Bark
+8–16 Bark
+```
+
+Metryka Bark nie jest wymagana do twardej decyzji, ale MUSI być dostępna w logach / metrykach do debugowania.
+
+---
+
+### 5.6 Metryki impulsowe i stacjonarność
+
+#### 5.6.1 Frame RMS
+
+Dla każdej ramki STFT:
+
+\[
+RMS_m = \sqrt{\frac{1}{N_{FFT}}\sum_{n=0}^{N_{FFT}-1} x_{mH+n}^2}
+\]
+
+lub przybliżenie z mocy STFT.
+
+#### 5.6.2 Impulse Frame Ratio
+
+Ramka jest impulsowa, jeśli:
+
+```python
+frame_peak / frame_rms > 6.0
+AND
+frame_rms > 3.0 * global_rms
+```
+
+\[
+ImpulseRatio = \frac{\text{liczba ramek impulsowych}}{M}
+\]
+
+Warunek fan:
+
+```python
+ImpulseRatio <= 0.04
+```
+
+Safety veto:
+
+```python
+ImpulseRatio > 0.04 -> NIE FAN
+```
+
+#### 5.6.3 Max Impulse Energy Ratio
+
+\[
+MaxImpulseEnergy = \frac{\max_m E_m}{\sum_m E_m}
+\]
+
+gdzie `E_m` to energia ramki.
+
+Warunek fan:
+
+```python
+MaxImpulseEnergy <= 0.12
+```
+
+Safety veto:
+
+```python
+MaxImpulseEnergy > 0.12 -> NIE FAN
+```
+
+#### 5.6.4 Spectral Flux
+
+\[
+Flux = \frac{
+\frac{1}{M-1}\sum_{m=1}^{M-1} \sum_k |P[k,m] - P[k,m-1]|
+}{
+\bar{P}_{mean} + \epsilon
+}
+\]
+
+gdzie:
+
+```python
+P_mean = mean(P)
+epsilon = 1e-12
+```
+
+Interpretacja:
+
+- fan: niski,
+- scratching: wysoki.
+
+Warunek fan:
+
+```python
+Flux <= 0.40
+```
+
+Safety veto:
+
+```python
+Flux > 0.40 -> NIE FAN
+```
+
+---
+
+### 5.7 Wykrywanie comb BPF
+
+Cel: wykrycie harmonicznych Blade Pass Frequency w pasmie 300–3000 Hz.
+
+#### 5.7.1 Algorytm
+
+1. Weź średnią moc widmową:
+
+\[
+\bar{P}[f]
+\]
+
+2. Wygładź medianą o szerokości 3 binów.
+3. Rozważ fundamental `f0` w zakresie:
+
+```python
+80 Hz <= f0 <= 1000 Hz
+krok = 0.5 Hz
+```
+
+4. Dla każdego `f0`:
+   - harmoniczne:
+     \[
+     f_k = k f_0, \quad k = 1,2,\dots,K
+     \]
+   - wymagane:
+     \[
+     f_k \le 3000 Hz
+     \]
+   - jeśli `K < 3`, odrzuć kandydata.
+
+5. Dla każdego harmonicznego:
+   - znajdź lokalny szczyt w oknie ±2 binów,
+   - oblicz baseline jako medianę binów ±5 do ±10 wokół szczytu,
+   - prominence:
+     \[
+     d_k = P_{peak,k} - P_{baseline,k}
+     \]
+   - SNR harmonicznego:
+     \[
+     snr_k = \frac{d_k}{RMS_{band} + \epsilon}
+     \]
+
+6. Harmoniczny jest ważny, jeśli:
+
+```python
+snr_k >= 1.0
+AND
+P_peak,k / P_baseline,k >= 2.5
+```
+
+7. Score dla danego `f0`:
+
+\[
+Score(f_0) =
+\frac{1}{K}
+\sum_{k \in valid}
+\min\left(1, \frac{snr_k}{3.0}\right)
+\cdot
+\frac{valid\_count}{K}
+```
+
+8. Jeśli `valid_count < 3`, score = 0.
+
+9. Wynik:
+
+```python
+bpf_comb_score = max Score(f0)
+best_bpf_hz = argmax f0
+valid_harmonics = valid_count dla best f0
+```
+
+#### 5.7.2 Maska harmoniczna
+
+Dla najlepszego `f0` zbuduj maskę binów wokół każdego ważnego harmonicznego:
+
+```python
+± max(3 bins, 2% f_k)
+```
+
+Oblicz:
+
+\[
+HarmonicEnergyRatio = \frac{E_{mask}}{E_{total}}
+\]
+
+\[
+BroadbandBackgroundRatio = 1 - HarmonicEnergyRatio
+\]
+
+Warunki fan dla BPF:
+
+```python
+bpf_comb_score >= 0.65
+AND
+valid_harmonics >= 3
+AND
+broadband_background_ratio >= 0.20
+AND
+harmonic_energy_ratio <= 0.65
+```
+
+Dlaczego `harmonic_energy_ratio <= 0.65`?
+
+- beeping może mieć silne harmoniczne, ale zbyt dużą koncentrację energii w samej masce,
+- fan ma prążki BPF + tło turbulentne,
+- jeśli prawie cała energia jest w harmonicznych, to bardziej wąskopasmowy sygnał mechaniczny niż aerodynamiczny.
+
+---
+
+### 5.8 Peak concentration — ochrona przed beeping
+
+Zdefiniuj:
+
+```python
+top10_nonharmonic_power = suma mocy 10 najwyższych binów POZA maską harmoniczną
+total_power = suma mocy w 50–10000 Hz
+```
+
+\[
+PeakConcentrationNonHarmonicTop10 =
+\frac{top10\_nonharmonic\_power}{total\_power}
+\]
+
+Warunek fan:
+
+```python
+PeakConcentrationNonHarmonicTop10 <= 0.45
+```
+
+Safety veto:
+
+```python
+PeakConcentrationNonHarmonicTop10 > 0.45 -> NIE FAN
+```
+
+Dlaczego to ważne?
+
+- czysty beeping / ton mechaniczny ma ogromną koncentrację energii,
+- nawet jeśli nie zostanie rozpoznany jako comb BPF, ta metryka go odrzuci.
+
+---
+
+### 5.9 Turbulence Score
+
+\[
+TurbulenceScore =
+(
+0.45 \cdot SlopeScore +
+0.35 \cdot StationarityScore +
+0.20 \cdot LowMidScore
+)
+\cdot HighFreqOK
+\]
+
+Gdzie:
+
+#### 5.9.1 SlopeScore
+
+\[
+SlopeScore =
+\begin{cases}
+\max\left(0, 1 - \frac{|m + 1.2|}{0.8}\right), & R^2 \ge 0.75 \\
+0, & \text{inaczej}
+\end{cases}
+\]
+
+#### 5.9.2 StationarityScore
+
+\[
+StationarityScore = \frac{1}{1 + \frac{Flux}{0.15}}
+\]
+
+#### 5.9.3 LowMidScore
+
+\[
+LowMidScore =
+\operatorname{clip}\left(
+\frac{LowMid - 0.45}{0.25},
+0,
+1
+\right)
+\]
+
+#### 5.9.4 HighFreqOK
+
+```python
+HighFreqOK = 1 if HighFreq <= 0.22 else 0
+```
+
+Warunek fan przez turbulence:
+
+```python
+TurbulenceScore >= 0.75
+AND
+LowMid >= 0.55
+AND
+RollOff95 <= 4800 Hz
+AND
+Centroid <= 2600 Hz
+AND
+HighFreq <= 0.22
+AND
+PeakConcentrationNonHarmonicTop10 <= 0.45
+AND
+SpectralFlatness >= 0.005
+```
+
+---
+
+## 6. FORMALNA DECYZJA `is_aerodynamic_fan_noise`
+
+### 6.1 Definicja zmiennych
+
+Niech `m` oznacza obliczone metryki.
+
+#### 6.1.1 Aktywność sygnału
+
+\[
+A =
+(RMS \ge 0.002)
+\land
+Finite(x)
+\land
+ValidShape
+\]
+
+#### 6.1.2 Safety veto — markery uszkodzenia HDD
+
+\[
+V =
+(Crest > 7.0)
+\lor
+(Kurtosis > 8.0)
+\lor
+(ImpulseRatio > 0.04)
+\lor
+(MaxImpulseEnergy > 0.12)
+\lor
+(Flux > 0.40)
+\lor
+(HighFreq > 0.22)
+\lor
+(PeakConcentrationNonHarmonicTop10 > 0.45)
+\lor
+(SpectralFlatness < 0.005)
+\]
+
+Jeśli `V = True`, decyzja MUSI być:
+
+```python
+HDD_DAMAGE_OR_UNKNOWN
+is_fan = False
+```
+
+#### 6.1.3 Dowód BPF
+
+\[
+E_{BPF} =
+(BPFCombScore \ge 0.65)
+\land
+(ValidHarmonics \ge 3)
+\land
+(BroadbandBackgroundRatio \ge 0.20)
+\land
+(HarmonicEnergyRatio \le 0.65)
+\]
+
+#### 6.1.4 Dowód turbulence
+
+\[
+E_{TURB} =
+(TurbulenceScore \ge 0.75)
+\land
+(LowMid \ge 0.55)
+\land
+(RollOff95 \le 4800)
+\land
+(Centroid \le 2600)
+\land
+(HighFreq \le 0.22)
+\land
+(PeakConcentrationNonHarmonicTop10 \le 0.45)
+\land
+(SpectralFlatness \ge 0.005)
+\]
+
+#### 6.1.5 Ostateczna decyzja waveform mode
+
+\[
+is\_fan =
+A
+\land
+\neg V
+\land
+(E_{BPF} \lor E_{TURB})
+\]
+
+Status:
+
+```python
+if is_fan:
+    status = AERODYNAMIC_FAN
+else:
+    status = HDD_DAMAGE_OR_UNKNOWN
+```
+
+---
+
+## 7. TRYB ENCODED-ONLY / PROXY
+
+### 7.1 Zasada bezpieczeństwa
+
+Domyślnie:
+
+```python
+allow_encoded_positive = False
+```
+
+Jeśli nie ma waveform:
+
+```python
+is_fan = False
+status = HDD_DAMAGE_OR_UNKNOWN
+reasons += ("waveform_required_for_positive_fan_decision",)
+```
+
+To gwarantuje, że encoded-only nie wywoła fałszywego pozytywu na uszkodzeniach HDD.
+
+### 7.2 Jeśli `allow_encoded_positive=True`
+
+Użyj ostrzejszych progów:
+
+```python
+crest_factor <= 6.5
+temporal_kurtosis <= 7.5
+impulse_frame_ratio <= 0.03
+spectral_flux <= 0.35
+high_freq_energy_ratio <= 0.18
+bpf_comb_score >= 0.80
+OR
+turbulence_score >= 0.85
+```
+
+Nawet wtedy decyzja MUSI być poprzedzona pełnym safety veto.
+
+### 7.3 Proxy-metryki z tensora mel
+
+Dla tensora:
+
+```python
+X: (B, 3, 128, 259)
+```
+
+Użyj kanału 0 jako głównego:
+
+```python
+mel = X[:, 0, :, :]
+```
+
+Jeśli tensor jest Channel-Last:
+
+```python
+(128, 259, 3) -> (3, 128, 259)
+```
+
+Oblicz proxy:
+
+1. frame energy:
+
+\[
+E_t = \sum_m X[m,t]
+\]
+
+2. temporal kurtosis proxy na `E_t`,
+3. crest factor proxy na `E_t`,
+4. spectral centroid z mapowania mel → Hz,
+5. roll-off 95% w skali mel,
+6. flatness w skali mel,
+7. BPF comb na średnim widmie mel,
+8. high-frequency ratio dla binów >4000 Hz,
+9. spectral flux między kolejnymi kolumnami czasowymi.
+
+Ważne:
+
+- proxy jest mniej wiarygodny niż waveform,
+- dlatego domyślnie nie daje pozytywnego fan decision.
+
+---
+
+## 8. CORNER-CASES, BEZPIECZEŃSTWO I OBSŁUGA BŁĘDÓW
+
+### 8.1 Puste dane
+
+Jeśli:
+
+```python
+waveform is None and encoded is None
+```
+
+zwróć:
+
+```python
+GuardResult(
+    status=GuardStatus.INVALID_INPUT,
+    is_fan=False,
+    confidence=0.0,
+    metrics=None,
+    reasons=("no_input_provided",)
+)
+```
+
+Jeśli waveform ma długość 0:
+
+```python
+status = INVALID_INPUT
+reasons = ("empty_waveform",)
+```
+
+### 8.2 Brakujące pliki
+
+Moduł niskopoziomowy `evaluate()` NIE ODCZYTUJE PLIKÓW.
+
+Jeśli wrapper odczytuje plik:
+
+```python
+try:
+    x = np.load(path)
+except FileNotFoundError:
+    return GuardResult(
+        status=GuardStatus.INVALID_INPUT,
+        is_fan=False,
+        confidence=0.0,
+        metrics=None,
+        reasons=("missing_file", str(path))
+    )
+```
+
+Zasada:
+
+- brak pliku NIE MOŻE zostać zinterpretowany jako fan,
+- brak pliku NIE MOŻE zostać zinterpretowany jako silence,
+- zawsze `INVALID_INPUT`.
+
+### 8.3 NaN / Inf
+
+Jeśli:
+
+```python
+not np.isfinite(x).all()
+```
+
+zwróć:
+
+```python
+status = INVALID_INPUT
+reasons = ("non_finite_values",)
+```
+
+### 8.4 Zły kształt tensora
+
+Dopuszczalne:
+
+```python
+(66150,)
+(128, 259, 3)
+(B, 3, 128, 259)
+```
+
+Niedozwolone:
+
+```python
+(66150, 2)
+(128, 259)
+(3, 128, 259, B)
+```
+
+Wynik:
+
+```python
+status = INVALID_INPUT
+reasons = ("wrong_shape", str(shape))
+```
+
+### 8.5 Zły sample rate
+
+Moduł zakłada `TARGET_SR = 22050`.
+
+Jeśli wejście ma inny SR:
+
+- nie resampleuj cicho,
+- zwróć `INVALID_INPUT`,
+- powód: `"wrong_sample_rate"`.
+
+### 8.6 Izolacja GPU / VRAM
+
+Zasady obowiązkowe:
+
+1. Guard działa domyślnie na CPU.
+2. Jeśli wejście jest tensorze CUDA:
+   - użyj `torch.no_grad()`,
+   - wykonaj `.detach().cpu()` dla pojedynczego elementu,
+   - nie trzymaj referencji do GPU po przetworzeniu.
+3. Dla batcha przetwarzaj w chunkach:
+
+```python
+chunk_size = 32
+```
+
+4. Nie alokuj dużych tensorów GPU pod metryki DSP.
+5. Po każdej iteracji usuń lokalne tablice:
+
+```python
+del x_cpu
+del power
+del avg_power
+```
+
+6. Nie twórz globalnych cache’i waveform / STFT.
+
+Przykład bezpiecznego batch:
+
+```python
+def evaluate_batch(
+    self,
+    waveforms: Optional[np.ndarray] = None,
+    encoded: Optional[torch.Tensor] = None,
+    chunk_size: int = 32,
+) -> List[GuardResult]:
+    results: List[GuardResult] = []
+
+    if waveforms is not None:
+        for i in range(0, waveforms.shape[0], chunk_size):
+            chunk = waveforms[i:i + chunk_size]
+            for x in chunk:
+                results.append(self.evaluate(waveform=x))
+                del x
+
+    if encoded is not None and isinstance(encoded, torch.Tensor):
+        with torch.no_grad():
+            for i in range(0, encoded.shape[0], chunk_size):
+                chunk = encoded[i:i + chunk_size].detach().cpu()
+                for j in range(chunk.shape[0]):
+                    results.append(self.evaluate(encoded=chunk[j]))
+                del chunk
+
+    return results
+```
+
+### 8.7 Wycieki pamięci
+
+Zakazane:
+
+- trzymanie `waveform` w atrybucie instancji,
+- trzymanie STFT w atrybucie instancji,
+- tworzenie list z referencjami do dużych tablic,
+- kopiowanie tensorów GPU bez potrzeby.
+
+Wymagane:
+
+- lokalne zmienne,
+- `del` po użyciu,
+- `torch.no_grad()` dla tensorów PyTorch,
+- brak globalnych cache’i.
+
+---
+
+## 9. GWARANCJA `0% FALSE POSITIVES` NA USZKODZENIACH HDD
+
+### 9.1 Definicja False Positive
+
+False Positive występuje, gdy:
+
+```python
+prawdziwa_etykieta = beeping OR scratching
+guard.is_fan == True
+```
+
+To jest niedozwolone.
+
+### 9.2 Architekturalna gwarancja
+
+Moduł zwraca `AERODYNAMIC_FAN` tylko wtedy, gdy:
+
+1. sygnał jest aktywny,
+2. nie występuje żaden marker uszkodzenia HDD,
+3. występuje silny dowód aerodynamiczny.
+
+Markerem uszkodzenia HDD jest każdy z warunków:
+
+```python
+Crest > 7.0
+Kurtosis > 8.0
+ImpulseRatio > 0.04
+MaxImpulseEnergy > 0.12
+Flux > 0.40
+HighFreq > 0.22
+PeakConcentrationNonHarmonicTop10 > 0.45
+SpectralFlatness < 0.005
+```
+
+Jeśli którykolwiek warunek jest spełniony:
+
+```python
+is_fan = False
+status = HDD_DAMAGE_OR_UNKNOWN
+```
+
+### 9.3 Zasada fail-safe
+
+W razie niepewności:
+
+```python
+return HDD_DAMAGE_OR_UNKNOWN
+```
+
+Nigdy:
+
+```python
+return AERODYNAMIC_FAN
+```
+
+### 9.4 Walidacja akceptacyjna
+
+Przed wdrożeniem modułu należy uruchomić test na zbiorze walidacyjnym zawierającym:
+
+1. prawdziwe `beeping`,
+2. prawdziwe `scratching`,
+3. wentylatory PC,
+4. turbiny 1U,
+5. odkurzacze,
+6. suszarki,
+7. ciszę,
+8. szum tła.
+
+Wymagany wynik:
+
+| Kategoria | Wymóg |
+|---|---:|
+| `beeping` | `0%` False Positive fan |
+| `scratching` | `0%` False Positive fan |
+| cisza | `100%` SILENCE / INVALID |
+| fan / turbina / odkurzacz | cel: recall >= 85%, ale FN dopuszczalne |
+| szum tła | nie może być klasyfikowany jako HDD damage przez guard; guard zwraca unknown/fan tylko konserwatywnie |
+
+Jeśli na zbiorze walidacyjnym pojawi się choćby jeden False Positive na `beeping` lub `scratching`:
+
+1. zwiększ progi safety veto o 10%,
+2. obniż akceptację fan decision,
+3. ponownie uruchom walidację,
+4. nie wdrażaj modułu, dopóki FP != 0.
+
+---
+
+## 10. WYMAGANY KOD — SZKIELET REFERENCYJNY
+
+Poniżej znajduje się wymagany szkielet implementacyjny. Programista wykonawczy MUSI go uzupełnić zgodnie z powyższą specyfikacją.
+
+```python
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Optional, Tuple, List, Dict, Union
+
+import numpy as np
+import torch
+
+from ml.hdd_audio_encoder import (
+    encode_audio_chunk,
+    normalize_waveform_peak,
+    normalize_tensor_zscore,
+)
+
+
+TARGET_SR = 22050
+N_FFT = 1024
+HOP_LENGTH = 256
+N_MELS = 128
+FMIN = 50.0
+FMAX = 10000.0
+CHUNK_SAMPLES = 66150
+RMS_SILENCE_THRESHOLD = 0.002
+
+
+class GuardStatus(str, Enum):
+    INVALID_INPUT = "INVALID_INPUT"
+    SILENCE = "SILENCE"
+    AERODYNAMIC_FAN = "AERODYNAMIC_FAN"
+    HDD_DAMAGE_OR_UNKNOWN = "HDD_DAMAGE_OR_UNKNOWN"
+
+
+@dataclass(frozen=True)
+class FanGuardThresholds:
+    rms_silence_threshold: float = 0.002
+
+    fmin_hz: float = 50.0
+    fmax_hz: float = 10000.0
+    bpf_band_min_hz: float = 300.0
+    bpf_band_max_hz: float = 3000.0
+    low_mid_band_min_hz: float = 100.0
+    low_mid_band_max_hz: float = 3000.0
+    high_freq_cutoff_hz: float = 4000.0
+
+    crest_factor_max: float = 7.0
+    temporal_kurtosis_max: float = 8.0
+    impulse_frame_ratio_max: float = 0.04
+    max_impulse_energy_ratio_max: float = 0.12
+    spectral_flux_max: float = 0.40
+    high_freq_energy_ratio_max: float = 0.22
+    peak_concentration_nonharmonic_top10_max: float = 0.45
+    spectral_flatness_min: float = 0.005
+
+    low_mid_energy_ratio_min: float = 0.55
+    roll_off_95_hz_max: float = 4800.0
+    spectral_centroid_hz_max: float = 2600.0
+
+    bpf_comb_score_min: float = 0.65
+    min_valid_harmonics: int = 3
+    broadband_background_ratio_min: float = 0.20
+    harmonic_energy_ratio_max: float = 0.65
+    bpf_fundamental_min_hz: float = 80.0
+    bpf_fundamental_max_hz: float = 1000.0
+    harmonic_snr_min: float = 1.0
+    peak_to_baseline_min: float = 2.5
+
+    turbulence_score_min: float = 0.75
+    slope_ideal: float = -1.2
+    slope_tolerance: float = 0.8
+    slope_r2_min: float = 0.75
+    stationarity_flux_scale: float = 0.15
+
+    allow_encoded_positive: bool = False
+    encoded_bpf_comb_score_min: float = 0.80
+    encoded_turbulence_score_min: float = 0.85
+    encoded_crest_factor_max: float = 6.5
+    encoded_temporal_kurtosis_max: float = 7.5
+    encoded_impulse_frame_ratio_max: float = 0.03
+    encoded_spectral_flux_max: float = 0.35
+    encoded_high_freq_energy_ratio_max: float = 0.18
+
+
+@dataclass(frozen=True)
+class GuardMetrics:
+    rms: float
+    peak: float
+    crest_factor: float
+    temporal_kurtosis: float
+
+    spectral_centroid_hz: float
+    roll_off_95_hz: float
+    spectral_flatness: float
+    spectral_slope_loglog: float
+    spectral_slope_r2: float
+
+    low_mid_energy_ratio: float
+    high_freq_energy_ratio: float
+
+    impulse_frame_ratio: float
+    max_impulse_energy_ratio: float
+    spectral_flux: float
+
+    bpf_comb_score: float
+    best_bpf_hz: float
+    valid_harmonics: int
+    harmonic_energy_ratio: float
+    broadband_background_ratio: float
+    peak_concentration_nonharmonic_top10: float
+
+    turbulence_score: float
+
+
+@dataclass(frozen=True)
+class GuardResult:
+    status: GuardStatus
+    is_fan: bool
+    confidence: float
+    metrics: Optional[GuardMetrics]
+    reasons: Tuple[str, ...]
+
+
+class AerodynamicFanGuard:
+    def __init__(
+        self,
+        sr: int = TARGET_SR,
+        n_fft: int = N_FFT,
+        hop_length: int = HOP_LENGTH,
+        thresholds: Optional[FanGuardThresholds] = None,
+    ) -> None:
+        if sr != TARGET_SR:
+            raise ValueError("AerodynamicFanGuard requires TARGET_SR=22050")
+        if n_fft != N_FFT:
+            raise ValueError("AerodynamicFanGuard requires N_FFT=1024")
+        if hop_length != HOP_LENGTH:
+            raise ValueError("AerodynamicFanGuard requires HOP_LENGTH=256")
+
+        self.sr = sr
+        self.n_fft = n_fft
+        self.hop_length = hop_length
+        self.thresholds = thresholds or FanGuardThresholds()
+
+    def is_aerodynamic_fan_noise(
+        self,
+        waveform: Optional[np.ndarray] = None,
+        encoded: Optional[Union[np.ndarray, torch.Tensor]] = None,
+    ) -> bool:
+        result = self.evaluate(waveform=waveform, encoded=encoded)
+        return result.is_fan
+
+    def evaluate(
+        self,
+        waveform: Optional[np.ndarray] = None,
+        encoded: Optional[Union[np.ndarray, torch.Tensor]] = None,
+    ) -> GuardResult:
+        if waveform is None and encoded is None:
+            return GuardResult(
+                status=GuardStatus.INVALID_INPUT,
+                is_fan=False,
+                confidence=0.0,
+                metrics=None,
+                reasons=("no_input_provided",),
+            )
+
+        if waveform is not None:
+            ok, reason = self._validate_waveform(waveform)
+            if not ok:
+                return GuardResult(
+                    status=GuardStatus.INVALID_INPUT,
+                    is_fan=False,
+                    confidence=0.0,
+                    metrics=None,
+                    reasons=(reason,),
+                )
+
+            x = waveform.astype(np.float32, copy=False)
+            if float(np.max(np.abs(x))) > 1.0 + 1e-6:
+                x = normalize_waveform_peak(x)
+
+            rms = float(np.sqrt(np.mean(x ** 2)))
+            if rms < self.thresholds.rms_silence_threshold:
+                return GuardResult(
+                    status=GuardStatus.SILENCE,
+                    is_fan=False,
+                    confidence=0.0,
+                    metrics=None,
+                    reasons=("rms_below_silence_threshold",),
+                )
+
+            metrics = self._compute_waveform_metrics(x)
+            return self._decision_from_metrics(metrics, waveform_available=True)
+
+        # encoded-only mode
+        if not self.thresholds.allow_encoded_positive:
+            return GuardResult(
+                status=GuardStatus.HDD_DAMAGE_OR_UNKNOWN,
+                is_fan=False,
+                confidence=0.0,
+                metrics=None,
+                reasons=("waveform_required_for_positive_fan_decision",),
+            )
+
+        encoded_np = self._prepare_encoded(encoded)
+        if encoded_np is None:
+            return GuardResult(
+                status=GuardStatus.INVALID_INPUT,
+                is_fan=False,
+                confidence=0.0,
+                metrics=None,
+                reasons=("invalid_encoded_input",),
+            )
+
+        metrics = self._compute_encoded_proxy_metrics(encoded_np)
+        return self._decision_from_metrics(metrics, waveform_available=False)
+
+    def evaluate_batch(
+        self,
+        waveforms: Optional[np.ndarray] = None,
+        encoded: Optional[torch.Tensor] = None,
+        chunk_size: int = 32,
+    ) -> List[GuardResult]:
+        results: List[GuardResult] = []
+
+        if waveforms is not None:
+            for i in range(0, waveforms.shape[0], chunk_size):
+                chunk = waveforms[i:i + chunk_size]
+                for x in chunk:
+                    results.append(self.evaluate(waveform=x))
+                    del x
+                del chunk
+
+        if encoded is not None and isinstance(encoded, torch.Tensor):
+            with torch.no_grad():
+                for i in range(0, encoded.shape[0], chunk_size):
+                    chunk = encoded[i:i + chunk_size].detach().cpu()
+                    for j in range(chunk.shape[0]):
+                        results.append(self.evaluate(encoded=chunk[j]))
+                    del chunk
+
+        return results
+
+    def _validate_waveform(self, x: np.ndarray) -> Tuple[bool, str]:
+        if x.ndim != 1:
+            return False, "wrong_shape"
+        if x.shape[0] != CHUNK_SAMPLES:
+            return False, "wrong_length"
+        if not np.issubdtype(x.dtype, np.floating):
+            return False, "wrong_dtype"
+        if not np.isfinite(x).all():
+            return False, "non_finite_values"
+        return True, "ok"
+
+    def _prepare_encoded(
+        self,
+        encoded: Union[np.ndarray, torch.Tensor],
+    ) -> Optional[np.ndarray]:
+        try:
+            if isinstance(encoded, torch.Tensor):
+                with torch.no_grad():
+                    arr = encoded.detach().cpu().numpy()
+            else:
+                arr = np.asarray(encoded)
+
+            if arr.ndim == 3 and arr.shape == (128, 259, 3):
+                arr = np.transpose(arr, (2, 0, 1))
+            elif arr.ndim == 4 and arr.shape[1] == 3:
+                pass
+            else:
+                return None
+
+            if arr.ndim == 4:
+                if arr.shape[0] != 1:
+                    return None
+                arr = arr[0]
+
+            if arr.shape != (3, 128, 259):
+                return None
+
+            arr = arr.astype(np.float32, copy=False)
+            if not np.isfinite(arr).all():
+                return None
+
+            return arr
+
+        except Exception:
+            return None
+
+    def _stft_power(self, x: np.ndarray) -> np.ndarray:
+        window = np.hanning(self.n_fft).astype(np.float32)
+        n_frames = max(0, (x.shape[0] - self.n_fft) // self.hop_length + 1)
+        power = np.zeros((self.n_fft // 2 + 1, n_frames), dtype=np.float64)
+
+        for m in range(n_frames):
+            start = m * self.hop_length
+            frame = x[start:start + self.n_fft].astype(np.float64) * window
+            spec = np.fft.rfft(frame, n=self.n_fft)
+            power[:, m] = np.abs(spec) ** 2
+
+        return power
+
+    def _band_mask(
+        self,
+        freqs: np.ndarray,
+        fmin_hz: float,
+        fmax_hz: float,
+    ) -> np.ndarray:
+        return (freqs >= fmin_hz) & (freqs <= fmax_hz)
+
+    def _compute_waveform_metrics(self, x: np.ndarray) -> GuardMetrics:
+        t = self.thresholds
+
+        rms = float(np.sqrt(np.mean(x ** 2)))
+        peak = float(np.max(np.abs(x)))
+        crest = peak / max(rms, 1e-12)
+        kurtosis = float(np.mean(x ** 4) / max((rms ** 2) ** 2, 1e-24))
+
+        power = self._stft_power(x)
+        freqs = np.fft.rfftfreq(self.n_fft, d=1.0 / self.sr)
+
+        avg_power = power.mean(axis=1).astype(np.float64)
+
+        band = self._band_mask(freqs, t.fmin_hz, t.fmax_hz)
+        total_power = float(avg_power[band].sum())
+        if total_power <= 0.0:
+            total_power = 1e-12
+
+        centroid = float(
+            np.sum(freqs[band] * avg_power[band]) / total_power
+        )
+
+        cum = np.cumsum(avg_power[band])
+        roll_idx = int(np.searchsorted(cum, 0.95 * total_power))
+        roll_off = float(freqs[band][roll_idx]) if roll_idx < len(freqs[band]) else t.fmax_hz
+
+        p_band = avg_power[band] + 1e-12
+        flatness = float(
+            np.exp(np.mean(np.log(p_band))) / np.mean(p_band)
+        )
+
+        slope_band = self._band_mask(freqs, 100.0, 4000.0)
+        if slope_band.sum() >= 8:
+            log_f = np.log(freqs[slope_band] + 1e-12)
+            log_p = np.log(avg_power[slope_band] + 1e-12)
+            A = np.vstack([log_f, np.ones_like(log_f)]).T
+            coef, _, _, _ = np.linalg.lstsq(A, log_p, rcond=None)
+            slope = float(coef[0])
+            pred = A @ coef
+            ss_res = float(np.sum((log_p - pred) ** 2))
+            ss_tot = float(np.sum((log_p - np.mean(log_p)) ** 2))
+            r2 = 1.0 - ss_res / max(ss_tot, 1e-12)
+        else:
+            slope = 0.0
+            r2 = 0.0
+
+        low_mid_band = self._band_mask(
+            freqs,
+            t.low_mid_band_min_hz,
+            t.low_mid_band_max_hz,
+        )
+        high_band = freqs > t.high_freq_cutoff_hz
+        low_mid_ratio = float(avg_power[low_mid_band].sum() / total_power)
+        high_freq_ratio = float(avg_power[high_band].sum() / total_power)
+
+        frame_rms = np.sqrt(power.sum(axis=0) / self.n_fft)
+        global_rms = rms
+        impulse_frames = 0
+        for m in range(power.shape[1]):
+            fr = frame_rms[m]
+            if fr <= 0.0:
+                continue
+            # przybliżenie peak z mocy ramki; w pełnej implementacji użyć frame time-domain peak
+            frame_peak_proxy = float(np.sqrt(power[:, m].max()))
+            if (frame_peak_proxy / max(fr, 1e-12) > 6.0) and (fr > 3.0 * global_rms):
+                impulse_frames += 1
+
+        impulse_ratio = float(impulse_frames / max(power.shape[1], 1))
+
+        frame_energy = power.sum(axis=0)
+        max_impulse_energy_ratio = float(
+            frame_energy.max() / max(frame_energy.sum(), 1e-12)
+        )
+
+        if power.shape[1] > 1:
+            flux_num = np.mean(np.abs(power[:, 1:] - power[:, :-1]))
+            flux_den = float(power.mean()) + 1e-12
+            spectral_flux = float(flux_num / flux_den)
+        else:
+            spectral_flux = 0.0
+
+        bpf_score, best_bpf_hz, valid_harmonics, harmonic_mask = (
+            self._bpf_comb_score(avg_power, freqs)
+        )
+
+        harmonic_energy_ratio = float(
+            avg_power[harmonic_mask].sum() / total_power
+        )
+        broadband_background_ratio = 1.0 - harmonic_energy_ratio
+
+        non_harmonic_band = band & (~harmonic_mask)
+        if non_harmonic_band.sum() >= 10:
+            top10 = np.sort(avg_power[non_harmonic_band])[-10:]
+            peak_conc_nonharmonic_top10 = float(top10.sum() / total_power)
+        else:
+            peak_conc_nonharmonic_top10 = 1.0
+
+        turbulence_score = self._turbulence_score(
+            spectral_flux=spectral_flux,
+            slope=slope,
+            r2=r2,
+            low_mid_ratio=low_mid_ratio,
+            high_freq_ratio=high_freq_ratio,
+        )
+
+        return GuardMetrics(
+            rms=rms,
+            peak=peak,
+            crest_factor=crest,
+            temporal_kurtosis=kurtosis,
+            spectral_centroid_hz=centroid,
+            roll_off_95_hz=roll_off,
+            spectral_flatness=flatness,
+            spectral_slope_loglog=slope,
+            spectral_slope_r2=float(r2),
+            low_mid_energy_ratio=low_mid_ratio,
+            high_freq_energy_ratio=high_freq_ratio,
+            impulse_frame_ratio=impulse_ratio,
+            max_impulse_energy_ratio=max_impulse_energy_ratio,
+            spectral_flux=spectral_flux,
+            bpf_comb_score=bpf_score,
+            best_bpf_hz=best_bpf_hz,
+            valid_harmonics=valid_harmonics,
+            harmonic_energy_ratio=harmonic_energy_ratio,
+            broadband_background_ratio=broadband_background_ratio,
+            peak_concentration_nonharmonic_top10=peak_conc_nonharmonic_top10,
+            turbulence_score=turbulence_score,
+        )
+
+    def _compute_encoded_proxy_metrics(self, encoded: np.ndarray) -> GuardMetrics:
+        # encoded shape: (3, 128, 259)
+        mel = np.maximum(encoded[

@@ -1,0 +1,1338 @@
+# SPECYFIKACJA TECHNICZNA — ITERACJA 1  
+## Ulepszenie klasyfikatora akustycznego HDD: eliminacja fałszywych alarmów na GPU Coil Whine i syntetyczny metronom, z zachowaniem ADR-001
+
+---
+
+## 1. CEL I ZAKRES
+
+### 1.1 Cel modułu
+
+Celem iteracji 1 jest **eliminacja fałszywych alarmów** w systemie detekcji akustycznej HDD:
+
+1. **GPU Coil Whine** z YouTube nie może być klasyfikowany jako `SCRATCHING` z wysoką pewnością.
+2. **Syntetyczny metronom 120 BPM** nie może być klasyfikowany jako `CLICKING` / `Click of Death`.
+3. System musi zachować zdolność do wykrywania autentycznych zdarzeń HDD:
+   - `SCRATCHING` / head crash / tarcie głowicy o talerz,
+   - `CLICKING` / Click of Death / impulsy pozycjonera głowicy,
+   - pozostałe klasy znane z istniejącego projektu.
+
+### 1.2 Zakres zmian
+
+Zakres obejmuje:
+
+- analizę fizyki akustycznej i DSP dla odróżnienia:
+  - wąskopasmowych harmonicznych magnetostrykcji cewek PWM,
+  - szerokopasmowego tarcia głowicy o talerz,
+  - syntetycznego metronomu,
+  - fizycznych impulsów pozycjonera HDD;
+- dodanie modułu cech DSP obliczanych z tensora mel-spectrogramu;
+- ulepszenie architektury modelu o fusion CNN + DSP features;
+- dodanie prototypów OOD i gate’a odrzucania danych spoza dystrybucji;
+- zachowanie wszystkich niezmienników ADR-001:
+  - podział na poziomie plików źródłowych,
+  - kształt tensora `(128, 259, 3)` na dysku i `(B, 3, 128, 259)` w PyTorch,
+  - parametry DSP: `TARGET_SR=22050`, `N_FFT=1024`, `HOP_LENGTH=256`, `N_MELS=128`, `FMIN=50`, `FMAX=10000`,
+  - izolacja normalizacji przez istniejące funkcje z `ml/hdd_audio_encoder.py`,
+  - użycie `HddNpyDataset` i `create_pytorch_dataloaders`.
+
+### 1.3 Definicja gotowości modułu
+
+Moduł jest gotowy, gdy:
+
+1. Na zbiorze walidacyjnym OOD:
+   - `FPR_OOD <= 5%`,
+   - `Recall_OOD >= 90%`,
+   - `AUC_OOD >= 0.95`.
+2. Na danych HDD:
+   - spadek accuracy względem baseline nie przekracza `1%`,
+   - fałszywe odrzucenia autentycznych zdarzeń HDD nie przekraczają `5%`.
+3. Na syntetycznych i rzeczywistych próbkach:
+   - GPU Coil Whine jest odrzucany jako OOD w co najmniej `95%` przypadków,
+   - metronom 120 BPM jest odrzucany jako OOD w co najmniej `95%` przypadków.
+4. Brak wycieków pamięci:
+   - peak VRAM dla batcha `32` mieści się w zdefiniowanym limicie,
+   - brak nieograniczonego wzrostu pamięci podczas inferencji na długiej liście plików,
+   - obsługa `CUDA OOM` przez retry z mniejszym batchem.
+5. Eksport ONNX:
+   - model hybrydowy działa w ONNX z wejściami `x` i `features`,
+   - różnica logitsów PyTorch/ONNX jest poniżej `1e-4`.
+
+---
+
+## 2. NIEZMIENNIKI I MODEL DANYCH
+
+### 2.1 Tabela kształtów tensorów
+
+| Element | Kształt | Typ | Układ | Uwagi |
+|---|---:|---|---|---|
+| Plik `.npy` na dysku | `(128, 259, 3)` | `float32` | Channel-Last | Zgodnie z ADR-001 |
+| Tensor PyTorch w modelu | `(B, 3, 128, 259)` | `float32` | Channel-First | Automatyczna transpozycja |
+| Wejście CNN | `(B, 3, 128, 259)` | `float32` | Channel-First | Kanał 0 = mel-spectrogram |
+| Wejście feature extractora | `(B, 3, 128, 259)` | `float32` | Channel-First | Używa głównie kanału 0 |
+| Cechy DSP | `(B, F)` | `float32` | — | `F = 17` |
+| Logity modelu | `(B, C)` | `float32` | — | `C = num_classes` |
+| OOD score | `(B,)` | `float32` | — | Im większe, tym bardziej OOD |
+| Prototyp mean | `(F,)` | `float32` | — | Dla każdej klasy/prototypu |
+| Prototyp inverse covariance | `(F, F)` | `float32` | — | Regularizowany |
+
+### 2.2 Typy danych i zakresy
+
+Wymagania:
+
+1. Tensor wejściowy musi być typu `torch.float32`.
+2. Tensor musi być skończony:
+   ```python
+   torch.isfinite(x).all() == True
+   ```
+3. Kształt na dysku musi być dokładnie:
+   ```python
+   (128, 259, 3)
+   ```
+4. Kształt w pamięci PyTorch musi być dokładnie:
+   ```python
+   (B, 3, 128, 259)
+   ```
+5. Wartości tensora po normalizacji zgodnie z ADR-001 muszą pochodzić wyłącznie z:
+   ```python
+   encode_audio_chunk
+   normalize_waveform_peak
+   normalize_tensor_zscore
+   ```
+   z modułu:
+   ```python
+   ml/hdd_audio_encoder.py
+   ```
+
+Zakazane jest:
+
+- ręczne przeliczanie normalizacji,
+- duplikowanie kodu normalizacji w skryptach treningowych, testowych lub inferencyjnych,
+- zmiana `TARGET_SR`, `N_FFT`, `HOP_LENGTH`, `N_MELS`, `FMIN`, `FMAX`,
+- losowy podział na pliki `.npy` bez zachowania podziału na poziomie nagraniów źródłowych.
+
+### 2.3 Parametry DSP — niezmiennikowe
+
+| Parametr | Wartość | Znaczenie |
+|---|---:|---|
+| `TARGET_SR` | `22050 Hz` | Częstotliwość próbkowania |
+| `N_FFT` | `1024` | Rozdzielczość częstotliwości ~21.5 Hz |
+| `HOP_LENGTH` | `256` | Krok czasowy ~11.6 ms |
+| `N_MELS` | `128` | Liczba binów mel |
+| `FMIN` | `50.0 Hz` | Dolna granica pasma |
+| `FMAX` | `10000.0 Hz` | Górna granica pasma |
+| `CHUNK_DURATION` | `3.0 s` | 66150 próbek |
+| `OVERLAP train` | `1.5 s` | Augmentacja |
+| `OVERLAP validate/test` | `0.0 s` | Brak augmentacji |
+| Odrzucanie ciszy | `RMS < 0.002` | Na etapie surowego sygnału |
+
+### 2.4 Fizyka akustyczna i DSP — kryteria odróżniania
+
+#### 2.4.1 GPU Coil Whine
+
+Źródło: magnetostrykcja cewek/transformatorów w zasilaczu PWM.
+
+Właściwości fizyczne:
+
+- wąskopasmowe harmoniczne,
+- częstotliwości zwykle w zakresie `1.5–8 kHz`,
+- wysoka stabilność czasowa,
+- niska zmienność amplitudy,
+- brak mikrotransjentów mechanicznych,
+- wysoki stosunek tonalności do szumu,
+- niska entropia widma mel,
+- wysoka koncentracja energii w kilku binach.
+
+Kryteria DSP:
+
+| Cecha | Oczekiwany kierunek dla Coil Whine |
+|---|---|
+| `narrowband_energy_ratio` | wysokie |
+| `temporal_stability` | wysokie |
+| `transient_density` | niskie |
+| `crest_factor_proxy` | niskie / średnie |
+| `mel_entropy` | niskie |
+| `tonal_peak_prominence` | wysokie |
+| `inter_event_cv` | nieistotne / brak impulsów |
+| `periodicity_score` | może być niskie w skali klatek, bo okres akustyczny jest krótszy niż hop |
+
+#### 2.4.2 Autentyczne SCRATCHING / Head Crash
+
+Źródło: tarcie głowicy o talerz magnetyczny.
+
+Właściwości fizyczne:
+
+- szerokie pasmo częstotliwości,
+- mikroimpulsy i transjenty,
+- wysoki Crest Factor,
+- duża zmienność czasowa,
+- brak stabilnych wąskopasmowych tonów,
+- wysoka entropia widma mel,
+- energia rozproszona w wielu binach.
+
+Kryteria DSP:
+
+| Cecha | Oczekiwany kierunek dla SCRATCHING |
+|---|---|
+| `narrowband_energy_ratio` | niskie |
+| `temporal_stability` | niskie |
+| `transient_density` | wysokie |
+| `crest_factor_proxy` | wysokie |
+| `mel_entropy` | wysokie |
+| `tonal_peak_prominence` | niskie / średnie |
+| `high_freq_ratio` | często wysokie |
+
+#### 2.4.3 Syntetyczny metronom 120 BPM
+
+Źródło: cyfrowy generator klików.
+
+Właściwości fizyczne:
+
+- regularne impulsy co `500 ms`,
+- brak jitteru lub bardzo niski jitter,
+- krótkie transjenty,
+- stała amplituda klików,
+- niski poziom szumu tła,
+- wysoka powtarzalność widma między klikami.
+
+Kryteria DSP:
+
+| Cecha | Oczekiwany kierunek dla metronomu |
+|---|---|
+| `inter_event_cv` | bardzo niskie |
+| `periodicity_score` | wysokie, szczególnie na lagu ~43 klatki |
+| `event_amplitude_var` | niskie |
+| `event_spectral_consistency` | wysokie |
+| `num_events_norm` | umiarkowane / wysokie dla 6 klików w 3 s |
+| `transient_density` | umiarkowane |
+
+Uwaga:  
+Przy `HOP_LENGTH = 256` i `TARGET_SR = 22050`:
+
+```text
+1 klatka = 256 / 22050 ≈ 11.6 ms
+500 ms / 11.6 ms ≈ 43.1 klatki
+```
+
+Zatem metronom 120 BPM powinien dawać wyraźną periodyczność w autocorrelacji `frame_rms` około na lagu `43`.
+
+#### 2.4.4 Fizyczny Click of Death HDD
+
+Źródło: impulsy mechaniczne pozycjonera głowicy.
+
+Właściwości fizyczne:
+
+- nieregularne impulsy,
+- zmienność amplitudy,
+- jitter czasowy,
+- szum tła mechanicznego,
+- szerokie pasmo impulsów,
+- brak stałego interwału,
+- zmienne widmo między impulsami.
+
+Kryteria DSP:
+
+| Cecha | Oczekiwany kierunek dla Click of Death |
+|---|---|
+| `inter_event_cv` | wysokie |
+| `periodicity_score` | niskie |
+| `event_amplitude_var` | wysokie |
+| `event_spectral_consistency` | niskie |
+| `transient_density` | umiarkowane / wysokie |
+| `num_events_norm` | zmienne |
+
+### 2.5 Podział danych — zgodność z ADR-001
+
+Zakazane:
+
+- losowy podział na pliki `.npy`,
+- mieszanie okien czasowych z tego samego nagrania w `train` i `validate/test`,
+- użycie danych OOD do treningu klas HDD bez osobnego protokołu,
+- strojenie progów OOD na zbiorze testowym.
+
+Wymagane:
+
+1. Podział HDD:
+   - `train`: 68%,
+   - `validate`: 14%,
+   - `test`: 18%,
+   - wyłącznie na poziomie całych nagrań źródłowych przed pocięciem na 3-sekundowe okna.
+
+2. Dane OOD:
+   - osobny katalog, np. `data/ood/`,
+   - podkategorie:
+     - `coil_whine`,
+     - `metronome`,
+     - `silence`,
+     - `noise`,
+     - `speech`,
+     - `music`,
+     - inne kategorie spoza HDD, jeśli dostępne.
+   - podział OOD:
+     - `ood_val`: 50%,
+     - `ood_test`: 18% lub 50%, zależnie od polityki projektu,
+   - podział również na poziomie plików źródłowych.
+
+3. Prototypy OOD:
+   - budowane wyłącznie z `ood_val` i danych walidacyjnych HDD,
+   - `ood_test` tylko do końcowej ewaluacji,
+   - nie mogą być używane do strojenia progów.
+
+---
+
+## 3. ARCHITEKTURA KLAS I SYGNATURY METOD
+
+### 3.1 Ogólne wymagania implementacyjne
+
+Wymagane moduły:
+
+```python
+ml/acoustic_dsp_features.py
+ml/ood_prototypes.py
+ml/hybrid_model.py
+ml/inference_pipeline.py
+```
+
+Zalecane rozszerzenia istniejących modułów:
+
+1. `model_cnn.py`:
+   - dodać metodę `forward_features`,
+   - narażać global average pooling przed classifierem,
+   - zachować istniejące API `forward`.
+
+2. `ml/dataset_pytorch.py`:
+   - rozszerzyć `create_pytorch_dataloaders` o parametr:
+     ```python
+     collate_fn: Optional[Callable] = None
+     ```
+   - zachować domyślne zachowanie, gdy `collate_fn=None`.
+
+Zakazane:
+
+- zmiana kształtu wejściowego,
+- zmiana parametrów DSP,
+- duplikacja normalizacji,
+- losowy podział na `.npy`,
+- hardkodowanie progów OOD bez kalibracji.
+
+---
+
+### 3.2 `AcousticFeatureExtractor`
+
+Plik:
+
+```python
+ml/acoustic_dsp_features.py
+```
+
+Cel:
+
+Oblicza 17 cech DSP z tensora mel-spectrogramu.
+
+```python
+from __future__ import annotations
+
+import torch
+from torch import Tensor
+from torch.nn import Module
+
+
+class AcousticFeatureExtractor(Module):
+    """
+    Oblicza cechy DSP z tensora mel-spectrogramu.
+
+    Wejście:
+        x: Tensor o kształcie (B, 3, 128, 259) lub (128, 259, 3).
+
+    Wyjście:
+        features: Tensor float32 o kształcie (B, 17).
+    """
+
+    FEATURE_DIM: int = 17
+
+    def __init__(
+        self,
+        n_mels: int = 128,
+        n_frames: int = 259,
+        fmin: float = 50.0,
+        fmax: float = 10000.0,
+        sr: int = 22050,
+        hop_length: int = 256,
+        n_fft: int = 1024,
+        eps: float = 1e-8,
+    ) -> None:
+        super().__init__()
+
+        self.n_mels = n_mels
+        self.n_frames = n_frames
+        self.fmin = fmin
+        self.fmax = fmax
+        self.sr = sr
+        self.hop_length = hop_length
+        self.n_fft = n_fft
+        self.eps = eps
+
+        self.register_buffer("mel_frequencies", self._mel_to_hz(n_mels, fmin, fmax))
+
+    @staticmethod
+    def _hz_to_mel(f: Tensor) -> Tensor:
+        return 2595.0 * torch.log10(1.0 + f / 700.0)
+
+    @staticmethod
+    def _mel_to_hz(m: Tensor) -> Tensor:
+        return 700.0 * (torch.pow(torch.tensor(10.0), m / 2595.0) - 1.0)
+
+    def _mel_to_hz(self, n_mels: int, fmin: float, fmax: float) -> Tensor:
+        mel_min = self._hz_to_mel(torch.tensor(fmin))
+        mel_max = self._hz_to_mel(torch.tensor(fmax))
+        mel_points = torch.linspace(mel_min, mel_max, n_mels)
+        return self._mel_to_hz(mel_points)
+
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Args:
+            x: Tensor o kształcie (B, 3, 128, 259) lub (128, 259, 3).
+
+        Returns:
+            Tensor float32 o kształcie (B, 17).
+        """
+        x = self._normalize_input_shape(x)
+
+        # Kanał 0 traktujemy jako mel-spectrogram.
+        E = x[:, 0]  # (B, M, T)
+
+        p = torch.softmax(E, dim=1)  # (B, M, T)
+
+        frame_rms = torch.sqrt(torch.mean(E * E, dim=1) + self.eps)  # (B, T)
+
+        features = [
+            self._rms_db_proxy(frame_rms),
+            self._crest_factor_proxy(frame_rms),
+            self._spectral_centroid(p),
+            self._spectral_bandwidth(p),
+            self._spectral_rolloff(p),
+            self._spectral_flatness(p),
+            self._mel_entropy(p),
+            self._narrowband_energy_ratio(p, top_k=8),
+            self._tonal_peak_prominence(p),
+            self._temporal_stability(p),
+            self._transient_density(frame_rms),
+            self._high_freq_ratio(p, threshold_hz=4000.0),
+            self._inter_event_cv(frame_rms),
+            self._periodicity_score(frame_rms),
+            self._num_events_norm(frame_rms),
+            self._event_amplitude_var(frame_rms),
+            self._event_spectral_consistency(p, frame_rms),
+        ]
+
+        out = torch.stack(features, dim=1)  # (B, 17)
+        return out.float()
+
+    def _normalize_input_shape(self, x: Tensor) -> Tensor:
+        if x.dim() == 4 and x.shape[1] == 3:
+            return x
+        if x.dim() == 3 and x.shape[-1] == 3:
+            return x.permute(2, 0, 1)
+        raise ValueError(
+            f"Nieobsługiwany kształt tensora: {tuple(x.shape)}. "
+            "Oczekiwano (B, 3, 128, 259) lub (128, 259, 3)."
+        )
+
+    def _rms_db_proxy(self, frame_rms: Tensor) -> Tensor:
+        mean_rms = torch.mean(frame_rms, dim=1) + self.eps
+        return 20.0 * torch.log10(mean_rms)
+
+    def _crest_factor_proxy(self, frame_rms: Tensor) -> Tensor:
+        peak = torch.max(frame_rms, dim=1).values
+        mean = torch.mean(frame_rms, dim=1) + self.eps
+        return peak / mean
+
+    def _spectral_centroid(self, p: Tensor) -> Tensor:
+        # p: (B, M, T)
+        weighted = torch.sum(p * self.mel_frequencies.unsqueeze(0).unsqueeze(2), dim=1)
+        total = torch.sum(p, dim=1) + self.eps
+        centroid = weighted / total  # (B, T)
+        return torch.mean(centroid, dim=1)
+
+    def _spectral_bandwidth(self, p: Tensor) -> Tensor:
+        weighted = torch.sum(p * self.mel_frequencies.unsqueeze(0).unsqueeze(2), dim=1)
+        total = torch.sum(p, dim=1) + self.eps
+        centroid = weighted / total  # (B, T)
+
+        diff = self.mel_frequencies.unsqueeze(0).unsqueeze(2) - centroid.unsqueeze(1)
+        variance = torch.sum(p * diff * diff, dim=1)
+        bandwidth = torch.sqrt(variance + self.eps)
+        return torch.mean(bandwidth, dim=1)
+
+    def _spectral_rolloff(self, p: Tensor) -> Tensor:
+        # p: (B, M, T)
+        cumsum = torch.cumsum(p, dim=1)  # (B, M, T)
+        total = torch.sum(p, dim=1, keepdim=True) + self.eps
+        normalized_cumsum = cumsum / total
+
+        # Dla każdej klatki znajdź pierwszy bin, gdzie cumulative >= 0.95.
+        mask = normalized_cumsum >= 0.95
+        indices = torch.arange(self.n_mels, device=p.device).unsqueeze(0).unsqueeze(2)
+        rolloff_indices = torch.where(mask, indices, self.n_mels - 1)
+        rolloff_index = torch.min(rolloff_indices, dim=1).values  # (B, T)
+
+        rolloff_hz = self.mel_frequencies[rolloff_index]
+        return torch.mean(rolloff_hz, dim=1)
+
+    def _spectral_flatness(self, p: Tensor) -> Tensor:
+        log_p = torch.log(p + self.eps)
+        geometric_mean = torch.exp(torch.mean(log_p, dim=1))
+        arithmetic_mean = torch.mean(p, dim=1) + self.eps
+        flatness = geometric_mean / arithmetic_mean
+        return torch.mean(flatness, dim=1)
+
+    def _mel_entropy(self, p: Tensor) -> Tensor:
+        entropy = -torch.sum(p * torch.log(p + self.eps), dim=1)
+        return torch.mean(entropy, dim=1)
+
+    def _narrowband_energy_ratio(self, p: Tensor, top_k: int = 8) -> Tensor:
+        top_values = torch.topk(p, k=top_k, dim=1).values  # (B, K, T)
+        ratio = torch.sum(top_values, dim=1)  # (B, T)
+        return torch.mean(ratio, dim=1)
+
+    def _tonal_peak_prominence(self, p: Tensor) -> Tensor:
+        peak = torch.max(p, dim=1).values  # (B, T)
+        median = torch.median(p, dim=1).values + self.eps  # (B, T)
+        prominence = peak / median
+        return torch.mean(prominence, dim=1)
+
+    def _temporal_stability(self, p: Tensor) -> Tensor:
+        # p: (B, M, T)
+        mean_spectrum = torch.mean(p, dim=2, keepdim=True)  # (B, M, 1)
+
+        p_norm = torch.nn.functional.normalize(p, p=2, dim=1)
+        mean_norm = torch.nn.functional.normalize(mean_spectrum, p=2, dim=1)
+
+        similarity = torch.sum(p_norm * mean_norm.expand_as(p_norm), dim=1)  # (B, T)
+        stability = torch.mean(similarity, dim=1)
+        return torch.clamp(stability, min=0.0, max=1.0)
+
+    def _transient_density(self, frame_rms: Tensor) -> Tensor:
+        median = torch.median(frame_rms, dim=1, keepdim=True).values  # (B, 1)
+        std = torch.std(frame_rms, dim=1, keepdim=True)  # (B, 1)
+        threshold = median + 2.0 * std
+
+        peaks = self._find_peaks(frame_rms, threshold)
+        density = torch.sum(peaks, dim=1).float() / frame_rms.shape[1]
+        return density
+
+    def _high_freq_ratio(self, p: Tensor, threshold_hz: float = 4000.0) -> Tensor:
+        high_mask = self.mel_frequencies >= threshold_hz
+        high_energy = torch.sum(p[:, high_mask], dim=1)  # (B, T)
+        total_energy = torch.sum(p, dim=1) + self.eps
+        ratio = high_energy / total_energy
+        return torch.mean(ratio, dim=1)
+
+    def _inter_event_cv(self, frame_rms: Tensor) -> Tensor:
+        median = torch.median(frame_rms, dim=1, keepdim=True).values
+        std = torch.std(frame_rms, dim=1, keepdim=True)
+        threshold = median + 2.0 * std
+
+        peaks = self._find_peaks(frame_rms, threshold)
+        peak_indices = torch.nonzero(peaks, as_tuple=False)  # (N, 2)
+
+        cv_values = []
+        for b in range(frame_rms.shape[0]):
+            idx = peak_indices[peak_indices[:, 0] == b][:, 1]
+            if idx.numel() < 2:
+                cv_values.append(1.0)
+                continue
+
+            intervals = torch.diff(idx).float()
+            mean_interval = torch.mean(intervals)
+            std_interval = torch.std(intervals)
+            cv = std_interval / (mean_interval + self.eps)
+            cv_values.append(cv.item())
+
+        return torch.tensor(cv_values, dtype=torch.float32, device=frame_rms.device)
+
+    def _periodicity_score(self, frame_rms: Tensor) -> Tensor:
+        # Autokorelacja w zakresie lagów 2..T//2.
+        T = frame_rms.shape[1]
+        max_lag = T // 2
+
+        scores = []
+        for b in range(frame_rms.shape[0]):
+            x = frame_rms[b] - torch.mean(frame_rms[b])
+            denom = torch.sum(x * x) + self.eps
+
+            best = 0.0
+            for lag in range(2, max_lag + 1):
+                num = torch.sum(x[:-lag] * x[lag:])
+                corr = num / denom
+                if corr > best:
+                    best = corr.item()
+
+            scores.append(max(0.0, best))
+
+        return torch.tensor(scores, dtype=torch.float32, device=frame_rms.device)
+
+    def _num_events_norm(self, frame_rms: Tensor) -> Tensor:
+        median = torch.median(frame_rms, dim=1, keepdim=True).values
+        std = torch.std(frame_rms, dim=1, keepdim=True)
+        threshold = median + 2.0 * std
+
+        peaks = self._find_peaks(frame_rms, threshold)
+        counts = torch.sum(peaks, dim=1).float()
+        return torch.clamp(counts / 10.0, min=0.0, max=1.0)
+
+    def _event_amplitude_var(self, frame_rms: Tensor) -> Tensor:
+        median = torch.median(frame_rms, dim=1, keepdim=True).values
+        std = torch.std(frame_rms, dim=1, keepdim=True)
+        threshold = median + 2.0 * std
+
+        peaks = self._find_peaks(frame_rms, threshold)
+        peak_indices = torch.nonzero(peaks, as_tuple=False)
+
+        values = []
+        for b in range(frame_rms.shape[0]):
+            idx = peak_indices[peak_indices[:, 0] == b][:, 1]
+            if idx.numel() < 2:
+                values.append(1.0)
+                continue
+
+            amp = frame_rms[b, idx]
+            mean_amp = torch.mean(amp)
+            var_amp = torch.var(amp)
+            cv2 = var_amp / (mean_amp * mean_amp + self.eps)
+            values.append(cv2.item())
+
+        return torch.tensor(values, dtype=torch.float32, device=frame_rms.device)
+
+    def _event_spectral_consistency(self, p: Tensor, frame_rms: Tensor) -> Tensor:
+        median = torch.median(frame_rms, dim=1, keepdim=True).values
+        std = torch.std(frame_rms, dim=1, keepdim=True)
+        threshold = median + 2.0 * std
+
+        peaks = self._find_peaks(frame_rms, threshold)
+        peak_indices = torch.nonzero(peaks, as_tuple=False)
+
+        values = []
+        for b in range(p.shape[0]):
+            idx = peak_indices[peak_indices[:, 0] == b][:, 1]
+            if idx.numel() < 2:
+                values.append(1.0)
+                continue
+
+            spectra = p[b, :, idx]  # (M, N)
+            spectra_norm = torch.nn.functional.normalize(spectra, p=2, dim=0)
+
+            sims = []
+            for i in range(spectra_norm.shape[1] - 1):
+                sim = torch.sum(spectra_norm[:, i] * spectra_norm[:, i + 1])
+                sims.append(sim.item())
+
+            values.append(max(0.0, sum(sims) / len(sims)))
+
+        return torch.tensor(values, dtype=torch.float32, device=p.device)
+
+    def _find_peaks(self, frame_rms: Tensor, threshold: Tensor) -> Tensor:
+        # Prosty wykrywacz szczytów: wartość > threshold i lokalny maksimum.
+        B, T = frame_rms.shape
+
+        left = torch.cat([torch.zeros(B, 1, device=frame_rms.device), frame_rms[:, :-1]], dim=1)
+        right = torch.cat([frame_rms[:, 1:], torch.zeros(B, 1, device=frame_rms.device)], dim=1)
+
+        is_local_max = (frame_rms >= left) & (frame_rms >= right)
+        above_threshold = frame_rms > threshold
+
+        return (is_local_max & above_threshold).float()
+```
+
+Wymagania testowe dla `AcousticFeatureExtractor`:
+
+1. Wejście `(128, 259, 3)` zwraca `(1, 17)`.
+2. Wejście `(B, 3, 128, 259)` zwraca `(B, 17)`.
+3. Wyjście jest `float32`.
+4. Wyjście nie zawiera `NaN` ani `Inf`.
+5. Dla syntetycznego coil whine:
+   - `narrowband_energy_ratio > 0.6`,
+   - `temporal_stability > 0.8`,
+   - `transient_density < 0.2`.
+6. Dla syntetycznego metronomu:
+   - `inter_event_cv < 0.15`,
+   - `periodicity_score > 0.5`,
+   - `event_spectral_consistency > 0.7`.
+
+---
+
+### 3.3 `OodPrototypes`
+
+Plik:
+
+```python
+ml/ood_prototypes.py
+```
+
+Cel:
+
+Buduje prototypy w przestrzeni cech DSP i oblicza odległość Mahalanobis.
+
+```python
+from __future__ import annotations
+
+from typing import Dict, List, Optional, Tuple
+
+import torch
+from torch import Tensor
+
+
+class OodPrototypes:
+    """
+    Prototypy OOD w przestrzeni cech DSP.
+
+    Dla każdej znanej klasy i opcjonalnych kategorii OOD przechowuje:
+        - mean: (F,)
+        - inverse covariance: (F, F)
+    """
+
+    def __init__(
+        self,
+        feature_dim: int,
+        class_names: List[str],
+        ood_names: Optional[List[str]] = None,
+        regularization: float = 1e-3,
+    ) -> None:
+        self.feature_dim = feature_dim
+        self.class_names = list(class_names)
+        self.ood_names = list(ood_names or [])
+        self.regularization = regularization
+
+        self.means: Dict[str, Tensor] = {}
+        self.inv_covs: Dict[str, Tensor] = {}
+
+    def fit(self, features_by_name: Dict[str, Tensor]) -> None:
+        """
+        Args:
+            features_by_name: słownik {nazwa_prototypu: Tensor (N, F)}.
+        """
+        self.means.clear()
+        self.inv_covs.clear()
+
+        for name, feats in features_by_name.items():
+            if feats.dim() != 2 or feats.shape[1] != self.feature_dim:
+                raise ValueError(
+                    f"Nieprawidłowy kształt cech dla prototypu '{name}': {tuple(feats.shape)}."
+                )
+
+            feats = feats.float()
+            mean = torch.mean(feats, dim=0)
+
+            if feats.shape[0] > 1:
+                cov = torch.cov(feats.T)
+            else:
+                cov = torch.eye(self.feature_dim, dtype=torch.float32, device=feats.device)
+
+            cov = cov + self.regularization * torch.eye(
+                self.feature_dim, dtype=torch.float32, device=feats.device
+            )
+
+            try:
+                inv_cov = torch.linalg.inv(cov)
+            except RuntimeError:
+                inv_cov = torch.linalg.pinv(cov)
+
+            self.means[name] = mean
+            self.inv_covs[name] = inv_cov
+
+    def _distance_to_prototype(self, features: Tensor, name: str) -> Tensor:
+        mu = self.means[name]
+        inv_cov = self.inv_covs[name]
+
+        diff = features - mu  # (B, F)
+        tmp = torch.matmul(diff, inv_cov)  # (B, F)
+        d2 = torch.sum(tmp * diff, dim=1)  # (B,)
+        return torch.sqrt(torch.clamp(d2, min=0.0))
+
+    def distance(self, features: Tensor) -> Tuple[Tensor, Tensor]:
+        """
+        Returns:
+            min_known_distance: (B,)
+            min_ood_distance: (B,) lub inf, jeśli brak prototypów OOD
+        """
+        if features.dim() != 2 or features.shape[1] != self.feature_dim:
+            raise ValueError(
+                f"Nieprawidłowy kształt cech: {tuple(features.shape)}. "
+                f"Oczekiwano (B, {self.feature_dim})."
+            )
+
+        known_dists = [
+            self._distance_to_prototype(features, name) for name in self.class_names
+        ]
+        min_known = torch.stack(known_dists, dim=1).min(dim=1).values
+
+        if not self.ood_names:
+            min_ood = torch.full_like(min_known, float("inf"))
+        else:
+            ood_dists = [
+                self._distance_to_prototype(features, name) for name in self.ood_names
+            ]
+            min_ood = torch.stack(ood_dists, dim=1).min(dim=1).values
+
+        return min_known, min_ood
+
+    def ood_score(self, features: Tensor) -> Tensor:
+        """
+        OOD score:
+            score = max(0, min_known_distance - min_ood_distance)
+
+        Jeśli brak prototypów OOD:
+            score = min_known_distance
+        """
+        min_known, min_ood = self.distance(features)
+
+        if not self.ood_names:
+            return min_known
+
+        score = torch.clamp(min_known - min_ood, min=0.0)
+        return score
+
+    def save(self, path: str) -> None:
+        payload = {
+            "feature_dim": self.feature_dim,
+            "class_names": self.class_names,
+            "ood_names": self.ood_names,
+            "regularization": self.regularization,
+            "means": {k: v.cpu() for k, v in self.means.items()},
+            "inv_covs": {k: v.cpu() for k, v in self.inv_covs.items()},
+        }
+        torch.save(payload, path)
+
+    @classmethod
+    def load(cls, path: str) -> "OodPrototypes":
+        payload = torch.load(path, map_location="cpu")
+        obj = cls(
+            feature_dim=payload["feature_dim"],
+            class_names=payload["class_names"],
+            ood_names=payload.get("ood_names", []),
+            regularization=payload.get("regularization", 1e-3),
+        )
+        obj.means = {k: v.float() for k, v in payload["means"].items()}
+        obj.inv_covs = {k: v.float() for k, v in payload["inv_covs"].items()}
+        return obj
+```
+
+Wymagania testowe:
+
+1. `fit` akceptuje słownik cech `(N, F)`.
+2. `ood_score` zwraca tensor `(B,)`.
+3. Dla danych z dystrybucji score jest niski.
+4. Dla danych OOD score jest wyższy niż dla danych HDD.
+5. Prototypy można zapisać i wczytać bez utraty kształtów.
+
+---
+
+### 3.4 `OodGate`
+
+Plik:
+
+```python
+ml/ood_prototypes.py
+```
+
+Cel:
+
+Łączy energy-based OOD z Mahalanobis distance w końcowy score.
+
+```python
+from __future__ import annotations
+
+from typing import Dict
+
+import torch
+from torch import Tensor
+
+
+class OodGate:
+    """
+    Gate OOD łączący:
+        - energy logits po temperature scaling,
+        - Mahalanobis distance w przestrzeni cech DSP.
+    """
+
+    def __init__(
+        self,
+        temperature: float = 1.0,
+        energy_weight: float = 0.3,
+        mahalanobis_weight: float = 0.7,
+        threshold: float = 2.0,
+    ) -> None:
+        if temperature <= 0:
+            raise ValueError("temperature musi być > 0.")
+
+        self.temperature = temperature
+        self.energy_weight = energy_weight
+        self.mahalanobis_weight = mahalanobis_weight
+        self.threshold = threshold
+
+    def score(
+        self,
+        logits: Tensor,
+        features: Tensor,
+        prototypes: "OodPrototypes",
+    ) -> Dict[str, Tensor]:
+        """
+        Args:
+            logits: (B, C)
+            features: (B, F)
+            prototypes: OodPrototypes
+
+        Returns:
+            {
+                "ood_score": (B,),
+                "energy": (B,),
+                "mahalanobis_score": (B,),
+                "is_ood": (B,) bool
+            }
+        """
+        if logits.dim() != 2:
+            raise ValueError(f"logits muszą mieć kształt (B, C), otrzymano {tuple(logits.shape)}.")
+
+        scaled_logits = logits / self.temperature
+
+        # Energy-based OOD: -logsumexp(logits)
+        energy = -torch.logsumexp(scaled_logits, dim=1)
+
+        mahalanobis_score = prototypes.ood_score(features)
+
+        # Normalizacja przybliżona dla stabilności.
+        energy_norm = torch.sigmoid(energy / 5.0)
+        mahal_norm = torch.sigmoid(mahalanobis_score / 5.0)
+
+        ood_score = (
+            self.energy_weight * energy_norm
+            + self.mahalanobis_weight * mahal_norm
+        )
+
+        is_ood = ood_score > self.threshold
+
+        return {
+            "ood_score": ood_score,
+            "energy": energy,
+            "mahalanobis_score": mahalanobis_score,
+            "is_ood": is_ood,
+        }
+```
+
+Wymagania:
+
+1. `temperature` musi być kalibrowane na zbiorze walidacyjnym.
+2. `threshold` musi być kalibrowane na `ood_val`.
+3. Zakaz strojenia `threshold` na `test` lub `ood_test`.
+4. Wynik `is_ood` musi być typu bool.
+
+---
+
+### 3.5 `AcousticHddSentinelHybrid`
+
+Plik:
+
+```python
+ml/hybrid_model.py
+```
+
+Cel:
+
+Łączy istniejący CNN z cechami DSP.
+
+Wymagana minimalna zmiana w `model_cnn.py`:
+
+```python
+class AcousticHddSentinelCNN(nn.Module):
+    ...
+
+    def forward_features(self, x: Tensor) -> Tensor:
+        """
+        Zwraca global average pooling przed classifierem.
+
+        Args:
+            x: (B, 3, 128, 259) lub (128, 259, 3)
+
+        Returns:
+            Tensor (B, D_cnn)
+        """
+        ...
+```
+
+Jeśli istniejący model nie ma `forward_features`, należy go dodać bez zmiany istniejącego `forward`.
+
+```python
+from __future__ import annotations
+
+from typing import Dict, Optional
+
+import torch
+from torch import Tensor
+from torch.nn import Module, Sequential, Linear, ReLU, Dropout
+
+from ml.acoustic_dsp_features import AcousticFeatureExtractor
+
+
+class AcousticHddSentinelHybrid(Module):
+    """
+    Model hybrydowy:
+        CNN features + DSP features -> fusion MLP -> logits.
+    """
+
+    def __init__(
+        self,
+        backbone: "AcousticHddSentinelCNN",
+        feature_extractor: AcousticFeatureExtractor,
+        cnn_feature_dim: int,
+        dsp_feature_dim: int,
+        num_classes: int,
+        hidden_dim: int = 256,
+        dropout: float = 0.1,
+    ) -> None:
+        super().__init__()
+
+        self.backbone = backbone
+        self.feature_extractor = feature_extractor
+
+        self.cnn_feature_dim = cnn_feature_dim
+        self.dsp_feature_dim = dsp_feature_dim
+        self.num_classes = num_classes
+
+        fusion_input_dim = cnn_feature_dim + dsp_feature_dim
+
+        self.fusion = Sequential(
+            Linear(fusion_input_dim, hidden_dim),
+            ReLU(),
+            Dropout(dropout),
+            Linear(hidden_dim, hidden_dim // 2),
+            ReLU(),
+            Dropout(dropout),
+            Linear(hidden_dim // 2, num_classes),
+        )
+
+    def forward(
+        self,
+        x: Tensor,
+        features: Optional[Tensor] = None,
+    ) -> Dict[str, Tensor]:
+        """
+        Args:
+            x: (B, 3, 128, 259) lub (128, 259, 3)
+            features: opcjonalnie (B, F). Jeśli None, zostaną obliczone.
+
+        Returns:
+            {
+                "logits": (B, C),
+                "features": (B, F),
+                "cnn_features": (B, D_cnn)
+            }
+        """
+        if features is None:
+            features = self.feature_extractor(x)
+
+        cnn_features = self.backbone.forward_features(x)
+
+        fused = torch.cat([cnn_features, features], dim=1)
+        logits = self.fusion(fused)
+
+        return {
+            "logits": logits,
+            "features": features,
+            "cnn_features": cnn_features,
+        }
+```
+
+Wymagania:
+
+1. Model musi akceptować oba układy wymiarów zgodnie z ADR-001.
+2. Jeśli `features=None`, model musi samodzielnie obliczyć cechy.
+3. Wyjście `logits` musi mieć kształt `(B, num_classes)`.
+4. Model musi być eksportowalny do ONNX z wejściami:
+   - `x`: `(1, 3, 128, 259)` float32,
+   - `features`: `(1, F)` float32.
+
+---
+
+### 3.6 `FeatureCollator`
+
+Plik:
+
+```python
+ml/dataset_pytorch.py
+```
+
+Cel:
+
+Oblicza cechy DSP na batchu, aby nie obciążać każdego `__getitem__`.
+
+```python
+from __future__ import annotations
+
+from typing import Callable, Dict, List, Tuple
+
+import torch
+from torch import Tensor
+
+from ml.acoustic_dsp_features import AcousticFeatureExtractor
+
+
+class FeatureCollator:
+    """
+    Collate function dla HddNpyDataset.
+
+    Oczekuje batch jako listę:
+        [(x, y), ...]
+
+    Zwraca:
+        {
+            "x": (B, 3, 128, 259),
+            "y": (B,),
+            "features": (B, F)
+        }
+    """
+
+    def __init__(self, extractor: AcousticFeatureExtractor) -> None:
+        self.extractor = extractor
+
+    def __call__(self, batch: List[Tuple[Tensor, int]]) -> Dict[str, Tensor]:
+        if not batch:
+            raise ValueError("Pusty batch w FeatureCollator.")
+
+        x_list = [item[0] for item in batch]
+        y_list = [item[1] for item in batch]
+
+        x = torch.stack(x_list, dim=0)  # (B, 3, 128, 259) lub (B, 128, 259, 3)
+        y = torch.tensor(y_list, dtype=torch.long)
+
+        features = self.extractor(x)
+
+        return {
+            "x": x,
+            "y": y,
+            "features": features,
+        }
+```
+
+Wymagania:
+
+1. `FeatureCollator` nie może zmieniać normalizacji.
+2. Cechy muszą być obliczane deterministycznie.
+3. Pusty batch musi wywoływać błąd.
+
+---
+
+### 3.7 `AcousticHddSentinelInference`
+
+Plik:
+
+```python
+ml/inference_pipeline.py
+```
+
+Cel:
+
+Bezpieczna inferencja z obsługą błędów, OOD i VRAM.
+
+```python
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import List, Optional
+
+import numpy as np
+import torch
+from torch import Tensor
+
+
+@dataclass
+class InferenceResult:
+    path: str
+    class_id: Optional[int]
+    class_name: Optional[str]
+    probability: Optional[float]
+    ood_score: float
+    is_ood: bool
+    error: Optional[str] = None
+    features: Optional[np.ndarray] = None
+
+
+class AcousticHddSentinelInference:
+    def __init__(
+        self,
+        model_path: str,
+        prototypes_path: Optional[str] = None,
+        onnx_path: Optional[str] = None,
+        device: str = "auto",
+        batch_size: int = 32,
+        ood_threshold: float = 2.0,
+        temperature: float = 1.0,
+    ) -> None:
+        self.model_path = model_path
+        self.prototypes_path = prototypes_path
+        self.onnx_path = onnx_path
+        self.device = self._resolve_device(device)
+        self.batch_size = max(1, int(batch_size))
+        self.ood_threshold = ood_threshold
+        self.temperature = temperature
+
+        self.model = None
+        self.feature_extractor = None
+        self.prototypes = None
+        self.ood_gate = None
+        self.class_names: List[str] = []
+
+        self._load_model()
+        self._load_prototypes()
+        self._build_ood_gate()
+
+    def _resolve_device(self, device: str) -> torch.device:
+        if device == "auto":
+            return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        return torch.device(device)
+
+    def _load_model(self) -> None:
+        # Implementacja zależna od istniejącego pipeline.
+        # Wymagane: załadowanie AcousticHddSentinelHybrid lub ONNX session.
+        raise NotImplementedError("Zaimplementuj wg istniejącego pipeline projektu.")
+
+    def _load_prototypes(self) -> None:
+        if self.prototypes_path is None:
+            raise ValueError("Brak ścieżki do prototypów OOD.")
+
+        from ml.ood_prototypes import OodPrototypes
+
+        self.prototypes = OodPrototypes.load(self.prototypes_path)
+
+    def _build_ood_gate(self) -> None:
+        from ml.ood_prototypes import OodGate
+
+        self.ood_gate = OodGate(
+            temperature=self.temperature,
+            threshold=self.ood_threshold,
+        )
+
+    def _validate_npy(self, arr: np.ndarray) -> bool:
+        if arr.dtype != np.float32:
+            return False
+        if arr.shape != (128, 259, 3):
+            return False
+        if not np.isfinite(arr).all():
+            return False
+        return True
+
+    def _predict_tensor(self, x: Tensor) -> InferenceResult:
+        with torch.no_grad():
+            features = self.feature_extractor(x)
+            out = self.model(x, features)
+            logits = out["logits"]
+
+            ood = self.ood_gate.score(logits, features, self.prototypes)
+
+        if not torch.isfinite(logits).all() or not torch.isfinite(ood["ood_score"]).all():
+            return InferenceResult(
+                path="",
+                class_id=None,
+                class_name=None,
+                probability=None,
+                ood_score=float("inf"),
+                is_ood=True,
+                error="NaN/Inf w logits lub OOD score",
+            )
+
+        probs = torch.softmax(logits, dim=1)
+        prob, class_id = torch.max(probs, dim=1)
+
+        if bool(ood["is_ood"][0]):
+            return InferenceResult(
+                path="",
+                class_id=int(class_id.item()),
+                class_name=self.class_names[class_id.item()] if self.class_names else None,
+                probability=float(prob.item()),
+                ood_score=float(ood["ood_score"][0].item()),
+                is_ood=True,
+                features=features[0].detach().cpu().numpy(),
+            )
+
+        return InferenceResult(
+            path="",
+            class_id=int(class_id.item()),
+            class_name=self.class_names[class_id.item()] if self.class_names else None,
+            probability=float(prob.item()),
+            ood_score=float(ood["ood_score"][0].item()),
+            is_ood=False,
+            features=features[0].detach().cpu().numpy(),
+        )
+
+    def predict_file(self, path: str) -> InferenceResult:
+        try:
+            arr = np.load(path)
+        except FileNotFoundError:
+            return InferenceResult(
+                path=path,
+                class_id=None,
+                class_name=None,
+                probability=None,
+                ood_score=float("inf"),
+                is_ood=True,
+                error="Brak pliku",
+            )
+        except Exception as exc:
+            return InferenceResult(
+                path=path,
+                class_id=None,
+                class_name=None,
+                probability=None,
+                ood_score=float("inf"),
+                is_ood=True,
+                error=f"Błąd wczytania pliku: {exc}",
+            )
+
+        if not self._validate_npy(arr):
+            return InferenceResult(
+                path=path,
+                class_id=None,
+                class_name=None,
+                probability=None,
+                ood_score=float("inf"),
+                is_ood=True,
+                error="Nieprawidłowy kształt, typ lub wartości w pliku .npy",
+            )
+
+        x = torch.from_numpy(arr).permute(2, 0, 1).unsqueeze(0).float().to(self.device)
+
+        try:
+            result = self._predict_tensor(x)
+            result.path = path
+            return result
+        except torch.cuda.OutOfMemoryError:
+            torch.cuda.empty_cache()
+            return InferenceResult(
+                path=path,
+                class_id=None,
+                class_name=None,
+                probability=None,
+                ood_score=float("inf"),
+                is_ood=True,
+                error="CUDA OOM podczas inferencji",
+            )
+        finally:
+            del x
+
+    def predict_batch(self, paths: List[str]) -> List[InferenceResult]:
+        results: List[InferenceResult] = []
+
+        for i in range(0, len(paths), self.batch_size):
+            batch_paths = paths[i:i + self.batch_size]
+            batch_results = [self.predict_file(p) for p in batch_paths]
+            results.extend(batch_results)
+
+            # Opcjonalne czyszczenie pamięci co batch.
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+        return results
+```
+
+Wymagania:
+
+1. Inferencja nie może crashować na pojedynczym błędnym pliku.
+2. Każdy wynik musi

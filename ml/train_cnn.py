@@ -25,6 +25,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, classification_report
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -286,6 +287,48 @@ def run_training(
     print(f"[5/6] Wczytywanie najlepszego modelu do ewaluacji testowej...")
     best_checkpoint = torch.load(best_model_path, weights_only=True)
     model.load_state_dict(best_checkpoint["state_dict"])
+
+    print(f"[5.5/6] Kalibracja prototypów Open-Set OOD dla uszkodzeń HDD...")
+    model.eval()
+    all_features = []
+    all_targets = []
+    with torch.no_grad():
+        for x_b, y_b in train_loader:
+            x_b = x_b.to(device)
+            f_b = model.extract_features(x_b)
+            all_features.append(f_b.cpu())
+            all_targets.append(y_b.cpu())
+
+    all_f = torch.cat(all_features, dim=0)
+    all_t = torch.cat(all_targets, dim=0)
+
+    # Indeksy klas uszkodzeń: beeping (0), clicking (1), scratching (3)
+    fault_indices = [0, 1, 3]
+    prototypes = torch.zeros((3, 128), dtype=torch.float32)
+    thresholds = torch.zeros(3, dtype=torch.float32)
+
+    for i, f_idx in enumerate(fault_indices):
+        mask = (all_t == f_idx)
+        class_f = all_f[mask]
+        class_f_norm = F.normalize(class_f, p=2, dim=1)
+        centroid = class_f_norm.mean(dim=0)
+        centroid = F.normalize(centroid.unsqueeze(0), p=2, dim=1).squeeze(0)
+        prototypes[i] = centroid
+
+        sims = torch.matmul(class_f_norm, centroid)
+        thresh = torch.quantile(sims, 0.05).item()
+        thresh = max(0.35, min(0.65, thresh - 0.05))
+        thresholds[i] = thresh
+        cls_name = classes[f_idx]
+        print(f"  - Prototyp {cls_name:12s}: obliczono z {len(class_f)} tensorów, próg cosinusowy: {thresh:.3f}")
+
+    model.set_fault_prototypes(prototypes.to(device), thresholds.to(device), gamma=12.0)
+
+    # Aktualizacja zapisanego checkpointu o skalibrowane prototypy OOD
+    best_checkpoint["state_dict"] = model.state_dict()
+    best_checkpoint["open_set_calibrated"] = True
+    torch.save(best_checkpoint, best_model_path)
+    print(f"      -> Zapisano checkpoint ze skalibrowanymi prototypami OOD: {best_model_path}")
 
     print(f"[6/6] Finalna ewaluacja na zbiorze testowym...")
     test_loss, test_acc, y_true, y_pred = evaluate_epoch(model, test_loader, criterion, device)

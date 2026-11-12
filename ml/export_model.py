@@ -286,7 +286,7 @@ class AcousticClassifierAndroid(context: Context) {
     if android_assets_dir.exists() and android_assets_dir.is_dir():
         import shutil
         print("\n[Synchronizacja] Aktualizacja artefaktów w android/app/src/main/assets/...")
-        for fname in ["best_hdd_cnn_model_int8.onnx", "classes.json", "model_card.json"]:
+        for fname in ["best_hdd_cnn_model.onnx", "best_hdd_cnn_model_int8.onnx", "classes.json", "model_card.json"]:
             src_file = Path(output_dir) / fname
             if src_file.exists():
                 shutil.copy2(src_file, android_assets_dir / fname)

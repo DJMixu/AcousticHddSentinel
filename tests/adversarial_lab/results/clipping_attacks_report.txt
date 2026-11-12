@@ -1,0 +1,46 @@
+================================================================================
+RAPORT Z BADAŃ ADWERSARIALNYCH: PRZESTEROWANIE MIKROFONU I DYSTORSJE AKUSTYCZNE
+================================================================================
+
+1. Łączna liczba przetestowanych próbek: 16
+2. Liczba podatności normal -> scratching: 26
+3. Liczba przypadków stłumienia clicking przez AGC: 1
+
+SZCZEGÓŁOWE ZESTAWIENIE PODATNOŚCI NA PRZESTEROWANIE (NORMAL -> SCRATCHING):
+- Próbka: seagate_seek | Atak: agc | P(scratching)=32.3% | Crest=9.99 | ClipRatio=0.0% | Sanitized=False
+- Próbka: ambient_ventilador | Atak: clean | P(scratching)=27.0% | Crest=4.85 | ClipRatio=0.0% | Sanitized=False
+- Próbka: ambient_ventilador | Atak: clip_090 | P(scratching)=27.1% | Crest=4.38 | ClipRatio=0.2% | Sanitized=False
+- Próbka: ambient_ventilador | Atak: clip_080 | P(scratching)=27.3% | Crest=3.92 | ClipRatio=0.6% | Sanitized=False
+- Próbka: ambient_ventilador | Atak: clip_060 | P(scratching)=27.6% | Crest=3.08 | ClipRatio=2.5% | Sanitized=True
+- Próbka: ambient_ventilador | Atak: thd | P(scratching)=26.8% | Crest=5.23 | ClipRatio=0.0% | Sanitized=False
+- Próbka: ambient_ventilador | Atak: agc | P(scratching)=29.0% | Crest=2.95 | ClipRatio=0.0% | Sanitized=True
+- Próbka: ambient_ventilador | Atak: combined_smart_mic | P(scratching)=28.1% | Crest=2.01 | ClipRatio=3.9% | Sanitized=True
+- Próbka: sine_500hz | Atak: clip_090 | P(scratching)=29.3% | Crest=1.32 | ClipRatio=29.5% | Sanitized=True
+- Próbka: sine_500hz | Atak: clip_080 | P(scratching)=31.5% | Crest=1.26 | ClipRatio=41.3% | Sanitized=True
+- Próbka: sine_500hz | Atak: clip_060 | P(scratching)=29.4% | Crest=1.17 | ClipRatio=59.4% | Sanitized=True
+- Próbka: sine_1000hz | Atak: clip_090 | P(scratching)=41.5% | Crest=1.32 | ClipRatio=29.5% | Sanitized=True
+- Próbka: sine_1000hz | Atak: clip_080 | P(scratching)=42.3% | Crest=1.26 | ClipRatio=41.3% | Sanitized=True
+- Próbka: sine_1000hz | Atak: clip_060 | P(scratching)=43.3% | Crest=1.17 | ClipRatio=59.4% | Sanitized=True
+- Próbka: sine_1000hz | Atak: thd | P(scratching)=34.8% | Crest=1.49 | ClipRatio=3.2% | Sanitized=True
+- Próbka: sine_1000hz | Atak: combined_smart_mic | P(scratching)=30.8% | Crest=3.93 | ClipRatio=0.1% | Sanitized=True
+- Próbka: sine_2000hz | Atak: clip_090 | P(scratching)=32.0% | Crest=1.32 | ClipRatio=29.5% | Sanitized=True
+- Próbka: sine_2000hz | Atak: clip_080 | P(scratching)=37.4% | Crest=1.26 | ClipRatio=41.3% | Sanitized=True
+- Próbka: sine_2000hz | Atak: clip_060 | P(scratching)=37.8% | Crest=1.17 | ClipRatio=59.4% | Sanitized=True
+- Próbka: sine_2000hz | Atak: thd | P(scratching)=34.9% | Crest=1.49 | ClipRatio=3.2% | Sanitized=True
+- Próbka: sine_2000hz | Atak: combined_smart_mic | P(scratching)=32.9% | Crest=3.95 | ClipRatio=0.1% | Sanitized=True
+- Próbka: sine_3000hz | Atak: clip_090 | P(scratching)=43.2% | Crest=1.32 | ClipRatio=29.9% | Sanitized=True
+- Próbka: sine_3000hz | Atak: clip_080 | P(scratching)=40.9% | Crest=1.26 | ClipRatio=40.8% | Sanitized=True
+- Próbka: sine_3000hz | Atak: clip_060 | P(scratching)=44.5% | Crest=1.17 | ClipRatio=59.9% | Sanitized=True
+- Próbka: sine_3000hz | Atak: thd | P(scratching)=29.2% | Crest=1.49 | ClipRatio=3.4% | Sanitized=True
+- Próbka: sine_3000hz | Atak: combined_smart_mic | P(scratching)=28.9% | Crest=3.95 | ClipRatio=0.1% | Sanitized=True
+
+KLUCZOWE WNIOSKI DLA ARCHITEKTA DSP:
+1. Czyste tony sinusoidalne i harmoniczne pisków (500-3000 Hz) po obcięciu (Hard Clipping 0.60 lub THD)
+   generują sztuczne harmoniczne o wysokiej częstotliwości, które sieć 2D CNN błędnie bierze za scratching.
+2. Cechy dystynktywne przesterowania mikrofonu:
+   - Crest Factor gwałtownie spada (< 2.2 dla silnego przesteru, podczas gdy prawdziwy scratching ma wysoki CF > 3.5)
+   - Clipping Ratio > 0.01 (ponad 1% próbek stale dotyka szyn +/-1.0)
+   - Max Flat Run > 4 (serie kolejnych identycznych próbek na poziomie szyny)
+3. Dotychczasowy DSPAdversarialGuard przepuszcza większość tych fałszywych alarmów,
+   ponieważ reguła is_aerodynamic_fan szuka ciągłego szumu 1/f, a is_coil_whine szuka wąskopasmowej cewki PWM.
+   Konieczny jest nowy moduł is_microphone_clipped_or_distorted()!

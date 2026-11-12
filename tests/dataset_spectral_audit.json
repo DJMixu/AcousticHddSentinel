@@ -1,0 +1,5221 @@
+{
+  "normal": [
+    {
+      "file": "synthetic_healthy_hdd_5400rpm_16.wav",
+      "parent_dir": "normal",
+      "duration_sec": 15.49,
+      "rms": 0.113559,
+      "peak": 0.45,
+      "crest_factor_db": 11.96,
+      "top_peaks": [
+        {
+          "freq_hz": 91.5,
+          "psd_db": -33.0,
+          "prominence": 32.5
+        },
+        {
+          "freq_hz": 177.6,
+          "psd_db": -36.5,
+          "prominence": 26.1
+        },
+        {
+          "freq_hz": 269.2,
+          "psd_db": -40.8,
+          "prominence": 21.2
+        },
+        {
+          "freq_hz": 355.3,
+          "psd_db": -45.3,
+          "prominence": 17.0
+        },
+        {
+          "freq_hz": 538.3,
+          "psd_db": -48.9,
+          "prominence": 12.9
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_5400rpm_14.wav",
+      "parent_dir": "normal",
+      "duration_sec": 17.16,
+      "rms": 0.109434,
+      "peak": 0.45,
+      "crest_factor_db": 12.28,
+      "top_peaks": [
+        {
+          "freq_hz": 91.5,
+          "psd_db": -32.7,
+          "prominence": 33.6
+        },
+        {
+          "freq_hz": 183.0,
+          "psd_db": -37.5,
+          "prominence": 25.2
+        },
+        {
+          "freq_hz": 269.2,
+          "psd_db": -41.9,
+          "prominence": 20.5
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -44.6,
+          "prominence": 17.9
+        },
+        {
+          "freq_hz": 543.7,
+          "psd_db": -48.9,
+          "prominence": 13.8
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_7200rpm_19.wav",
+      "parent_dir": "normal",
+      "duration_sec": 17.44,
+      "rms": 0.118155,
+      "peak": 0.45,
+      "crest_factor_db": 11.62,
+      "top_peaks": [
+        {
+          "freq_hz": 123.8,
+          "psd_db": -32.3,
+          "prominence": 29.5
+        },
+        {
+          "freq_hz": 242.2,
+          "psd_db": -35.7,
+          "prominence": 25.9
+        },
+        {
+          "freq_hz": 366.1,
+          "psd_db": -40.1,
+          "prominence": 21.5
+        },
+        {
+          "freq_hz": 484.5,
+          "psd_db": -44.3,
+          "prominence": 16.9
+        },
+        {
+          "freq_hz": 732.1,
+          "psd_db": -48.5,
+          "prominence": 13.1
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_5400rpm_20.wav",
+      "parent_dir": "normal",
+      "duration_sec": 12.75,
+      "rms": 0.125654,
+      "peak": 0.45,
+      "crest_factor_db": 11.08,
+      "top_peaks": [
+        {
+          "freq_hz": 91.5,
+          "psd_db": -31.6,
+          "prominence": 32.3
+        },
+        {
+          "freq_hz": 177.6,
+          "psd_db": -36.0,
+          "prominence": 25.8
+        },
+        {
+          "freq_hz": 269.2,
+          "psd_db": -39.7,
+          "prominence": 21.7
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -43.4,
+          "prominence": 18.0
+        },
+        {
+          "freq_hz": 538.3,
+          "psd_db": -47.2,
+          "prominence": 14.1
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_5400rpm_27.wav",
+      "parent_dir": "normal",
+      "duration_sec": 14.7,
+      "rms": 0.10788,
+      "peak": 0.45,
+      "crest_factor_db": 12.41,
+      "top_peaks": [
+        {
+          "freq_hz": 91.5,
+          "psd_db": -32.8,
+          "prominence": 33.3
+        },
+        {
+          "freq_hz": 183.0,
+          "psd_db": -37.6,
+          "prominence": 25.5
+        },
+        {
+          "freq_hz": 269.2,
+          "psd_db": -41.8,
+          "prominence": 20.5
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -44.7,
+          "prominence": 17.8
+        },
+        {
+          "freq_hz": 543.7,
+          "psd_db": -49.1,
+          "prominence": 13.8
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_7200rpm_23.wav",
+      "parent_dir": "normal",
+      "duration_sec": 17.94,
+      "rms": 0.113432,
+      "peak": 0.45,
+      "crest_factor_db": 11.97,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -32.3,
+          "prominence": 31.2
+        },
+        {
+          "freq_hz": 236.9,
+          "psd_db": -36.9,
+          "prominence": 25.6
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -42.1,
+          "prominence": 20.2
+        },
+        {
+          "freq_hz": 479.1,
+          "psd_db": -44.9,
+          "prominence": 17.3
+        },
+        {
+          "freq_hz": 716.0,
+          "psd_db": -48.8,
+          "prominence": 13.7
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_7200rpm_09.wav",
+      "parent_dir": "normal",
+      "duration_sec": 13.18,
+      "rms": 0.126204,
+      "peak": 0.45,
+      "crest_factor_db": 11.04,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -31.8,
+          "prominence": 29.6
+        },
+        {
+          "freq_hz": 242.2,
+          "psd_db": -34.8,
+          "prominence": 26.4
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -39.7,
+          "prominence": 20.8
+        },
+        {
+          "freq_hz": 484.5,
+          "psd_db": -42.8,
+          "prominence": 17.9
+        },
+        {
+          "freq_hz": 726.7,
+          "psd_db": -47.5,
+          "prominence": 13.3
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_7200rpm_18.wav",
+      "parent_dir": "normal",
+      "duration_sec": 12.11,
+      "rms": 0.115576,
+      "peak": 0.45,
+      "crest_factor_db": 11.81,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -31.3,
+          "prominence": 31.4
+        },
+        {
+          "freq_hz": 236.9,
+          "psd_db": -35.5,
+          "prominence": 26.5
+        },
+        {
+          "freq_hz": 355.3,
+          "psd_db": -39.9,
+          "prominence": 21.3
+        },
+        {
+          "freq_hz": 473.7,
+          "psd_db": -43.4,
+          "prominence": 17.7
+        },
+        {
+          "freq_hz": 710.6,
+          "psd_db": -48.0,
+          "prominence": 13.5
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_5400rpm_01.wav",
+      "parent_dir": "normal",
+      "duration_sec": 15.71,
+      "rms": 0.112529,
+      "peak": 0.45,
+      "crest_factor_db": 12.04,
+      "top_peaks": [
+        {
+          "freq_hz": 91.5,
+          "psd_db": -32.2,
+          "prominence": 33.2
+        },
+        {
+          "freq_hz": 177.6,
+          "psd_db": -36.9,
+          "prominence": 25.3
+        },
+        {
+          "freq_hz": 269.2,
+          "psd_db": -40.4,
+          "prominence": 21.6
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -43.8,
+          "prominence": 17.9
+        },
+        {
+          "freq_hz": 538.3,
+          "psd_db": -48.3,
+          "prominence": 13.6
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_7200rpm_06.wav",
+      "parent_dir": "normal",
+      "duration_sec": 17.49,
+      "rms": 0.115712,
+      "peak": 0.45,
+      "crest_factor_db": 11.8,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -31.8,
+          "prominence": 30.7
+        },
+        {
+          "freq_hz": 242.2,
+          "psd_db": -36.6,
+          "prominence": 25.2
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -39.9,
+          "prominence": 21.3
+        },
+        {
+          "freq_hz": 479.1,
+          "psd_db": -43.5,
+          "prominence": 17.5
+        },
+        {
+          "freq_hz": 721.4,
+          "psd_db": -48.3,
+          "prominence": 13.4
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_5400rpm_17.wav",
+      "parent_dir": "normal",
+      "duration_sec": 13.34,
+      "rms": 0.113634,
+      "peak": 0.45,
+      "crest_factor_db": 11.95,
+      "top_peaks": [
+        {
+          "freq_hz": 91.5,
+          "psd_db": -32.9,
+          "prominence": 32.8
+        },
+        {
+          "freq_hz": 177.6,
+          "psd_db": -36.3,
+          "prominence": 26.5
+        },
+        {
+          "freq_hz": 269.2,
+          "psd_db": -40.8,
+          "prominence": 21.4
+        },
+        {
+          "freq_hz": 355.3,
+          "psd_db": -45.0,
+          "prominence": 17.0
+        },
+        {
+          "freq_hz": 538.3,
+          "psd_db": -48.9,
+          "prominence": 13.1
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_5400rpm_03.wav",
+      "parent_dir": "normal",
+      "duration_sec": 15.47,
+      "rms": 0.122637,
+      "peak": 0.45,
+      "crest_factor_db": 11.29,
+      "top_peaks": [
+        {
+          "freq_hz": 91.5,
+          "psd_db": -32.5,
+          "prominence": 31.8
+        },
+        {
+          "freq_hz": 177.6,
+          "psd_db": -35.4,
+          "prominence": 26.3
+        },
+        {
+          "freq_hz": 269.2,
+          "psd_db": -40.5,
+          "prominence": 20.9
+        },
+        {
+          "freq_hz": 355.3,
+          "psd_db": -43.3,
+          "prominence": 17.8
+        },
+        {
+          "freq_hz": 532.9,
+          "psd_db": -47.8,
+          "prominence": 13.3
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_7200rpm_29.wav",
+      "parent_dir": "normal",
+      "duration_sec": 14.58,
+      "rms": 0.118482,
+      "peak": 0.45,
+      "crest_factor_db": 11.59,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -32.9,
+          "prominence": 29.2
+        },
+        {
+          "freq_hz": 242.2,
+          "psd_db": -35.7,
+          "prominence": 26.3
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -41.2,
+          "prominence": 20.5
+        },
+        {
+          "freq_hz": 484.5,
+          "psd_db": -43.7,
+          "prominence": 17.8
+        },
+        {
+          "freq_hz": 726.7,
+          "psd_db": -48.2,
+          "prominence": 13.8
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_7200rpm_08.wav",
+      "parent_dir": "normal",
+      "duration_sec": 11.04,
+      "rms": 0.125395,
+      "peak": 0.45,
+      "crest_factor_db": 11.1,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -31.6,
+          "prominence": 30.9
+        },
+        {
+          "freq_hz": 242.2,
+          "psd_db": -35.4,
+          "prominence": 25.8
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -39.5,
+          "prominence": 21.4
+        },
+        {
+          "freq_hz": 479.1,
+          "psd_db": -44.2,
+          "prominence": 16.6
+        },
+        {
+          "freq_hz": 721.4,
+          "psd_db": -47.2,
+          "prominence": 13.6
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_7200rpm_11.wav",
+      "parent_dir": "normal",
+      "duration_sec": 11.75,
+      "rms": 0.10799,
+      "peak": 0.45,
+      "crest_factor_db": 12.4,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -32.0,
+          "prominence": 31.2
+        },
+        {
+          "freq_hz": 236.9,
+          "psd_db": -36.2,
+          "prominence": 26.9
+        },
+        {
+          "freq_hz": 355.3,
+          "psd_db": -40.7,
+          "prominence": 21.1
+        },
+        {
+          "freq_hz": 473.7,
+          "psd_db": -44.2,
+          "prominence": 17.6
+        },
+        {
+          "freq_hz": 710.6,
+          "psd_db": -48.7,
+          "prominence": 13.4
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_7200rpm_13.wav",
+      "parent_dir": "normal",
+      "duration_sec": 12.48,
+      "rms": 0.120031,
+      "peak": 0.45,
+      "crest_factor_db": 11.48,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -31.5,
+          "prominence": 31.1
+        },
+        {
+          "freq_hz": 236.9,
+          "psd_db": -35.6,
+          "prominence": 26.7
+        },
+        {
+          "freq_hz": 355.3,
+          "psd_db": -40.1,
+          "prominence": 21.0
+        },
+        {
+          "freq_hz": 473.7,
+          "psd_db": -43.7,
+          "prominence": 17.5
+        },
+        {
+          "freq_hz": 710.6,
+          "psd_db": -48.3,
+          "prominence": 13.7
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_7200rpm_30.wav",
+      "parent_dir": "normal",
+      "duration_sec": 13.33,
+      "rms": 0.120526,
+      "peak": 0.45,
+      "crest_factor_db": 11.44,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -31.3,
+          "prominence": 30.4
+        },
+        {
+          "freq_hz": 236.9,
+          "psd_db": -36.4,
+          "prominence": 25.1
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -40.0,
+          "prominence": 21.0
+        },
+        {
+          "freq_hz": 479.1,
+          "psd_db": -43.1,
+          "prominence": 18.0
+        },
+        {
+          "freq_hz": 716.0,
+          "psd_db": -48.3,
+          "prominence": 12.9
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_7200rpm_10.wav",
+      "parent_dir": "normal",
+      "duration_sec": 11.01,
+      "rms": 0.106824,
+      "peak": 0.45,
+      "crest_factor_db": 12.49,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -32.2,
+          "prominence": 31.6
+        },
+        {
+          "freq_hz": 236.9,
+          "psd_db": -36.3,
+          "prominence": 26.8
+        },
+        {
+          "freq_hz": 355.3,
+          "psd_db": -40.7,
+          "prominence": 21.4
+        },
+        {
+          "freq_hz": 473.7,
+          "psd_db": -44.2,
+          "prominence": 17.9
+        },
+        {
+          "freq_hz": 710.6,
+          "psd_db": -49.1,
+          "prominence": 13.3
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_7200rpm_22.wav",
+      "parent_dir": "normal",
+      "duration_sec": 13.95,
+      "rms": 0.108986,
+      "peak": 0.45,
+      "crest_factor_db": 12.32,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -32.4,
+          "prominence": 31.4
+        },
+        {
+          "freq_hz": 236.9,
+          "psd_db": -36.5,
+          "prominence": 26.4
+        },
+        {
+          "freq_hz": 355.3,
+          "psd_db": -41.1,
+          "prominence": 21.1
+        },
+        {
+          "freq_hz": 473.7,
+          "psd_db": -44.7,
+          "prominence": 17.6
+        },
+        {
+          "freq_hz": 710.6,
+          "psd_db": -49.1,
+          "prominence": 13.3
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_7200rpm_26.wav",
+      "parent_dir": "normal",
+      "duration_sec": 12.97,
+      "rms": 0.111771,
+      "peak": 0.45,
+      "crest_factor_db": 12.1,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -31.6,
+          "prominence": 31.4
+        },
+        {
+          "freq_hz": 236.9,
+          "psd_db": -35.8,
+          "prominence": 26.3
+        },
+        {
+          "freq_hz": 355.3,
+          "psd_db": -40.2,
+          "prominence": 21.7
+        },
+        {
+          "freq_hz": 473.7,
+          "psd_db": -43.7,
+          "prominence": 17.9
+        },
+        {
+          "freq_hz": 710.6,
+          "psd_db": -48.4,
+          "prominence": 13.2
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_5400rpm_21.wav",
+      "parent_dir": "normal",
+      "duration_sec": 13.88,
+      "rms": 0.109908,
+      "peak": 0.45,
+      "crest_factor_db": 12.24,
+      "top_peaks": [
+        {
+          "freq_hz": 91.5,
+          "psd_db": -32.7,
+          "prominence": 32.7
+        },
+        {
+          "freq_hz": 177.6,
+          "psd_db": -37.7,
+          "prominence": 25.5
+        },
+        {
+          "freq_hz": 269.2,
+          "psd_db": -41.1,
+          "prominence": 21.0
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -44.2,
+          "prominence": 18.0
+        },
+        {
+          "freq_hz": 538.3,
+          "psd_db": -49.8,
+          "prominence": 13.2
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_5400rpm_02.wav",
+      "parent_dir": "normal",
+      "duration_sec": 15.12,
+      "rms": 0.120256,
+      "peak": 0.45,
+      "crest_factor_db": 11.46,
+      "top_peaks": [
+        {
+          "freq_hz": 91.5,
+          "psd_db": -32.0,
+          "prominence": 32.3
+        },
+        {
+          "freq_hz": 177.6,
+          "psd_db": -35.0,
+          "prominence": 26.4
+        },
+        {
+          "freq_hz": 269.2,
+          "psd_db": -39.9,
+          "prominence": 20.6
+        },
+        {
+          "freq_hz": 355.3,
+          "psd_db": -43.3,
+          "prominence": 17.6
+        },
+        {
+          "freq_hz": 532.9,
+          "psd_db": -47.6,
+          "prominence": 13.1
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_7200rpm_28.wav",
+      "parent_dir": "normal",
+      "duration_sec": 12.13,
+      "rms": 0.111802,
+      "peak": 0.45,
+      "crest_factor_db": 12.09,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -31.8,
+          "prominence": 31.3
+        },
+        {
+          "freq_hz": 236.9,
+          "psd_db": -36.0,
+          "prominence": 26.0
+        },
+        {
+          "freq_hz": 355.3,
+          "psd_db": -40.8,
+          "prominence": 21.0
+        },
+        {
+          "freq_hz": 473.7,
+          "psd_db": -44.4,
+          "prominence": 17.1
+        },
+        {
+          "freq_hz": 716.0,
+          "psd_db": -49.1,
+          "prominence": 12.6
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_7200rpm_12.wav",
+      "parent_dir": "normal",
+      "duration_sec": 11.41,
+      "rms": 0.122621,
+      "peak": 0.45,
+      "crest_factor_db": 11.29,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -30.7,
+          "prominence": 31.1
+        },
+        {
+          "freq_hz": 236.9,
+          "psd_db": -34.7,
+          "prominence": 26.5
+        },
+        {
+          "freq_hz": 355.3,
+          "psd_db": -39.2,
+          "prominence": 21.6
+        },
+        {
+          "freq_hz": 473.7,
+          "psd_db": -42.6,
+          "prominence": 18.3
+        },
+        {
+          "freq_hz": 710.6,
+          "psd_db": -47.1,
+          "prominence": 13.6
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_5400rpm_07.wav",
+      "parent_dir": "normal",
+      "duration_sec": 13.25,
+      "rms": 0.120046,
+      "peak": 0.45,
+      "crest_factor_db": 11.48,
+      "top_peaks": [
+        {
+          "freq_hz": 91.5,
+          "psd_db": -31.8,
+          "prominence": 32.7
+        },
+        {
+          "freq_hz": 177.6,
+          "psd_db": -36.1,
+          "prominence": 25.8
+        },
+        {
+          "freq_hz": 269.2,
+          "psd_db": -39.7,
+          "prominence": 21.8
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -43.4,
+          "prominence": 17.6
+        },
+        {
+          "freq_hz": 538.3,
+          "psd_db": -47.7,
+          "prominence": 13.9
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_7200rpm_25.wav",
+      "parent_dir": "normal",
+      "duration_sec": 12.53,
+      "rms": 0.102653,
+      "peak": 0.45,
+      "crest_factor_db": 12.84,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -33.0,
+          "prominence": 30.7
+        },
+        {
+          "freq_hz": 242.2,
+          "psd_db": -38.0,
+          "prominence": 25.1
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -41.5,
+          "prominence": 21.3
+        },
+        {
+          "freq_hz": 479.1,
+          "psd_db": -44.8,
+          "prominence": 17.7
+        },
+        {
+          "freq_hz": 721.4,
+          "psd_db": -49.8,
+          "prominence": 13.0
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_5400rpm_05.wav",
+      "parent_dir": "normal",
+      "duration_sec": 17.63,
+      "rms": 0.128319,
+      "peak": 0.45,
+      "crest_factor_db": 10.9,
+      "top_peaks": [
+        {
+          "freq_hz": 91.5,
+          "psd_db": -31.0,
+          "prominence": 33.0
+        },
+        {
+          "freq_hz": 177.6,
+          "psd_db": -34.9,
+          "prominence": 25.8
+        },
+        {
+          "freq_hz": 269.2,
+          "psd_db": -38.8,
+          "prominence": 21.7
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -43.2,
+          "prominence": 16.9
+        },
+        {
+          "freq_hz": 538.3,
+          "psd_db": -46.8,
+          "prominence": 13.6
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_5400rpm_24.wav",
+      "parent_dir": "normal",
+      "duration_sec": 16.92,
+      "rms": 0.111186,
+      "peak": 0.45,
+      "crest_factor_db": 12.14,
+      "top_peaks": [
+        {
+          "freq_hz": 91.5,
+          "psd_db": -32.4,
+          "prominence": 32.8
+        },
+        {
+          "freq_hz": 177.6,
+          "psd_db": -36.6,
+          "prominence": 25.6
+        },
+        {
+          "freq_hz": 269.2,
+          "psd_db": -40.3,
+          "prominence": 21.4
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -44.3,
+          "prominence": 17.4
+        },
+        {
+          "freq_hz": 538.3,
+          "psd_db": -48.2,
+          "prominence": 13.4
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_5400rpm_15.wav",
+      "parent_dir": "normal",
+      "duration_sec": 11.39,
+      "rms": 0.114704,
+      "peak": 0.45,
+      "crest_factor_db": 11.87,
+      "top_peaks": [
+        {
+          "freq_hz": 91.5,
+          "psd_db": -31.5,
+          "prominence": 34.4
+        },
+        {
+          "freq_hz": 183.0,
+          "psd_db": -35.7,
+          "prominence": 26.3
+        },
+        {
+          "freq_hz": 274.5,
+          "psd_db": -40.1,
+          "prominence": 21.7
+        },
+        {
+          "freq_hz": 366.1,
+          "psd_db": -44.0,
+          "prominence": 17.4
+        },
+        {
+          "freq_hz": 549.1,
+          "psd_db": -48.5,
+          "prominence": 13.3
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "synthetic_healthy_hdd_7200rpm_04.wav",
+      "parent_dir": "normal",
+      "duration_sec": 17.78,
+      "rms": 0.121857,
+      "peak": 0.45,
+      "crest_factor_db": 11.35,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -31.3,
+          "prominence": 30.3
+        },
+        {
+          "freq_hz": 242.2,
+          "psd_db": -36.0,
+          "prominence": 25.3
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -39.4,
+          "prominence": 21.4
+        },
+        {
+          "freq_hz": 479.1,
+          "psd_db": -43.0,
+          "prominence": 18.2
+        },
+        {
+          "freq_hz": 721.4,
+          "psd_db": -47.7,
+          "prominence": 13.3
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    }
+  ],
+  "beeping": [
+    {
+      "file": "Aesonlabs Data Recovery_750GB Western Digital Beeping.wav",
+      "parent_dir": "beeping",
+      "duration_sec": 14.09,
+      "rms": 0.016279,
+      "peak": 0.4375,
+      "crest_factor_db": 28.59,
+      "top_peaks": [
+        {
+          "freq_hz": 764.4,
+          "psd_db": -81.5,
+          "prominence": 20.9
+        },
+        {
+          "freq_hz": 1841.1,
+          "psd_db": -92.7,
+          "prominence": 15.8
+        },
+        {
+          "freq_hz": 1598.8,
+          "psd_db": -92.9,
+          "prominence": 15.1
+        },
+        {
+          "freq_hz": 279.9,
+          "psd_db": -79.9,
+          "prominence": 13.9
+        },
+        {
+          "freq_hz": 1017.4,
+          "psd_db": -96.9,
+          "prominence": 12.7
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Aesonlabs Data Recovery_Maxtor Heads Stuck Melody.wav",
+      "parent_dir": "beeping",
+      "duration_sec": 28.09,
+      "rms": 0.038252,
+      "peak": 0.4911,
+      "crest_factor_db": 22.17,
+      "top_peaks": [
+        {
+          "freq_hz": 1092.8,
+          "psd_db": -54.8,
+          "prominence": 37.2
+        },
+        {
+          "freq_hz": 1480.4,
+          "psd_db": -54.4,
+          "prominence": 36.0
+        },
+        {
+          "freq_hz": 1884.2,
+          "psd_db": -49.1,
+          "prominence": 34.5
+        },
+        {
+          "freq_hz": 279.9,
+          "psd_db": -73.8,
+          "prominence": 10.5
+        },
+        {
+          "freq_hz": 775.2,
+          "psd_db": -90.7,
+          "prominence": 9.6
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Aesonlabs Data Recovery_1.5TB Seagate Beeping.wav",
+      "parent_dir": "beeping",
+      "duration_sec": 19.74,
+      "rms": 0.088748,
+      "peak": 0.3858,
+      "crest_factor_db": 12.76,
+      "top_peaks": [
+        {
+          "freq_hz": 1695.7,
+          "psd_db": -61.5,
+          "prominence": 27.0
+        },
+        {
+          "freq_hz": 1017.4,
+          "psd_db": -61.5,
+          "prominence": 25.3
+        },
+        {
+          "freq_hz": 339.1,
+          "psd_db": -41.3,
+          "prominence": 23.2
+        },
+        {
+          "freq_hz": 1356.6,
+          "psd_db": -72.1,
+          "prominence": 17.3
+        },
+        {
+          "freq_hz": 285.3,
+          "psd_db": -52.3,
+          "prominence": 11.3
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Hard Drive Heads Making Beeping Sound： Is it Fixable？.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 28.62,
+      "rms": 0.019169,
+      "peak": 0.1804,
+      "crest_factor_db": 19.47,
+      "top_peaks": [
+        {
+          "freq_hz": 209.9,
+          "psd_db": -87.9,
+          "prominence": 9.5
+        },
+        {
+          "freq_hz": 96.9,
+          "psd_db": -85.7,
+          "prominence": 8.7
+        },
+        {
+          "freq_hz": 1410.4,
+          "psd_db": -77.2,
+          "prominence": 8.1
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -91.2,
+          "prominence": 5.2
+        },
+        {
+          "freq_hz": 1135.9,
+          "psd_db": -80.2,
+          "prominence": 4.8
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Seized Spindle.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 25.05,
+      "rms": 0.009083,
+      "peak": 0.3779,
+      "crest_factor_db": 32.38,
+      "top_peaks": [
+        {
+          "freq_hz": 290.7,
+          "psd_db": -64.5,
+          "prominence": 17.8
+        },
+        {
+          "freq_hz": 102.3,
+          "psd_db": -65.1,
+          "prominence": 17.1
+        },
+        {
+          "freq_hz": 1663.4,
+          "psd_db": -70.0,
+          "prominence": 15.6
+        },
+        {
+          "freq_hz": 527.6,
+          "psd_db": -66.3,
+          "prominence": 14.3
+        },
+        {
+          "freq_hz": 1938.0,
+          "psd_db": -73.6,
+          "prominence": 12.0
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "maxtor_melody.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 12.7,
+      "rms": 0.139617,
+      "peak": 1.0168,
+      "crest_factor_db": 17.25,
+      "top_peaks": [
+        {
+          "freq_hz": 172.3,
+          "psd_db": -47.4,
+          "prominence": 30.3
+        },
+        {
+          "freq_hz": 748.3,
+          "psd_db": -50.4,
+          "prominence": 29.4
+        },
+        {
+          "freq_hz": 651.4,
+          "psd_db": -57.6,
+          "prominence": 20.1
+        },
+        {
+          "freq_hz": 1631.1,
+          "psd_db": -48.8,
+          "prominence": 19.3
+        },
+        {
+          "freq_hz": 1098.2,
+          "psd_db": -70.0,
+          "prominence": 13.6
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Stiction-WD-2.5-A77102.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 12.46,
+      "rms": 0.008044,
+      "peak": 0.3545,
+      "crest_factor_db": 32.88,
+      "top_peaks": [
+        {
+          "freq_hz": 145.3,
+          "psd_db": -59.6,
+          "prominence": 19.6
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -62.0,
+          "prominence": 14.0
+        },
+        {
+          "freq_hz": 511.4,
+          "psd_db": -68.6,
+          "prominence": 13.9
+        },
+        {
+          "freq_hz": 780.6,
+          "psd_db": -70.4,
+          "prominence": 13.9
+        },
+        {
+          "freq_hz": 1012.1,
+          "psd_db": -70.8,
+          "prominence": 13.9
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "hitachi_1_click_with_beep.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 8.83,
+      "rms": 0.051504,
+      "peak": 0.27,
+      "crest_factor_db": 14.39,
+      "top_peaks": [
+        {
+          "freq_hz": 716.0,
+          "psd_db": -60.2,
+          "prominence": 31.3
+        },
+        {
+          "freq_hz": 1432.0,
+          "psd_db": -60.9,
+          "prominence": 28.4
+        },
+        {
+          "freq_hz": 1744.2,
+          "psd_db": -67.7,
+          "prominence": 19.2
+        },
+        {
+          "freq_hz": 549.1,
+          "psd_db": -76.6,
+          "prominence": 8.2
+        },
+        {
+          "freq_hz": 877.5,
+          "psd_db": -80.1,
+          "prominence": 7.8
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "seagate_stiction-1.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 21.73,
+      "rms": 0.00263,
+      "peak": 0.0184,
+      "crest_factor_db": 16.89,
+      "top_peaks": [
+        {
+          "freq_hz": 1507.3,
+          "psd_db": -68.7,
+          "prominence": 27.1
+        },
+        {
+          "freq_hz": 215.3,
+          "psd_db": -70.6,
+          "prominence": 22.0
+        },
+        {
+          "freq_hz": 479.1,
+          "psd_db": -76.1,
+          "prominence": 12.3
+        },
+        {
+          "freq_hz": 1884.2,
+          "psd_db": -84.6,
+          "prominence": 10.1
+        },
+        {
+          "freq_hz": 958.2,
+          "psd_db": -83.5,
+          "prominence": 8.7
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "hitachi_laptop_60gb_nospin_buzzing.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 12.59,
+      "rms": 0.003404,
+      "peak": 0.0306,
+      "crest_factor_db": 19.07,
+      "top_peaks": [
+        {
+          "freq_hz": 1615.0,
+          "psd_db": -74.8,
+          "prominence": 19.1
+        },
+        {
+          "freq_hz": 328.4,
+          "psd_db": -84.3,
+          "prominence": 14.7
+        },
+        {
+          "freq_hz": 1717.3,
+          "psd_db": -75.4,
+          "prominence": 12.6
+        },
+        {
+          "freq_hz": 1216.6,
+          "psd_db": -78.9,
+          "prominence": 12.5
+        },
+        {
+          "freq_hz": 662.1,
+          "psd_db": -84.6,
+          "prominence": 12.5
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Beeping Seagate HDD.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 13.61,
+      "rms": 0.056994,
+      "peak": 0.4406,
+      "crest_factor_db": 17.77,
+      "top_peaks": [
+        {
+          "freq_hz": 317.6,
+          "psd_db": -50.3,
+          "prominence": 26.3
+        },
+        {
+          "freq_hz": 597.5,
+          "psd_db": -55.0,
+          "prominence": 19.0
+        },
+        {
+          "freq_hz": 1092.8,
+          "psd_db": -66.7,
+          "prominence": 9.8
+        },
+        {
+          "freq_hz": 1200.5,
+          "psd_db": -67.6,
+          "prominence": 7.9
+        },
+        {
+          "freq_hz": 193.8,
+          "psd_db": -61.9,
+          "prominence": 7.2
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "wd_250gb_stuck_spindle_chuttering.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 8.96,
+      "rms": 0.005404,
+      "peak": 0.0737,
+      "crest_factor_db": 22.7,
+      "top_peaks": [
+        {
+          "freq_hz": 942.1,
+          "psd_db": -91.9,
+          "prominence": 14.5
+        },
+        {
+          "freq_hz": 64.6,
+          "psd_db": -78.4,
+          "prominence": 10.1
+        },
+        {
+          "freq_hz": 129.2,
+          "psd_db": -85.2,
+          "prominence": 7.1
+        },
+        {
+          "freq_hz": 193.8,
+          "psd_db": -87.9,
+          "prominence": 6.3
+        },
+        {
+          "freq_hz": 258.4,
+          "psd_db": -90.5,
+          "prominence": 5.6
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "WD Green Hard Drive strange beeping noise.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 33.02,
+      "rms": 0.003387,
+      "peak": 0.3528,
+      "crest_factor_db": 40.36,
+      "top_peaks": [
+        {
+          "freq_hz": 635.2,
+          "psd_db": -80.4,
+          "prominence": 8.4
+        },
+        {
+          "freq_hz": 1501.9,
+          "psd_db": -85.9,
+          "prominence": 6.6
+        },
+        {
+          "freq_hz": 328.4,
+          "psd_db": -77.2,
+          "prominence": 5.5
+        },
+        {
+          "freq_hz": 1884.2,
+          "psd_db": -90.1,
+          "prominence": 5.3
+        },
+        {
+          "freq_hz": 269.2,
+          "psd_db": -77.3,
+          "prominence": 4.5
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Stiction-WD-1TB-2.5-Fblite.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 8.1,
+      "rms": 0.006665,
+      "peak": 0.1492,
+      "crest_factor_db": 27.0,
+      "top_peaks": [
+        {
+          "freq_hz": 1787.3,
+          "psd_db": -70.8,
+          "prominence": 18.8
+        },
+        {
+          "freq_hz": 75.4,
+          "psd_db": -62.5,
+          "prominence": 15.8
+        },
+        {
+          "freq_hz": 1701.1,
+          "psd_db": -77.9,
+          "prominence": 10.9
+        },
+        {
+          "freq_hz": 1022.8,
+          "psd_db": -77.5,
+          "prominence": 10.2
+        },
+        {
+          "freq_hz": 1528.9,
+          "psd_db": -79.3,
+          "prominence": 9.4
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "maxtor_melody2.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 6.5,
+      "rms": 0.052915,
+      "peak": 0.2685,
+      "crest_factor_db": 14.11,
+      "top_peaks": [
+        {
+          "freq_hz": 1092.8,
+          "psd_db": -54.3,
+          "prominence": 46.3
+        },
+        {
+          "freq_hz": 1480.4,
+          "psd_db": -60.4,
+          "prominence": 39.5
+        },
+        {
+          "freq_hz": 1889.5,
+          "psd_db": -54.6,
+          "prominence": 30.4
+        },
+        {
+          "freq_hz": 436.0,
+          "psd_db": -73.8,
+          "prominence": 19.1
+        },
+        {
+          "freq_hz": 678.3,
+          "psd_db": -80.5,
+          "prominence": 16.2
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Beeping Seagate Hard Drive.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 36.36,
+      "rms": 0.003754,
+      "peak": 0.086,
+      "crest_factor_db": 27.2,
+      "top_peaks": [
+        {
+          "freq_hz": 215.3,
+          "psd_db": -78.1,
+          "prominence": 15.3
+        },
+        {
+          "freq_hz": 1507.3,
+          "psd_db": -88.2,
+          "prominence": 4.6
+        },
+        {
+          "freq_hz": 613.7,
+          "psd_db": -81.9,
+          "prominence": 4.5
+        },
+        {
+          "freq_hz": 543.7,
+          "psd_db": -82.1,
+          "prominence": 3.5
+        },
+        {
+          "freq_hz": 1022.8,
+          "psd_db": -88.4,
+          "prominence": 3.2
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "seagate_stuck_spindle.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 7.94,
+      "rms": 0.053497,
+      "peak": 0.1449,
+      "crest_factor_db": 8.65,
+      "top_peaks": [
+        {
+          "freq_hz": 403.7,
+          "psd_db": -60.0,
+          "prominence": 34.1
+        },
+        {
+          "freq_hz": 290.7,
+          "psd_db": -64.3,
+          "prominence": 28.4
+        },
+        {
+          "freq_hz": 349.9,
+          "psd_db": -62.9,
+          "prominence": 27.9
+        },
+        {
+          "freq_hz": 753.7,
+          "psd_db": -76.3,
+          "prominence": 22.0
+        },
+        {
+          "freq_hz": 1792.6,
+          "psd_db": -73.8,
+          "prominence": 21.2
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "seagate_barracuda_seized_stiction.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 35.65,
+      "rms": 0.086318,
+      "peak": 0.4141,
+      "crest_factor_db": 13.62,
+      "top_peaks": [
+        {
+          "freq_hz": 317.6,
+          "psd_db": -32.0,
+          "prominence": 48.4
+        },
+        {
+          "freq_hz": 802.1,
+          "psd_db": -48.6,
+          "prominence": 35.2
+        },
+        {
+          "freq_hz": 1437.3,
+          "psd_db": -55.1,
+          "prominence": 30.6
+        },
+        {
+          "freq_hz": 1281.2,
+          "psd_db": -55.0,
+          "prominence": 27.4
+        },
+        {
+          "freq_hz": 1119.7,
+          "psd_db": -54.5,
+          "prominence": 26.9
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "wd_laptop_stuck_siren.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 12.85,
+      "rms": 0.24999,
+      "peak": 0.3285,
+      "crest_factor_db": 2.37,
+      "top_peaks": [
+        {
+          "freq_hz": 829.0,
+          "psd_db": -56.4,
+          "prominence": 25.4
+        },
+        {
+          "freq_hz": 1033.6,
+          "psd_db": -62.9,
+          "prominence": 21.9
+        },
+        {
+          "freq_hz": 1528.9,
+          "psd_db": -64.4,
+          "prominence": 16.5
+        },
+        {
+          "freq_hz": 204.6,
+          "psd_db": -65.5,
+          "prominence": 15.8
+        },
+        {
+          "freq_hz": 915.2,
+          "psd_db": -59.6,
+          "prominence": 15.7
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "wd_500gb_bad_bearings.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 20.17,
+      "rms": 0.237342,
+      "peak": 0.6879,
+      "crest_factor_db": 9.24,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -34.1,
+          "prominence": 28.6
+        },
+        {
+          "freq_hz": 1318.9,
+          "psd_db": -42.5,
+          "prominence": 24.5
+        },
+        {
+          "freq_hz": 236.9,
+          "psd_db": -49.8,
+          "prominence": 18.6
+        },
+        {
+          "freq_hz": 1437.3,
+          "psd_db": -43.4,
+          "prominence": 15.3
+        },
+        {
+          "freq_hz": 1921.8,
+          "psd_db": -50.9,
+          "prominence": 13.3
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "seagate_spindle_lock2.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 31.24,
+      "rms": 0.002128,
+      "peak": 0.028,
+      "crest_factor_db": 22.37,
+      "top_peaks": [
+        {
+          "freq_hz": 1523.5,
+          "psd_db": -80.7,
+          "prominence": 28.0
+        },
+        {
+          "freq_hz": 1302.8,
+          "psd_db": -82.4,
+          "prominence": 24.3
+        },
+        {
+          "freq_hz": 1087.4,
+          "psd_db": -83.2,
+          "prominence": 23.0
+        },
+        {
+          "freq_hz": 436.0,
+          "psd_db": -76.3,
+          "prominence": 22.4
+        },
+        {
+          "freq_hz": 1954.1,
+          "psd_db": -85.7,
+          "prominence": 21.6
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Stiction-samsung-25-extrnl-1.mp3",
+      "parent_dir": "beeping",
+      "duration_sec": 8.62,
+      "rms": 0.018645,
+      "peak": 0.7541,
+      "crest_factor_db": 32.14,
+      "top_peaks": [
+        {
+          "freq_hz": 145.3,
+          "psd_db": -56.1,
+          "prominence": 20.9
+        },
+        {
+          "freq_hz": 1771.1,
+          "psd_db": -76.7,
+          "prominence": 6.2
+        },
+        {
+          "freq_hz": 75.4,
+          "psd_db": -61.8,
+          "prominence": 5.6
+        },
+        {
+          "freq_hz": 877.5,
+          "psd_db": -68.3,
+          "prominence": 3.9
+        },
+        {
+          "freq_hz": 1324.3,
+          "psd_db": -73.8,
+          "prominence": 3.7
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    }
+  ],
+  "clicking": [
+    {
+      "file": "Aesonlabs Data Recovery_Clicking Hard Drive.wav",
+      "parent_dir": "clicking",
+      "duration_sec": 13.61,
+      "rms": 0.009323,
+      "peak": 0.2404,
+      "crest_factor_db": 28.23,
+      "top_peaks": [
+        {
+          "freq_hz": 145.3,
+          "psd_db": -71.1,
+          "prominence": 20.6
+        },
+        {
+          "freq_hz": 1593.5,
+          "psd_db": -70.1,
+          "prominence": 17.9
+        },
+        {
+          "freq_hz": 818.3,
+          "psd_db": -78.7,
+          "prominence": 12.6
+        },
+        {
+          "freq_hz": 1367.4,
+          "psd_db": -75.2,
+          "prominence": 10.3
+        },
+        {
+          "freq_hz": 1200.5,
+          "psd_db": -84.2,
+          "prominence": 4.6
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Aesonlabs Data Recovery_Western Digital 1TB WD10JMVW Clicking.wav",
+      "parent_dir": "clicking",
+      "duration_sec": 17.92,
+      "rms": 0.014339,
+      "peak": 0.2985,
+      "crest_factor_db": 26.37,
+      "top_peaks": [
+        {
+          "freq_hz": 818.3,
+          "psd_db": -75.5,
+          "prominence": 20.6
+        },
+        {
+          "freq_hz": 285.3,
+          "psd_db": -71.7,
+          "prominence": 14.4
+        },
+        {
+          "freq_hz": 495.3,
+          "psd_db": -80.9,
+          "prominence": 14.1
+        },
+        {
+          "freq_hz": 1738.8,
+          "psd_db": -83.2,
+          "prominence": 11.5
+        },
+        {
+          "freq_hz": 409.1,
+          "psd_db": -84.8,
+          "prominence": 8.8
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Aesonlabs Data Recovery_1.5TB Seagate Clicking.wav",
+      "parent_dir": "clicking",
+      "duration_sec": 17.91,
+      "rms": 0.011171,
+      "peak": 0.227,
+      "crest_factor_db": 26.16,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -51.5,
+          "prominence": 20.1
+        },
+        {
+          "freq_hz": 285.3,
+          "psd_db": -73.6,
+          "prominence": 12.3
+        },
+        {
+          "freq_hz": 1561.2,
+          "psd_db": -74.2,
+          "prominence": 11.4
+        },
+        {
+          "freq_hz": 1087.4,
+          "psd_db": -76.8,
+          "prominence": 11.1
+        },
+        {
+          "freq_hz": 1921.8,
+          "psd_db": -73.7,
+          "prominence": 9.6
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Aesonlabs Data Recovery_Seagate 8TB Clicking Due To Scratches ST8000DM004.wav",
+      "parent_dir": "clicking",
+      "duration_sec": 9.26,
+      "rms": 0.013476,
+      "peak": 0.4318,
+      "crest_factor_db": 30.11,
+      "top_peaks": [
+        {
+          "freq_hz": 285.3,
+          "psd_db": -67.1,
+          "prominence": 16.2
+        },
+        {
+          "freq_hz": 1388.9,
+          "psd_db": -75.1,
+          "prominence": 11.9
+        },
+        {
+          "freq_hz": 409.1,
+          "psd_db": -79.1,
+          "prominence": 10.5
+        },
+        {
+          "freq_hz": 640.6,
+          "psd_db": -80.8,
+          "prominence": 7.1
+        },
+        {
+          "freq_hz": 199.2,
+          "psd_db": -76.6,
+          "prominence": 6.5
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Aesonlabs Data Recovery_DiamondMax 200GB Maxtor Clicking.wav",
+      "parent_dir": "clicking",
+      "duration_sec": 10.45,
+      "rms": 0.033712,
+      "peak": 0.5266,
+      "crest_factor_db": 23.87,
+      "top_peaks": [
+        {
+          "freq_hz": 1523.5,
+          "psd_db": -63.2,
+          "prominence": 14.0
+        },
+        {
+          "freq_hz": 1039.0,
+          "psd_db": -66.1,
+          "prominence": 13.9
+        },
+        {
+          "freq_hz": 371.4,
+          "psd_db": -66.6,
+          "prominence": 11.5
+        },
+        {
+          "freq_hz": 118.4,
+          "psd_db": -51.7,
+          "prominence": 9.6
+        },
+        {
+          "freq_hz": 1625.8,
+          "psd_db": -67.5,
+          "prominence": 9.5
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "seagate_dying_heads_spin_down.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 15.78,
+      "rms": 0.161174,
+      "peak": 0.6971,
+      "crest_factor_db": 12.72,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -40.0,
+          "prominence": 35.7
+        },
+        {
+          "freq_hz": 839.8,
+          "psd_db": -51.3,
+          "prominence": 32.3
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -50.5,
+          "prominence": 30.7
+        },
+        {
+          "freq_hz": 602.9,
+          "psd_db": -55.0,
+          "prominence": 25.9
+        },
+        {
+          "freq_hz": 721.4,
+          "psd_db": -56.9,
+          "prominence": 20.5
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Heads-toshiba-2.5-A100201.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 4.86,
+      "rms": 0.028898,
+      "peak": 0.9234,
+      "crest_factor_db": 30.09,
+      "top_peaks": [
+        {
+          "freq_hz": 1270.5,
+          "psd_db": -64.2,
+          "prominence": 12.9
+        },
+        {
+          "freq_hz": 96.9,
+          "psd_db": -61.3,
+          "prominence": 12.5
+        },
+        {
+          "freq_hz": 1792.6,
+          "psd_db": -70.1,
+          "prominence": 6.8
+        },
+        {
+          "freq_hz": 1469.6,
+          "psd_db": -68.4,
+          "prominence": 5.6
+        },
+        {
+          "freq_hz": 1082.0,
+          "psd_db": -73.6,
+          "prominence": 4.2
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "wd6400aals.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 17.55,
+      "rms": 0.078924,
+      "peak": 0.7016,
+      "crest_factor_db": 18.98,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -38.6,
+          "prominence": 14.9
+        },
+        {
+          "freq_hz": 446.8,
+          "psd_db": -42.5,
+          "prominence": 14.7
+        },
+        {
+          "freq_hz": 59.2,
+          "psd_db": -39.6,
+          "prominence": 11.6
+        },
+        {
+          "freq_hz": 1475.0,
+          "psd_db": -62.9,
+          "prominence": 7.6
+        },
+        {
+          "freq_hz": 183.0,
+          "psd_db": -48.6,
+          "prominence": 6.0
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Heads-toshiba-35-A-87102.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 15.91,
+      "rms": 0.011024,
+      "peak": 0.3516,
+      "crest_factor_db": 30.07,
+      "top_peaks": [
+        {
+          "freq_hz": 123.8,
+          "psd_db": -62.4,
+          "prominence": 23.1
+        },
+        {
+          "freq_hz": 290.7,
+          "psd_db": -72.6,
+          "prominence": 8.3
+        },
+        {
+          "freq_hz": 538.3,
+          "psd_db": -76.2,
+          "prominence": 7.2
+        },
+        {
+          "freq_hz": 786.0,
+          "psd_db": -76.7,
+          "prominence": 7.1
+        },
+        {
+          "freq_hz": 1776.5,
+          "psd_db": -79.6,
+          "prominence": 5.4
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "wd_laptop_clicking.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 10.5,
+      "rms": 0.00088,
+      "peak": 0.0236,
+      "crest_factor_db": 28.56,
+      "top_peaks": [
+        {
+          "freq_hz": 995.9,
+          "psd_db": -84.2,
+          "prominence": 31.4
+        },
+        {
+          "freq_hz": 91.5,
+          "psd_db": -75.0,
+          "prominence": 24.8
+        },
+        {
+          "freq_hz": 1878.8,
+          "psd_db": -93.1,
+          "prominence": 17.3
+        },
+        {
+          "freq_hz": 651.4,
+          "psd_db": -101.4,
+          "prominence": 11.2
+        },
+        {
+          "freq_hz": 1329.7,
+          "psd_db": -101.9,
+          "prominence": 8.5
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Heads-TOSHIBA-500GB-3.5-DT01ACA050.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 16.07,
+      "rms": 0.00876,
+      "peak": 0.2247,
+      "crest_factor_db": 28.18,
+      "top_peaks": [
+        {
+          "freq_hz": 1297.4,
+          "psd_db": -71.2,
+          "prominence": 13.2
+        },
+        {
+          "freq_hz": 75.4,
+          "psd_db": -65.9,
+          "prominence": 12.8
+        },
+        {
+          "freq_hz": 899.0,
+          "psd_db": -72.3,
+          "prominence": 11.7
+        },
+        {
+          "freq_hz": 468.3,
+          "psd_db": -73.1,
+          "prominence": 8.9
+        },
+        {
+          "freq_hz": 220.7,
+          "psd_db": -69.9,
+          "prominence": 8.4
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Heads-wd-2.5-1-TB-Fblite-1.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 7.47,
+      "rms": 0.00879,
+      "peak": 0.4513,
+      "crest_factor_db": 34.21,
+      "top_peaks": [
+        {
+          "freq_hz": 75.4,
+          "psd_db": -62.6,
+          "prominence": 17.8
+        },
+        {
+          "freq_hz": 1760.3,
+          "psd_db": -68.7,
+          "prominence": 16.3
+        },
+        {
+          "freq_hz": 172.3,
+          "psd_db": -69.4,
+          "prominence": 9.0
+        },
+        {
+          "freq_hz": 694.4,
+          "psd_db": -77.4,
+          "prominence": 8.3
+        },
+        {
+          "freq_hz": 904.4,
+          "psd_db": -77.8,
+          "prominence": 7.5
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Heads-wd-1tb-A79301.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 14.71,
+      "rms": 0.008825,
+      "peak": 0.1383,
+      "crest_factor_db": 23.9,
+      "top_peaks": [
+        {
+          "freq_hz": 1615.0,
+          "psd_db": -60.5,
+          "prominence": 32.1
+        },
+        {
+          "freq_hz": 91.5,
+          "psd_db": -74.6,
+          "prominence": 14.6
+        },
+        {
+          "freq_hz": 1082.0,
+          "psd_db": -80.8,
+          "prominence": 9.1
+        },
+        {
+          "freq_hz": 737.5,
+          "psd_db": -79.6,
+          "prominence": 8.2
+        },
+        {
+          "freq_hz": 1555.8,
+          "psd_db": -72.7,
+          "prominence": 7.5
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "samsung_40gb_bad_heads_knocks-1.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 9.06,
+      "rms": 0.002544,
+      "peak": 0.0575,
+      "crest_factor_db": 27.08,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -70.4,
+          "prominence": 14.2
+        },
+        {
+          "freq_hz": 1690.4,
+          "psd_db": -81.2,
+          "prominence": 13.6
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -80.4,
+          "prominence": 12.0
+        },
+        {
+          "freq_hz": 775.2,
+          "psd_db": -82.3,
+          "prominence": 11.7
+        },
+        {
+          "freq_hz": 193.8,
+          "psd_db": -79.4,
+          "prominence": 9.1
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Heads-bad-wd-101403.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 13.3,
+      "rms": 0.010337,
+      "peak": 0.8576,
+      "crest_factor_db": 38.38,
+      "top_peaks": [
+        {
+          "freq_hz": 199.2,
+          "psd_db": -68.0,
+          "prominence": 13.3
+        },
+        {
+          "freq_hz": 1835.7,
+          "psd_db": -67.9,
+          "prominence": 13.1
+        },
+        {
+          "freq_hz": 48.4,
+          "psd_db": -69.7,
+          "prominence": 6.7
+        },
+        {
+          "freq_hz": 581.4,
+          "psd_db": -72.2,
+          "prominence": 4.9
+        },
+        {
+          "freq_hz": 118.4,
+          "psd_db": -72.0,
+          "prominence": 4.2
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "WD-YGA-heads.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 17.66,
+      "rms": 0.00703,
+      "peak": 0.7398,
+      "crest_factor_db": 40.44,
+      "top_peaks": [
+        {
+          "freq_hz": 172.3,
+          "psd_db": -70.8,
+          "prominence": 18.0
+        },
+        {
+          "freq_hz": 118.4,
+          "psd_db": -77.9,
+          "prominence": 10.9
+        },
+        {
+          "freq_hz": 1717.3,
+          "psd_db": -76.9,
+          "prominence": 8.7
+        },
+        {
+          "freq_hz": 909.8,
+          "psd_db": -77.7,
+          "prominence": 7.1
+        },
+        {
+          "freq_hz": 231.5,
+          "psd_db": -74.8,
+          "prominence": 5.6
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Hitachi-heads6.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 26.67,
+      "rms": 0.007376,
+      "peak": 0.394,
+      "crest_factor_db": 34.55,
+      "top_peaks": [
+        {
+          "freq_hz": 199.2,
+          "psd_db": -74.8,
+          "prominence": 13.5
+        },
+        {
+          "freq_hz": 1932.6,
+          "psd_db": -75.1,
+          "prominence": 12.4
+        },
+        {
+          "freq_hz": 118.4,
+          "psd_db": -77.8,
+          "prominence": 11.6
+        },
+        {
+          "freq_hz": 969.0,
+          "psd_db": -77.3,
+          "prominence": 8.0
+        },
+        {
+          "freq_hz": 581.4,
+          "psd_db": -78.2,
+          "prominence": 7.6
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "fujitsu_60gb_clicking.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 8.17,
+      "rms": 0.023581,
+      "peak": 1.0694,
+      "crest_factor_db": 33.13,
+      "top_peaks": [
+        {
+          "freq_hz": 1711.9,
+          "psd_db": -61.0,
+          "prominence": 16.5
+        },
+        {
+          "freq_hz": 500.6,
+          "psd_db": -81.3,
+          "prominence": 6.4
+        },
+        {
+          "freq_hz": 64.6,
+          "psd_db": -66.7,
+          "prominence": 6.3
+        },
+        {
+          "freq_hz": 602.9,
+          "psd_db": -82.2,
+          "prominence": 5.4
+        },
+        {
+          "freq_hz": 1362.0,
+          "psd_db": -64.3,
+          "prominence": 5.3
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "wd_5000gb_slowclicking_spindown.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 9.65,
+      "rms": 0.016718,
+      "peak": 0.4532,
+      "crest_factor_db": 28.66,
+      "top_peaks": [
+        {
+          "freq_hz": 812.9,
+          "psd_db": -57.4,
+          "prominence": 23.0
+        },
+        {
+          "freq_hz": 646.0,
+          "psd_db": -62.2,
+          "prominence": 17.2
+        },
+        {
+          "freq_hz": 1593.5,
+          "psd_db": -68.9,
+          "prominence": 10.8
+        },
+        {
+          "freq_hz": 1022.8,
+          "psd_db": -72.8,
+          "prominence": 6.8
+        },
+        {
+          "freq_hz": 323.0,
+          "psd_db": -70.8,
+          "prominence": 6.6
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Heads-bad-hitachi-2.5-A109206.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 10.63,
+      "rms": 0.004739,
+      "peak": 0.0671,
+      "crest_factor_db": 23.02,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -65.5,
+          "prominence": 17.2
+        },
+        {
+          "freq_hz": 635.2,
+          "psd_db": -78.6,
+          "prominence": 8.3
+        },
+        {
+          "freq_hz": 199.2,
+          "psd_db": -73.7,
+          "prominence": 6.8
+        },
+        {
+          "freq_hz": 1523.5,
+          "psd_db": -80.7,
+          "prominence": 5.6
+        },
+        {
+          "freq_hz": 296.1,
+          "psd_db": -76.5,
+          "prominence": 5.5
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "hitachi_ibm_clicking.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 8.25,
+      "rms": 0.002992,
+      "peak": 0.1246,
+      "crest_factor_db": 32.39,
+      "top_peaks": [
+        {
+          "freq_hz": 1738.8,
+          "psd_db": -75.2,
+          "prominence": 17.4
+        },
+        {
+          "freq_hz": 942.1,
+          "psd_db": -94.3,
+          "prominence": 10.2
+        },
+        {
+          "freq_hz": 1302.8,
+          "psd_db": -96.6,
+          "prominence": 7.0
+        },
+        {
+          "freq_hz": 1900.3,
+          "psd_db": -85.8,
+          "prominence": 5.7
+        },
+        {
+          "freq_hz": 866.7,
+          "psd_db": -95.9,
+          "prominence": 5.3
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Head Crash HDD.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 22.71,
+      "rms": 0.017063,
+      "peak": 0.9668,
+      "crest_factor_db": 35.07,
+      "top_peaks": [
+        {
+          "freq_hz": 156.1,
+          "psd_db": -72.6,
+          "prominence": 20.2
+        },
+        {
+          "freq_hz": 403.7,
+          "psd_db": -77.2,
+          "prominence": 14.9
+        },
+        {
+          "freq_hz": 236.9,
+          "psd_db": -74.5,
+          "prominence": 10.8
+        },
+        {
+          "freq_hz": 1760.3,
+          "psd_db": -64.9,
+          "prominence": 8.0
+        },
+        {
+          "freq_hz": 1426.6,
+          "psd_db": -72.6,
+          "prominence": 7.8
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "maxtor_160gb_steady_knocking.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 8.46,
+      "rms": 0.029435,
+      "peak": 0.8739,
+      "crest_factor_db": 29.45,
+      "top_peaks": [
+        {
+          "freq_hz": 640.6,
+          "psd_db": -70.7,
+          "prominence": 16.2
+        },
+        {
+          "freq_hz": 979.8,
+          "psd_db": -69.9,
+          "prominence": 15.3
+        },
+        {
+          "freq_hz": 468.3,
+          "psd_db": -72.1,
+          "prominence": 11.4
+        },
+        {
+          "freq_hz": 1641.9,
+          "psd_db": -68.4,
+          "prominence": 10.2
+        },
+        {
+          "freq_hz": 64.6,
+          "psd_db": -73.3,
+          "prominence": 6.7
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Heads-toshiba-2.5-2-TB.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 14.94,
+      "rms": 0.013311,
+      "peak": 0.7018,
+      "crest_factor_db": 34.44,
+      "top_peaks": [
+        {
+          "freq_hz": 1711.9,
+          "psd_db": -62.1,
+          "prominence": 16.5
+        },
+        {
+          "freq_hz": 145.3,
+          "psd_db": -68.8,
+          "prominence": 12.2
+        },
+        {
+          "freq_hz": 1318.9,
+          "psd_db": -75.2,
+          "prominence": 9.3
+        },
+        {
+          "freq_hz": 48.4,
+          "psd_db": -69.9,
+          "prominence": 7.0
+        },
+        {
+          "freq_hz": 1819.6,
+          "psd_db": -71.9,
+          "prominence": 6.5
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "WDRaptorX.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 27.95,
+      "rms": 0.009044,
+      "peak": 0.6726,
+      "crest_factor_db": 37.43,
+      "top_peaks": [
+        {
+          "freq_hz": 349.9,
+          "psd_db": -70.5,
+          "prominence": 16.9
+        },
+        {
+          "freq_hz": 721.4,
+          "psd_db": -73.4,
+          "prominence": 11.6
+        },
+        {
+          "freq_hz": 1410.4,
+          "psd_db": -74.1,
+          "prominence": 10.8
+        },
+        {
+          "freq_hz": 1125.1,
+          "psd_db": -75.8,
+          "prominence": 8.6
+        },
+        {
+          "freq_hz": 172.3,
+          "psd_db": -78.8,
+          "prominence": 8.6
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Heads-WD-2.5-500-GB-Fblite-fff.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 11.44,
+      "rms": 0.010797,
+      "peak": 0.4981,
+      "crest_factor_db": 33.28,
+      "top_peaks": [
+        {
+          "freq_hz": 75.4,
+          "psd_db": -66.3,
+          "prominence": 8.5
+        },
+        {
+          "freq_hz": 1313.5,
+          "psd_db": -71.1,
+          "prominence": 7.8
+        },
+        {
+          "freq_hz": 199.2,
+          "psd_db": -68.2,
+          "prominence": 4.9
+        },
+        {
+          "freq_hz": 850.6,
+          "psd_db": -71.7,
+          "prominence": 4.8
+        },
+        {
+          "freq_hz": 290.7,
+          "psd_db": -72.3,
+          "prominence": 4.0
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Headsmotor-Maxtor-2tb-A72502.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 15.12,
+      "rms": 0.00453,
+      "peak": 0.0544,
+      "crest_factor_db": 21.59,
+      "top_peaks": [
+        {
+          "freq_hz": 145.3,
+          "psd_db": -71.6,
+          "prominence": 10.4
+        },
+        {
+          "freq_hz": 1561.2,
+          "psd_db": -90.2,
+          "prominence": 8.5
+        },
+        {
+          "freq_hz": 366.1,
+          "psd_db": -79.1,
+          "prominence": 8.2
+        },
+        {
+          "freq_hz": 48.4,
+          "psd_db": -70.0,
+          "prominence": 6.7
+        },
+        {
+          "freq_hz": 1733.4,
+          "psd_db": -91.8,
+          "prominence": 5.9
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Heads-seagate-barracuda-7200.12.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 11.91,
+      "rms": 0.023007,
+      "peak": 0.9878,
+      "crest_factor_db": 32.66,
+      "top_peaks": [
+        {
+          "freq_hz": 990.5,
+          "psd_db": -68.5,
+          "prominence": 16.5
+        },
+        {
+          "freq_hz": 96.9,
+          "psd_db": -55.2,
+          "prominence": 15.3
+        },
+        {
+          "freq_hz": 893.6,
+          "psd_db": -73.1,
+          "prominence": 10.7
+        },
+        {
+          "freq_hz": 1921.8,
+          "psd_db": -69.8,
+          "prominence": 9.5
+        },
+        {
+          "freq_hz": 172.3,
+          "psd_db": -63.2,
+          "prominence": 8.3
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "samsung_clicks_spins_down.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 9.83,
+      "rms": 0.251709,
+      "peak": 0.7506,
+      "crest_factor_db": 9.49,
+      "top_peaks": [
+        {
+          "freq_hz": 1033.6,
+          "psd_db": -57.1,
+          "prominence": 19.7
+        },
+        {
+          "freq_hz": 463.0,
+          "psd_db": -61.8,
+          "prominence": 13.9
+        },
+        {
+          "freq_hz": 753.7,
+          "psd_db": -58.3,
+          "prominence": 9.3
+        },
+        {
+          "freq_hz": 91.5,
+          "psd_db": -66.8,
+          "prominence": 6.1
+        },
+        {
+          "freq_hz": 1383.5,
+          "psd_db": -66.3,
+          "prominence": 5.5
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Heads-Seagate-2.5-250GB.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 14.05,
+      "rms": 0.006885,
+      "peak": 0.2039,
+      "crest_factor_db": 29.43,
+      "top_peaks": [
+        {
+          "freq_hz": 75.4,
+          "psd_db": -63.9,
+          "prominence": 16.8
+        },
+        {
+          "freq_hz": 613.7,
+          "psd_db": -77.6,
+          "prominence": 6.8
+        },
+        {
+          "freq_hz": 226.1,
+          "psd_db": -71.4,
+          "prominence": 6.5
+        },
+        {
+          "freq_hz": 290.7,
+          "psd_db": -71.7,
+          "prominence": 6.2
+        },
+        {
+          "freq_hz": 145.3,
+          "psd_db": -71.5,
+          "prominence": 5.0
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "wd_loud_clicking.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 17.87,
+      "rms": 0.204438,
+      "peak": 1.271,
+      "crest_factor_db": 15.87,
+      "top_peaks": [
+        {
+          "freq_hz": 1135.9,
+          "psd_db": -33.5,
+          "prominence": 45.9
+        },
+        {
+          "freq_hz": 118.4,
+          "psd_db": -55.4,
+          "prominence": 11.7
+        },
+        {
+          "freq_hz": 333.8,
+          "psd_db": -61.6,
+          "prominence": 10.2
+        },
+        {
+          "freq_hz": 441.4,
+          "psd_db": -69.0,
+          "prominence": 9.1
+        },
+        {
+          "freq_hz": 1216.6,
+          "psd_db": -47.6,
+          "prominence": 8.3
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Heads-A84201-SEAGATE-DM001.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 22.7,
+      "rms": 0.007533,
+      "peak": 0.2872,
+      "crest_factor_db": 31.62,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -65.3,
+          "prominence": 21.7
+        },
+        {
+          "freq_hz": 597.5,
+          "psd_db": -72.7,
+          "prominence": 11.1
+        },
+        {
+          "freq_hz": 839.8,
+          "psd_db": -74.7,
+          "prominence": 8.9
+        },
+        {
+          "freq_hz": 721.4,
+          "psd_db": -74.3,
+          "prominence": 8.2
+        },
+        {
+          "freq_hz": 344.5,
+          "psd_db": -75.2,
+          "prominence": 7.2
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "HEADS-SEAGATE-3TB-3.5-ΜΕ-SPIN-DOWN.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 17.06,
+      "rms": 0.005326,
+      "peak": 0.097,
+      "crest_factor_db": 25.21,
+      "top_peaks": [
+        {
+          "freq_hz": 123.8,
+          "psd_db": -66.2,
+          "prominence": 17.7
+        },
+        {
+          "freq_hz": 1383.5,
+          "psd_db": -76.8,
+          "prominence": 8.8
+        },
+        {
+          "freq_hz": 290.7,
+          "psd_db": -70.1,
+          "prominence": 8.5
+        },
+        {
+          "freq_hz": 1211.2,
+          "psd_db": -77.4,
+          "prominence": 7.9
+        },
+        {
+          "freq_hz": 597.5,
+          "psd_db": -74.7,
+          "prominence": 7.2
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "barracuda_lp_heads.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 54.26,
+      "rms": 0.003061,
+      "peak": 0.0858,
+      "crest_factor_db": 28.96,
+      "top_peaks": [
+        {
+          "freq_hz": 177.6,
+          "psd_db": -76.8,
+          "prominence": 18.4
+        },
+        {
+          "freq_hz": 118.4,
+          "psd_db": -80.1,
+          "prominence": 10.0
+        },
+        {
+          "freq_hz": 882.9,
+          "psd_db": -82.9,
+          "prominence": 6.8
+        },
+        {
+          "freq_hz": 1125.1,
+          "psd_db": -83.9,
+          "prominence": 5.4
+        },
+        {
+          "freq_hz": 683.7,
+          "psd_db": -83.8,
+          "prominence": 5.4
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "seagate_laptop_clicking.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 11.08,
+      "rms": 0.140967,
+      "peak": 1.1926,
+      "crest_factor_db": 18.55,
+      "top_peaks": [
+        {
+          "freq_hz": 1518.1,
+          "psd_db": -49.2,
+          "prominence": 21.8
+        },
+        {
+          "freq_hz": 936.7,
+          "psd_db": -52.2,
+          "prominence": 17.0
+        },
+        {
+          "freq_hz": 1722.7,
+          "psd_db": -51.4,
+          "prominence": 14.7
+        },
+        {
+          "freq_hz": 366.1,
+          "psd_db": -59.3,
+          "prominence": 12.4
+        },
+        {
+          "freq_hz": 753.7,
+          "psd_db": -62.5,
+          "prominence": 8.9
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "wd_unstable_clicking_spin_down.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 16.59,
+      "rms": 0.303455,
+      "peak": 1.042,
+      "crest_factor_db": 10.72,
+      "top_peaks": [
+        {
+          "freq_hz": 102.3,
+          "psd_db": -40.6,
+          "prominence": 30.3
+        },
+        {
+          "freq_hz": 183.0,
+          "psd_db": -46.5,
+          "prominence": 18.8
+        },
+        {
+          "freq_hz": 317.6,
+          "psd_db": -52.8,
+          "prominence": 12.2
+        },
+        {
+          "freq_hz": 1873.4,
+          "psd_db": -62.3,
+          "prominence": 11.9
+        },
+        {
+          "freq_hz": 1582.7,
+          "psd_db": -64.2,
+          "prominence": 7.0
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Heads-seagateDL-101301.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 13.98,
+      "rms": 0.012923,
+      "peak": 0.2693,
+      "crest_factor_db": 26.38,
+      "top_peaks": [
+        {
+          "freq_hz": 1012.1,
+          "psd_db": -66.1,
+          "prominence": 13.6
+        },
+        {
+          "freq_hz": 145.3,
+          "psd_db": -68.4,
+          "prominence": 10.4
+        },
+        {
+          "freq_hz": 290.7,
+          "psd_db": -70.7,
+          "prominence": 8.2
+        },
+        {
+          "freq_hz": 48.4,
+          "psd_db": -69.9,
+          "prominence": 6.8
+        },
+        {
+          "freq_hz": 1986.4,
+          "psd_db": -64.3,
+          "prominence": 5.3
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Unhealthiest laptop sound ever - hard disk crash caught on tape.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 30.37,
+      "rms": 0.01543,
+      "peak": 0.7223,
+      "crest_factor_db": 33.41,
+      "top_peaks": [
+        {
+          "freq_hz": 500.6,
+          "psd_db": -55.1,
+          "prominence": 24.1
+        },
+        {
+          "freq_hz": 220.7,
+          "psd_db": -56.2,
+          "prominence": 17.3
+        },
+        {
+          "freq_hz": 672.9,
+          "psd_db": -62.0,
+          "prominence": 10.1
+        },
+        {
+          "freq_hz": 1313.5,
+          "psd_db": -69.2,
+          "prominence": 9.2
+        },
+        {
+          "freq_hz": 834.4,
+          "psd_db": -65.5,
+          "prominence": 8.6
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Seagate-heads7.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 10.81,
+      "rms": 0.031533,
+      "peak": 0.1525,
+      "crest_factor_db": 13.69,
+      "top_peaks": [
+        {
+          "freq_hz": 1442.7,
+          "psd_db": -52.0,
+          "prominence": 36.7
+        },
+        {
+          "freq_hz": 721.4,
+          "psd_db": -61.4,
+          "prominence": 22.5
+        },
+        {
+          "freq_hz": 118.4,
+          "psd_db": -70.6,
+          "prominence": 14.8
+        },
+        {
+          "freq_hz": 775.2,
+          "psd_db": -74.9,
+          "prominence": 8.0
+        },
+        {
+          "freq_hz": 403.7,
+          "psd_db": -77.4,
+          "prominence": 6.0
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "HEADS-Samsung2.5-A85203-1.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 20.17,
+      "rms": 0.006003,
+      "peak": 0.1139,
+      "crest_factor_db": 25.56,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -65.6,
+          "prominence": 18.8
+        },
+        {
+          "freq_hz": 689.1,
+          "psd_db": -72.3,
+          "prominence": 13.6
+        },
+        {
+          "freq_hz": 597.5,
+          "psd_db": -73.4,
+          "prominence": 10.8
+        },
+        {
+          "freq_hz": 1082.0,
+          "psd_db": -79.1,
+          "prominence": 7.8
+        },
+        {
+          "freq_hz": 296.1,
+          "psd_db": -70.8,
+          "prominence": 7.6
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Heads-seagate-97303.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 9.8,
+      "rms": 0.008603,
+      "peak": 0.1523,
+      "crest_factor_db": 24.96,
+      "top_peaks": [
+        {
+          "freq_hz": 96.9,
+          "psd_db": -62.4,
+          "prominence": 16.3
+        },
+        {
+          "freq_hz": 199.2,
+          "psd_db": -67.6,
+          "prominence": 11.7
+        },
+        {
+          "freq_hz": 1318.9,
+          "psd_db": -82.1,
+          "prominence": 5.6
+        },
+        {
+          "freq_hz": 387.6,
+          "psd_db": -76.8,
+          "prominence": 5.6
+        },
+        {
+          "freq_hz": 549.1,
+          "psd_db": -78.6,
+          "prominence": 5.3
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Seagate-heads6.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 8.65,
+      "rms": 0.006391,
+      "peak": 0.0905,
+      "crest_factor_db": 23.03,
+      "top_peaks": [
+        {
+          "freq_hz": 236.9,
+          "psd_db": -66.6,
+          "prominence": 25.6
+        },
+        {
+          "freq_hz": 64.6,
+          "psd_db": -81.6,
+          "prominence": 9.3
+        },
+        {
+          "freq_hz": 931.3,
+          "psd_db": -78.3,
+          "prominence": 8.1
+        },
+        {
+          "freq_hz": 1222.0,
+          "psd_db": -78.5,
+          "prominence": 7.1
+        },
+        {
+          "freq_hz": 328.4,
+          "psd_db": -72.9,
+          "prominence": 6.2
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "HEADS-WD-2.5-1TB-FIREBIRD.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 7.58,
+      "rms": 0.013185,
+      "peak": 0.2703,
+      "crest_factor_db": 26.24,
+      "top_peaks": [
+        {
+          "freq_hz": 96.9,
+          "psd_db": -52.6,
+          "prominence": 22.7
+        },
+        {
+          "freq_hz": 1598.8,
+          "psd_db": -69.7,
+          "prominence": 14.8
+        },
+        {
+          "freq_hz": 979.8,
+          "psd_db": -68.6,
+          "prominence": 11.8
+        },
+        {
+          "freq_hz": 796.7,
+          "psd_db": -72.8,
+          "prominence": 7.3
+        },
+        {
+          "freq_hz": 1776.5,
+          "psd_db": -77.6,
+          "prominence": 7.0
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "ecc-seagate-500-A78103.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 17.82,
+      "rms": 0.00647,
+      "peak": 0.2044,
+      "crest_factor_db": 29.99,
+      "top_peaks": [
+        {
+          "freq_hz": 958.2,
+          "psd_db": -70.3,
+          "prominence": 20.7
+        },
+        {
+          "freq_hz": 1238.2,
+          "psd_db": -73.0,
+          "prominence": 16.6
+        },
+        {
+          "freq_hz": 172.3,
+          "psd_db": -70.8,
+          "prominence": 12.8
+        },
+        {
+          "freq_hz": 1921.8,
+          "psd_db": -73.0,
+          "prominence": 11.3
+        },
+        {
+          "freq_hz": 75.4,
+          "psd_db": -71.9,
+          "prominence": 9.5
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Heads-Seagate-3.5-500GB-7200.10.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 15.23,
+      "rms": 0.012513,
+      "peak": 0.6352,
+      "crest_factor_db": 34.11,
+      "top_peaks": [
+        {
+          "freq_hz": 96.9,
+          "psd_db": -56.9,
+          "prominence": 24.4
+        },
+        {
+          "freq_hz": 199.2,
+          "psd_db": -66.8,
+          "prominence": 9.1
+        },
+        {
+          "freq_hz": 1410.4,
+          "psd_db": -77.1,
+          "prominence": 8.8
+        },
+        {
+          "freq_hz": 387.6,
+          "psd_db": -72.0,
+          "prominence": 8.6
+        },
+        {
+          "freq_hz": 958.2,
+          "psd_db": -78.1,
+          "prominence": 8.2
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "wd_2500js_slow_click_spin_down.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 12.9,
+      "rms": 0.052615,
+      "peak": 0.2918,
+      "crest_factor_db": 14.88,
+      "top_peaks": [
+        {
+          "freq_hz": 1130.5,
+          "psd_db": -54.4,
+          "prominence": 39.5
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -74.9,
+          "prominence": 19.3
+        },
+        {
+          "freq_hz": 463.0,
+          "psd_db": -79.3,
+          "prominence": 11.5
+        },
+        {
+          "freq_hz": 113.0,
+          "psd_db": -78.4,
+          "prominence": 8.4
+        },
+        {
+          "freq_hz": 1760.3,
+          "psd_db": -82.0,
+          "prominence": 8.4
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Headsmd-seagate-97402.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 11.86,
+      "rms": 0.024648,
+      "peak": 0.9293,
+      "crest_factor_db": 31.53,
+      "top_peaks": [
+        {
+          "freq_hz": 172.3,
+          "psd_db": -60.2,
+          "prominence": 14.1
+        },
+        {
+          "freq_hz": 786.0,
+          "psd_db": -70.8,
+          "prominence": 4.8
+        },
+        {
+          "freq_hz": 274.5,
+          "psd_db": -65.5,
+          "prominence": 3.9
+        },
+        {
+          "freq_hz": 479.1,
+          "psd_db": -68.6,
+          "prominence": 3.2
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "toshiba_clicking_sweeping.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 8.0,
+      "rms": 0.003383,
+      "peak": 0.1334,
+      "crest_factor_db": 31.92,
+      "top_peaks": [
+        {
+          "freq_hz": 1685.0,
+          "psd_db": -81.1,
+          "prominence": 10.2
+        },
+        {
+          "freq_hz": 877.5,
+          "psd_db": -92.8,
+          "prominence": 8.6
+        },
+        {
+          "freq_hz": 985.1,
+          "psd_db": -94.2,
+          "prominence": 7.1
+        },
+        {
+          "freq_hz": 441.4,
+          "psd_db": -94.3,
+          "prominence": 4.1
+        },
+        {
+          "freq_hz": 258.4,
+          "psd_db": -82.5,
+          "prominence": 3.9
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "maxtor_calypso_constant_clicking.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 19.49,
+      "rms": 0.229896,
+      "peak": 1.098,
+      "crest_factor_db": 13.58,
+      "top_peaks": [
+        {
+          "freq_hz": 931.3,
+          "psd_db": -37.6,
+          "prominence": 33.9
+        },
+        {
+          "freq_hz": 118.4,
+          "psd_db": -43.8,
+          "prominence": 30.7
+        },
+        {
+          "freq_hz": 473.7,
+          "psd_db": -49.2,
+          "prominence": 21.2
+        },
+        {
+          "freq_hz": 1421.2,
+          "psd_db": -45.3,
+          "prominence": 18.6
+        },
+        {
+          "freq_hz": 1884.2,
+          "psd_db": -56.0,
+          "prominence": 11.8
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "seagate_slow_clicking.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 12.91,
+      "rms": 0.052356,
+      "peak": 0.1239,
+      "crest_factor_db": 7.48,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -52.3,
+          "prominence": 32.3
+        },
+        {
+          "freq_hz": 296.1,
+          "psd_db": -68.8,
+          "prominence": 20.1
+        },
+        {
+          "freq_hz": 597.5,
+          "psd_db": -82.2,
+          "prominence": 10.8
+        },
+        {
+          "freq_hz": 1921.8,
+          "psd_db": -83.1,
+          "prominence": 7.0
+        },
+        {
+          "freq_hz": 893.6,
+          "psd_db": -86.4,
+          "prominence": 6.8
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "HEADS-HGST-3.5-500GB-HDS721050CLA362.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 14.79,
+      "rms": 0.011283,
+      "peak": 0.2644,
+      "crest_factor_db": 27.4,
+      "top_peaks": [
+        {
+          "freq_hz": 1884.2,
+          "psd_db": -57.6,
+          "prominence": 18.2
+        },
+        {
+          "freq_hz": 75.4,
+          "psd_db": -64.5,
+          "prominence": 14.3
+        },
+        {
+          "freq_hz": 172.3,
+          "psd_db": -67.4,
+          "prominence": 12.7
+        },
+        {
+          "freq_hz": 936.7,
+          "psd_db": -72.9,
+          "prominence": 12.5
+        },
+        {
+          "freq_hz": 554.5,
+          "psd_db": -76.8,
+          "prominence": 7.5
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Heads-hitachi-3.5-1-TB.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 18.16,
+      "rms": 0.025794,
+      "peak": 0.8875,
+      "crest_factor_db": 30.73,
+      "top_peaks": [
+        {
+          "freq_hz": 1894.9,
+          "psd_db": -55.8,
+          "prominence": 28.6
+        },
+        {
+          "freq_hz": 947.5,
+          "psd_db": -61.3,
+          "prominence": 25.1
+        },
+        {
+          "freq_hz": 75.4,
+          "psd_db": -68.3,
+          "prominence": 11.8
+        },
+        {
+          "freq_hz": 290.7,
+          "psd_db": -74.0,
+          "prominence": 8.6
+        },
+        {
+          "freq_hz": 1765.7,
+          "psd_db": -78.2,
+          "prominence": 7.5
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "WD800_Motor_Heads.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 6.61,
+      "rms": 0.072848,
+      "peak": 0.8954,
+      "crest_factor_db": 21.79,
+      "top_peaks": [
+        {
+          "freq_hz": 511.4,
+          "psd_db": -40.6,
+          "prominence": 26.0
+        },
+        {
+          "freq_hz": 371.4,
+          "psd_db": -49.2,
+          "prominence": 16.6
+        },
+        {
+          "freq_hz": 678.3,
+          "psd_db": -43.7,
+          "prominence": 14.9
+        },
+        {
+          "freq_hz": 1873.4,
+          "psd_db": -62.0,
+          "prominence": 10.3
+        },
+        {
+          "freq_hz": 850.6,
+          "psd_db": -48.3,
+          "prominence": 8.2
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Heads-1TB-E5E-3.5-PURPLE.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 11.7,
+      "rms": 0.008541,
+      "peak": 0.1069,
+      "crest_factor_db": 21.95,
+      "top_peaks": [
+        {
+          "freq_hz": 91.5,
+          "psd_db": -55.6,
+          "prominence": 25.8
+        },
+        {
+          "freq_hz": 893.6,
+          "psd_db": -70.5,
+          "prominence": 19.3
+        },
+        {
+          "freq_hz": 290.7,
+          "psd_db": -70.7,
+          "prominence": 8.6
+        },
+        {
+          "freq_hz": 220.7,
+          "psd_db": -70.7,
+          "prominence": 8.3
+        },
+        {
+          "freq_hz": 1049.7,
+          "psd_db": -79.5,
+          "prominence": 7.8
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Seagate-heads8.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 14.16,
+      "rms": 0.05192,
+      "peak": 0.3934,
+      "crest_factor_db": 17.59,
+      "top_peaks": [
+        {
+          "freq_hz": 398.4,
+          "psd_db": -67.2,
+          "prominence": 17.5
+        },
+        {
+          "freq_hz": 882.9,
+          "psd_db": -67.7,
+          "prominence": 10.9
+        },
+        {
+          "freq_hz": 699.8,
+          "psd_db": -69.0,
+          "prominence": 8.3
+        },
+        {
+          "freq_hz": 183.0,
+          "psd_db": -67.4,
+          "prominence": 7.2
+        },
+        {
+          "freq_hz": 479.1,
+          "psd_db": -68.6,
+          "prominence": 6.8
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "quantum_clunking-1.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 13.25,
+      "rms": 0.011817,
+      "peak": 0.4771,
+      "crest_factor_db": 32.12,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -67.0,
+          "prominence": 24.2
+        },
+        {
+          "freq_hz": 845.2,
+          "psd_db": -63.3,
+          "prominence": 24.2
+        },
+        {
+          "freq_hz": 1103.6,
+          "psd_db": -60.5,
+          "prominence": 20.8
+        },
+        {
+          "freq_hz": 1938.0,
+          "psd_db": -70.7,
+          "prominence": 8.9
+        },
+        {
+          "freq_hz": 199.2,
+          "psd_db": -93.6,
+          "prominence": 8.6
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "wd_200gb_bad_preamp_click_stop.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 8.02,
+      "rms": 0.007482,
+      "peak": 0.3699,
+      "crest_factor_db": 33.88,
+      "top_peaks": [
+        {
+          "freq_hz": 193.8,
+          "psd_db": -69.8,
+          "prominence": 13.9
+        },
+        {
+          "freq_hz": 129.2,
+          "psd_db": -67.6,
+          "prominence": 12.8
+        },
+        {
+          "freq_hz": 258.4,
+          "psd_db": -72.2,
+          "prominence": 12.8
+        },
+        {
+          "freq_hz": 516.8,
+          "psd_db": -73.7,
+          "prominence": 12.1
+        },
+        {
+          "freq_hz": 317.6,
+          "psd_db": -73.9,
+          "prominence": 11.2
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "WD5000AAKS.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 20.92,
+      "rms": 0.001218,
+      "peak": 0.1594,
+      "crest_factor_db": 42.34,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -77.0,
+          "prominence": 22.7
+        },
+        {
+          "freq_hz": 1566.5,
+          "psd_db": -88.2,
+          "prominence": 8.6
+        },
+        {
+          "freq_hz": 393.0,
+          "psd_db": -88.2,
+          "prominence": 7.7
+        },
+        {
+          "freq_hz": 1012.1,
+          "psd_db": -92.9,
+          "prominence": 6.4
+        },
+        {
+          "freq_hz": 220.7,
+          "psd_db": -86.5,
+          "prominence": 5.4
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "HEADS-500GB-3.5TAHOE-XL.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 18.55,
+      "rms": 0.005785,
+      "peak": 0.1717,
+      "crest_factor_db": 29.45,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -62.0,
+          "prominence": 19.6
+        },
+        {
+          "freq_hz": 1141.3,
+          "psd_db": -77.1,
+          "prominence": 13.1
+        },
+        {
+          "freq_hz": 511.4,
+          "psd_db": -78.3,
+          "prominence": 7.5
+        },
+        {
+          "freq_hz": 317.6,
+          "psd_db": -78.3,
+          "prominence": 7.4
+        },
+        {
+          "freq_hz": 1668.8,
+          "psd_db": -83.2,
+          "prominence": 4.9
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Heads-sg-DM-A92202.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 14.03,
+      "rms": 0.012663,
+      "peak": 0.9308,
+      "crest_factor_db": 37.33,
+      "top_peaks": [
+        {
+          "freq_hz": 1706.5,
+          "psd_db": -72.4,
+          "prominence": 11.9
+        },
+        {
+          "freq_hz": 118.4,
+          "psd_db": -64.5,
+          "prominence": 11.1
+        },
+        {
+          "freq_hz": 1022.8,
+          "psd_db": -74.9,
+          "prominence": 6.0
+        },
+        {
+          "freq_hz": 683.7,
+          "psd_db": -73.9,
+          "prominence": 4.3
+        },
+        {
+          "freq_hz": 549.1,
+          "psd_db": -72.3,
+          "prominence": 4.1
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "fujitsu_60gb_sweeping.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 7.22,
+      "rms": 0.017838,
+      "peak": 0.7786,
+      "crest_factor_db": 32.8,
+      "top_peaks": [
+        {
+          "freq_hz": 1399.7,
+          "psd_db": -63.1,
+          "prominence": 14.8
+        },
+        {
+          "freq_hz": 1022.8,
+          "psd_db": -68.0,
+          "prominence": 14.4
+        },
+        {
+          "freq_hz": 349.9,
+          "psd_db": -66.0,
+          "prominence": 8.1
+        },
+        {
+          "freq_hz": 500.6,
+          "psd_db": -72.5,
+          "prominence": 7.8
+        },
+        {
+          "freq_hz": 899.0,
+          "psd_db": -74.5,
+          "prominence": 7.7
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "samsung_sp8002_clicking.mp3",
+      "parent_dir": "clicking",
+      "duration_sec": 13.87,
+      "rms": 0.256488,
+      "peak": 1.031,
+      "crest_factor_db": 12.08,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -43.6,
+          "prominence": 18.3
+        },
+        {
+          "freq_hz": 1033.6,
+          "psd_db": -57.0,
+          "prominence": 16.9
+        },
+        {
+          "freq_hz": 1749.6,
+          "psd_db": -56.1,
+          "prominence": 15.8
+        },
+        {
+          "freq_hz": 306.8,
+          "psd_db": -57.7,
+          "prominence": 13.3
+        },
+        {
+          "freq_hz": 366.1,
+          "psd_db": -63.2,
+          "prominence": 5.1
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    }
+  ],
+  "scratching": [
+    {
+      "file": "Aesonlabs Data Recovery_750GB Seagate Scratches Screeching Clicking Power Down.wav",
+      "parent_dir": "scratching",
+      "duration_sec": 8.93,
+      "rms": 0.014096,
+      "peak": 0.4017,
+      "crest_factor_db": 29.1,
+      "top_peaks": [
+        {
+          "freq_hz": 258.4,
+          "psd_db": -67.3,
+          "prominence": 14.4
+        },
+        {
+          "freq_hz": 118.4,
+          "psd_db": -51.8,
+          "prominence": 13.8
+        },
+        {
+          "freq_hz": 1561.2,
+          "psd_db": -74.9,
+          "prominence": 9.8
+        },
+        {
+          "freq_hz": 1695.7,
+          "psd_db": -74.4,
+          "prominence": 8.5
+        },
+        {
+          "freq_hz": 586.8,
+          "psd_db": -76.9,
+          "prominence": 6.5
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Α78301-IBM-SCSI-SURFACE-ΜΗ-ΑΝΑΚΤ.mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 19.64,
+      "rms": 0.032284,
+      "peak": 0.5305,
+      "crest_factor_db": 24.31,
+      "top_peaks": [
+        {
+          "freq_hz": 102.3,
+          "psd_db": -53.6,
+          "prominence": 15.4
+        },
+        {
+          "freq_hz": 1049.7,
+          "psd_db": -65.5,
+          "prominence": 9.5
+        },
+        {
+          "freq_hz": 1620.4,
+          "psd_db": -67.7,
+          "prominence": 7.9
+        },
+        {
+          "freq_hz": 807.5,
+          "psd_db": -69.8,
+          "prominence": 5.0
+        },
+        {
+          "freq_hz": 721.4,
+          "psd_db": -69.0,
+          "prominence": 4.1
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "HEADSSURFACE-HGST-2.5-500GB-HTS545050A7E380.mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 17.63,
+      "rms": 0.0078,
+      "peak": 0.1491,
+      "crest_factor_db": 25.63,
+      "top_peaks": [
+        {
+          "freq_hz": 75.4,
+          "psd_db": -64.5,
+          "prominence": 14.6
+        },
+        {
+          "freq_hz": 172.3,
+          "psd_db": -67.1,
+          "prominence": 12.1
+        },
+        {
+          "freq_hz": 290.7,
+          "psd_db": -72.0,
+          "prominence": 5.0
+        },
+        {
+          "freq_hz": 619.1,
+          "psd_db": -77.6,
+          "prominence": 4.9
+        },
+        {
+          "freq_hz": 554.5,
+          "psd_db": -77.3,
+          "prominence": 4.4
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "ibm_scratching_bad_sectors-1.mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 21.11,
+      "rms": 0.072514,
+      "peak": 1.0584,
+      "crest_factor_db": 23.28,
+      "top_peaks": [
+        {
+          "freq_hz": 1437.3,
+          "psd_db": -58.1,
+          "prominence": 11.2
+        },
+        {
+          "freq_hz": 118.4,
+          "psd_db": -57.7,
+          "prominence": 11.0
+        },
+        {
+          "freq_hz": 48.4,
+          "psd_db": -38.1,
+          "prominence": 9.7
+        },
+        {
+          "freq_hz": 473.7,
+          "psd_db": -63.0,
+          "prominence": 9.7
+        },
+        {
+          "freq_hz": 360.7,
+          "psd_db": -63.5,
+          "prominence": 8.7
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "ibm_40gb_bad_heads_rattles_squeals.mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 14.73,
+      "rms": 0.016544,
+      "peak": 0.7391,
+      "crest_factor_db": 33.0,
+      "top_peaks": [
+        {
+          "freq_hz": 581.4,
+          "psd_db": -77.2,
+          "prominence": 14.5
+        },
+        {
+          "freq_hz": 118.4,
+          "psd_db": -85.3,
+          "prominence": 11.5
+        },
+        {
+          "freq_hz": 64.6,
+          "psd_db": -82.3,
+          "prominence": 8.3
+        },
+        {
+          "freq_hz": 473.7,
+          "psd_db": -80.6,
+          "prominence": 6.5
+        },
+        {
+          "freq_hz": 1022.8,
+          "psd_db": -83.5,
+          "prominence": 6.4
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "fujitsu_20gb_bad_media_scratches.mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 19.64,
+      "rms": 0.004726,
+      "peak": 0.0892,
+      "crest_factor_db": 25.52,
+      "top_peaks": [
+        {
+          "freq_hz": 446.8,
+          "psd_db": -78.9,
+          "prominence": 15.7
+        },
+        {
+          "freq_hz": 129.2,
+          "psd_db": -76.1,
+          "prominence": 14.5
+        },
+        {
+          "freq_hz": 193.8,
+          "psd_db": -79.0,
+          "prominence": 13.3
+        },
+        {
+          "freq_hz": 64.6,
+          "psd_db": -73.6,
+          "prominence": 13.2
+        },
+        {
+          "freq_hz": 258.4,
+          "psd_db": -82.2,
+          "prominence": 11.9
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "The Screeching Hard Drive of Death.mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 41.13,
+      "rms": 0.026283,
+      "peak": 0.584,
+      "crest_factor_db": 26.93,
+      "top_peaks": [
+        {
+          "freq_hz": 140.0,
+          "psd_db": -69.4,
+          "prominence": 19.8
+        },
+        {
+          "freq_hz": 1518.1,
+          "psd_db": -78.1,
+          "prominence": 9.1
+        },
+        {
+          "freq_hz": 1889.5,
+          "psd_db": -78.3,
+          "prominence": 6.3
+        },
+        {
+          "freq_hz": 1119.7,
+          "psd_db": -83.0,
+          "prominence": 5.3
+        },
+        {
+          "freq_hz": 1340.4,
+          "psd_db": -84.4,
+          "prominence": 3.7
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "seagate_momentus_nasty_drilling.mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 14.92,
+      "rms": 0.256032,
+      "peak": 0.4133,
+      "crest_factor_db": 4.16,
+      "top_peaks": [
+        {
+          "freq_hz": 360.7,
+          "psd_db": -50.1,
+          "prominence": 27.7
+        },
+        {
+          "freq_hz": 1351.2,
+          "psd_db": -60.5,
+          "prominence": 17.5
+        },
+        {
+          "freq_hz": 629.8,
+          "psd_db": -60.3,
+          "prominence": 15.1
+        },
+        {
+          "freq_hz": 452.2,
+          "psd_db": -53.7,
+          "prominence": 14.5
+        },
+        {
+          "freq_hz": 904.4,
+          "psd_db": -62.6,
+          "prominence": 13.7
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "HEADSsurface-HITACHI-3.5-1TB-HDS721010KLA330-1.mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 21.71,
+      "rms": 0.011868,
+      "peak": 0.1854,
+      "crest_factor_db": 23.88,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -57.6,
+          "prominence": 21.6
+        },
+        {
+          "freq_hz": 242.2,
+          "psd_db": -66.3,
+          "prominence": 9.7
+        },
+        {
+          "freq_hz": 172.3,
+          "psd_db": -67.1,
+          "prominence": 8.0
+        },
+        {
+          "freq_hz": 893.6,
+          "psd_db": -74.0,
+          "prominence": 7.1
+        },
+        {
+          "freq_hz": 296.1,
+          "psd_db": -71.9,
+          "prominence": 6.9
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "How to Identify Platter Scratch Sound in Hard Drive - Stellar Data Recovery Services.mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 30.5,
+      "rms": 0.018444,
+      "peak": 0.2173,
+      "crest_factor_db": 21.42,
+      "top_peaks": [
+        {
+          "freq_hz": 242.2,
+          "psd_db": -56.9,
+          "prominence": 25.9
+        },
+        {
+          "freq_hz": 393.0,
+          "psd_db": -62.6,
+          "prominence": 8.3
+        },
+        {
+          "freq_hz": 624.5,
+          "psd_db": -66.1,
+          "prominence": 7.9
+        },
+        {
+          "freq_hz": 1394.3,
+          "psd_db": -69.6,
+          "prominence": 5.6
+        },
+        {
+          "freq_hz": 1173.6,
+          "psd_db": -69.9,
+          "prominence": 4.8
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "HDD Grinding Noise.mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 24.49,
+      "rms": 0.004476,
+      "peak": 0.2684,
+      "crest_factor_db": 35.56,
+      "top_peaks": [
+        {
+          "freq_hz": 452.2,
+          "psd_db": -67.7,
+          "prominence": 25.6
+        },
+        {
+          "freq_hz": 161.5,
+          "psd_db": -71.7,
+          "prominence": 10.2
+        },
+        {
+          "freq_hz": 710.6,
+          "psd_db": -81.5,
+          "prominence": 6.8
+        },
+        {
+          "freq_hz": 1076.7,
+          "psd_db": -83.8,
+          "prominence": 6.7
+        },
+        {
+          "freq_hz": 893.6,
+          "psd_db": -82.6,
+          "prominence": 6.3
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "toshiba_degrading_bearings-1.mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 30.46,
+      "rms": 0.174528,
+      "peak": 0.9576,
+      "crest_factor_db": 14.79,
+      "top_peaks": [
+        {
+          "freq_hz": 91.5,
+          "psd_db": -49.0,
+          "prominence": 27.7
+        },
+        {
+          "freq_hz": 301.5,
+          "psd_db": -42.4,
+          "prominence": 23.6
+        },
+        {
+          "freq_hz": 979.8,
+          "psd_db": -51.4,
+          "prominence": 14.3
+        },
+        {
+          "freq_hz": 446.8,
+          "psd_db": -52.3,
+          "prominence": 13.5
+        },
+        {
+          "freq_hz": 1195.1,
+          "psd_db": -53.2,
+          "prominence": 5.9
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "toshiba_seizure_scratching_no_spin-1.mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 9.25,
+      "rms": 0.003102,
+      "peak": 0.0218,
+      "crest_factor_db": 16.93,
+      "top_peaks": [
+        {
+          "freq_hz": 1345.8,
+          "psd_db": -68.2,
+          "prominence": 33.1
+        },
+        {
+          "freq_hz": 791.3,
+          "psd_db": -78.5,
+          "prominence": 22.1
+        },
+        {
+          "freq_hz": 247.6,
+          "psd_db": -89.5,
+          "prominence": 14.3
+        },
+        {
+          "freq_hz": 952.8,
+          "psd_db": -87.7,
+          "prominence": 12.5
+        },
+        {
+          "freq_hz": 1938.0,
+          "psd_db": -88.0,
+          "prominence": 11.3
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Hard disk grinding scratching sound.mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 15.12,
+      "rms": 0.021981,
+      "peak": 0.2131,
+      "crest_factor_db": 19.73,
+      "top_peaks": [
+        {
+          "freq_hz": 1415.8,
+          "psd_db": -57.1,
+          "prominence": 31.6
+        },
+        {
+          "freq_hz": 118.4,
+          "psd_db": -57.6,
+          "prominence": 25.6
+        },
+        {
+          "freq_hz": 209.9,
+          "psd_db": -59.7,
+          "prominence": 18.2
+        },
+        {
+          "freq_hz": 393.0,
+          "psd_db": -64.6,
+          "prominence": 14.8
+        },
+        {
+          "freq_hz": 1345.8,
+          "psd_db": -57.7,
+          "prominence": 14.7
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "toshiba_60gb_loud_grinding.mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 4.8,
+      "rms": 0.052742,
+      "peak": 0.6865,
+      "crest_factor_db": 22.29,
+      "top_peaks": [
+        {
+          "freq_hz": 226.1,
+          "psd_db": -58.9,
+          "prominence": 17.8
+        },
+        {
+          "freq_hz": 1555.8,
+          "psd_db": -55.5,
+          "prominence": 9.9
+        },
+        {
+          "freq_hz": 161.5,
+          "psd_db": -66.2,
+          "prominence": 9.3
+        },
+        {
+          "freq_hz": 1722.7,
+          "psd_db": -55.7,
+          "prominence": 8.0
+        },
+        {
+          "freq_hz": 947.5,
+          "psd_db": -66.6,
+          "prominence": 6.1
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "samsung_bad_sectors-1.mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 8.86,
+      "rms": 0.379844,
+      "peak": 0.6223,
+      "crest_factor_db": 4.29,
+      "top_peaks": [
+        {
+          "freq_hz": 91.5,
+          "psd_db": -48.1,
+          "prominence": 18.3
+        },
+        {
+          "freq_hz": 1082.0,
+          "psd_db": -56.1,
+          "prominence": 18.2
+        },
+        {
+          "freq_hz": 1356.6,
+          "psd_db": -59.6,
+          "prominence": 15.4
+        },
+        {
+          "freq_hz": 366.1,
+          "psd_db": -56.4,
+          "prominence": 14.8
+        },
+        {
+          "freq_hz": 1523.5,
+          "psd_db": -66.1,
+          "prominence": 8.1
+        }
+      ],
+      "has_5400_rpm": true,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "HeadssurfaceseagateA79403.mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 20.82,
+      "rms": 0.009883,
+      "peak": 0.4029,
+      "crest_factor_db": 32.21,
+      "top_peaks": [
+        {
+          "freq_hz": 145.3,
+          "psd_db": -65.2,
+          "prominence": 14.5
+        },
+        {
+          "freq_hz": 1868.0,
+          "psd_db": -78.6,
+          "prominence": 10.2
+        },
+        {
+          "freq_hz": 1076.7,
+          "psd_db": -80.0,
+          "prominence": 7.1
+        },
+        {
+          "freq_hz": 253.0,
+          "psd_db": -69.4,
+          "prominence": 6.3
+        },
+        {
+          "freq_hz": 1765.7,
+          "psd_db": -80.4,
+          "prominence": 5.9
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "hard drive scratched surface.mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 36.48,
+      "rms": 0.042485,
+      "peak": 0.5006,
+      "crest_factor_db": 21.42,
+      "top_peaks": [
+        {
+          "freq_hz": 1550.4,
+          "psd_db": -64.3,
+          "prominence": 12.8
+        },
+        {
+          "freq_hz": 452.2,
+          "psd_db": -68.3,
+          "prominence": 8.8
+        },
+        {
+          "freq_hz": 188.4,
+          "psd_db": -72.6,
+          "prominence": 5.1
+        },
+        {
+          "freq_hz": 893.6,
+          "psd_db": -71.2,
+          "prominence": 5.0
+        },
+        {
+          "freq_hz": 64.6,
+          "psd_db": -80.4,
+          "prominence": 5.0
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": false,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Scratching surface of a faulty hard drive..mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 40.09,
+      "rms": 0.044369,
+      "peak": 0.8414,
+      "crest_factor_db": 25.56,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -70.6,
+          "prominence": 12.5
+        },
+        {
+          "freq_hz": 1571.9,
+          "psd_db": -56.1,
+          "prominence": 11.8
+        },
+        {
+          "freq_hz": 387.6,
+          "psd_db": -74.4,
+          "prominence": 9.7
+        },
+        {
+          "freq_hz": 635.2,
+          "psd_db": -73.5,
+          "prominence": 9.5
+        },
+        {
+          "freq_hz": 242.2,
+          "psd_db": -75.4,
+          "prominence": 7.3
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    },
+    {
+      "file": "Seagate-grenada-με-ring-A105202.mp3",
+      "parent_dir": "scratching",
+      "duration_sec": 20.01,
+      "rms": 0.00771,
+      "peak": 0.9427,
+      "crest_factor_db": 41.75,
+      "top_peaks": [
+        {
+          "freq_hz": 118.4,
+          "psd_db": -64.1,
+          "prominence": 6.7
+        },
+        {
+          "freq_hz": 1604.2,
+          "psd_db": -80.6,
+          "prominence": 5.1
+        },
+        {
+          "freq_hz": 1523.5,
+          "psd_db": -81.8,
+          "prominence": 3.4
+        }
+      ],
+      "has_5400_rpm": false,
+      "has_7200_rpm": true,
+      "has_10000_rpm": false,
+      "has_beep_tone": true
+    }
+  ]
+}

@@ -117,6 +117,7 @@ public class MainViewModel extends AndroidViewModel {
         final boolean[] hasAnomalyContainer = new boolean[1];
         final ClassificationResult[] bestAnomalyContainer = new ClassificationResult[1];
         final AudioChunk[] repChunkContainer = new AudioChunk[1];
+        final int[] faultWindowCountContainer = new int[1];
 
         audioRecorder.startAdaptiveListening(maxSeconds, new AudioRecorder.AdaptiveStreamCallback() {
             @Override
@@ -130,47 +131,57 @@ public class MainViewModel extends AndroidViewModel {
             public boolean onWindowReady(int windowIndex, AudioChunk chunk) {
                 try {
                     float[] samples = chunk.getSamples();
-                    float maxAbs = 0f;
-                    for (float s : samples) {
-                        float abs = Math.abs(s);
-                        if (abs > maxAbs) maxAbs = abs;
-                    }
-                    float crestFactor = maxAbs / (chunk.getRms() + 1e-9f);
-
                     RpmHarmonicsAnalyzer.RpmResult rpmRes = rpmHarmonicsAnalyzer.analyzeChunk(samples);
                     if (rpmRes.hasRotation && rpmRes.detectedRpm != null) {
                         detectedRpmContainer[0] = rpmRes.nominalRpm + " RPM";
                     }
 
                     float[][] logMelRaw = audioPreprocessor.extractLogMelForVisualization(samples);
-                    boolean isFanNoise = AudioPreprocessor.isAerodynamicFanNoise(samples, crestFactor, logMelRaw);
-
                     float[] flatTensor = audioPreprocessor.processAudioChunkToFlatTensor(samples);
                     ClassificationResult res = classifier.classifyChunk(flatTensor);
 
-                    boolean isAnomaly = res.isAnomaly();
-                    String dominantClass = res.getDominantClass();
-                    float confidence = res.getConfidence();
+                    // Pobranie surowych prawdopodobieństw z modelu ONNX
+                    float[] rawProbs = new float[]{
+                        res.getProbabilities().getOrDefault("beeping", 0f),
+                        res.getProbabilities().getOrDefault("clicking", 0f),
+                        res.getProbabilities().getOrDefault("normal", 0f),
+                        res.getProbabilities().getOrDefault("scratching", 0f)
+                    };
 
-                    // Twarde weto fizyczne 1: Clicking bez transjentów impulsowych (Crest Factor < 3.2)
-                    // lub spełniający kryteria ciągłego szumu aerodynamicznego (wentylator PC, oczyszczacz)
-                    if (isAnomaly && "clicking".equals(dominantClass) && (crestFactor < 3.2f || isFanNoise)) {
-                        Log.w(TAG, "Twarde weto fizyczne: Odrzucono fałszywy alarm 'clicking' (CF: " + crestFactor + ", isFan: " + isFanNoise + ")");
-                        isAnomaly = false;
-                        dominantClass = "normal";
-                        confidence = res.getProbabilities().getOrDefault("normal", 0.85f);
-                    }
+                    // Zastosowanie fizycznego strażnika DSP (twarde weta dla szumów wentylatorów, clippingu itp.)
+                    DspPhysicalGuard.SanitizationResult guardResult = dspPhysicalGuard.sanitizeProbabilities(
+                        rawProbs, samples, logMelRaw, rpmRes
+                    );
+                    float[] sanProbs = guardResult.sanitizedProbs;
+                    Map<String, Float> sanProbsMap = new HashMap<>();
+                    sanProbsMap.put("beeping", sanProbs[0]);
+                    sanProbsMap.put("clicking", sanProbs[1]);
+                    sanProbsMap.put("normal", sanProbs[2]);
+                    sanProbsMap.put("scratching", sanProbs[3]);
 
-                    // Twarde weto fizyczne 2: Scratching dla szumu aerodynamicznego o łagodnym spadku widma
-                    if (isAnomaly && "scratching".equals(dominantClass) && isFanNoise) {
-                        Log.w(TAG, "Twarde weto fizyczne: Odrzucono fałszywy alarm 'scratching' dla szumu aerodynamicznego.");
-                        isAnomaly = false;
-                        dominantClass = "normal";
-                        confidence = res.getProbabilities().getOrDefault("normal", 0.85f);
+                    // Agregacja prawdopodobieństwa awarii mechanicznej: P(fault) = P(beeping) + P(clicking) + P(scratching)
+                    float faultProbability = sanProbs[0] + sanProbs[1] + sanProbs[3];
+                    boolean isFaultWindow = (faultProbability >= 0.70f);
+
+                    String dominantClass = "normal";
+                    float confidence = sanProbs[2];
+
+                    if (isFaultWindow) {
+                        faultWindowCountContainer[0]++;
+                        if (sanProbs[0] >= sanProbs[1] && sanProbs[0] >= sanProbs[3]) {
+                            dominantClass = "beeping";
+                            confidence = sanProbs[0];
+                        } else if (sanProbs[1] >= sanProbs[0] && sanProbs[1] >= sanProbs[3]) {
+                            dominantClass = "clicking";
+                            confidence = sanProbs[1];
+                        } else {
+                            dominantClass = "scratching";
+                            confidence = sanProbs[3];
+                        }
                     }
 
                     ClassificationResult sanitizedRes = new ClassificationResult(
-                        dominantClass, confidence, res.getProbabilities(), isAnomaly,
+                        dominantClass, confidence, sanProbsMap, isFaultWindow,
                         res.getInferenceTimeMs(), detectedRpmContainer[0], null
                     );
 
@@ -181,7 +192,7 @@ public class MainViewModel extends AndroidViewModel {
                         repChunkContainer[0] = chunk;
                     }
 
-                    if (isAnomaly) {
+                    if (isFaultWindow) {
                         hasAnomalyContainer[0] = true;
                         if (bestAnomalyContainer[0] == null || confidence > bestAnomalyContainer[0].getConfidence()) {
                             bestAnomalyContainer[0] = sanitizedRes;
@@ -190,33 +201,32 @@ public class MainViewModel extends AndroidViewModel {
                     }
 
                     // ===============================================================
-                    // LOGIKA EARLY STOPPING (Jak w prawdziwym Shazam):
+                    // LOGIKA EARLY STOPPING (Jak w Shazam, z twardym wymogiem min. 2 okien dla awarii):
                     // ===============================================================
 
-                    // 1. Ewidentna awaria mechaniczna (Clicking z CF>=3.2, Beeping, Scratching) z wysoką pewnością (>= 75%)
-                    if (isAnomaly && confidence >= 0.75f) {
-                        Log.i(TAG, "Early Stopping: Wykryto ewidentną awarię (" + dominantClass + ", " + (confidence * 100) + "%) w oknie " + windowIndex);
+                    // 1. Zatrzymanie przy awarii WYŁĄCZNIE po potwierdzeniu w co najmniej 2 oknach!
+                    if (faultWindowCountContainer[0] >= 2) {
+                        Log.i(TAG, "Early Stopping: Potwierdzono awarię w co najmniej 2 oknach (okno " + windowIndex + ", faultProb=" + (faultProbability * 100) + "%)");
                         return true;
                     }
 
                     // 2. Potwierdzony dysk sprawny z wykrytą rotacją (5400/7200 RPM) i wysoką pewnością (>= 80%)
-                    if (!isAnomaly && rpmRes.hasRotation && confidence >= 0.80f) {
+                    if (!isFaultWindow && rpmRes.hasRotation && confidence >= 0.80f) {
                         Log.i(TAG, "Early Stopping: Jednoznaczny stan sprawny z potwierdzoną rotacją RPM (" + (confidence * 100) + "%) w oknie " + windowIndex);
                         return true;
                     }
 
-                    // 3. Spójność trzech kolejnych okien (Consensus Voting)
-                    if (windowIndex >= 2) {
+                    // 3. Spójność trzech kolejnych okien sprawnych (Consensus Voting)
+                    if (windowIndex >= 2 && !isFaultWindow) {
                         ClassificationResult prev1 = windowResults.get(windowIndex - 1);
                         ClassificationResult prev2 = windowResults.get(windowIndex - 2);
-                        if (dominantClass.equals(prev1.getDominantClass()) && dominantClass.equals(prev2.getDominantClass())
-                                && confidence >= 0.65f && prev1.getConfidence() >= 0.65f) {
-                            Log.i(TAG, "Early Stopping: Konsensus 3 kolejnych okien (" + dominantClass + ") w oknie " + windowIndex);
+                        if (!prev1.isAnomaly() && !prev2.isAnomaly() && confidence >= 0.70f) {
+                            Log.i(TAG, "Early Stopping: Konsensus 3 kolejnych okien sprawnych w oknie " + windowIndex);
                             return true;
                         }
                     }
 
-                    // Jeśli wynik wciąż niejednoznaczny (np. zakłócenie na początku) i są kolejne okna:
+                    // Jeśli wynik wciąż niejednoznaczny (np. szum tła) i są kolejne okna:
                     if (windowIndex < 4) {
                         int nextWindow = windowIndex + 2;
                         int elapsedMs = (windowIndex + 1) * 1500 + 1500;
@@ -281,32 +291,48 @@ public class MainViewModel extends AndroidViewModel {
                 int numWindows = windowResults.size();
                 Map<String, Float> avgProbs = new HashMap<>();
                 long totalInfTime = 0;
+                int faultWindowsCount = 0;
 
                 for (ClassificationResult wr : windowResults) {
                     totalInfTime += wr.getInferenceTimeMs();
+                    float faultP = wr.getProbabilities().getOrDefault("beeping", 0f)
+                            + wr.getProbabilities().getOrDefault("clicking", 0f)
+                            + wr.getProbabilities().getOrDefault("scratching", 0f);
+                    if (faultP >= 0.70f) {
+                        faultWindowsCount++;
+                    }
                     for (Map.Entry<String, Float> e : wr.getProbabilities().entrySet()) {
                         avgProbs.put(e.getKey(), avgProbs.getOrDefault(e.getKey(), 0.0f) + e.getValue() / numWindows);
                     }
                 }
 
+                // Twardy wymóg: Werdykt "USZKODZONY" WYŁĄCZNIE po potwierdzeniu w co najmniej 2 oknach
+                boolean isFinalFault = (faultWindowsCount >= 2 && bestAnomalyResult != null);
+
                 String finalDominantClass;
                 float finalConfidence;
                 String customRecommendation;
 
-                if (hasMechanicalAnomaly && bestAnomalyResult != null) {
+                if (isFinalFault) {
                     finalDominantClass = bestAnomalyResult.getDominantClass();
-                    finalConfidence = bestAnomalyResult.getConfidence();
-                    customRecommendation = ClassificationResult.generateRecommendation(finalDominantClass, true);
+                    float avgFaultProb = avgProbs.getOrDefault("beeping", 0f)
+                            + avgProbs.getOrDefault("clicking", 0f)
+                            + avgProbs.getOrDefault("scratching", 0f);
+                    finalConfidence = Math.max(bestAnomalyResult.getConfidence(), avgFaultProb);
+                    customRecommendation = "Wykryto wyraźne uszkodzenie mechaniczne dysku twardego (pewność: "
+                            + (int) (finalConfidence * 100) + "%). Zalecana natychmiastowa kopia zapasowa.";
                 } else {
                     if (detectedRpmOverall != null) {
+                        // Stan 2: SPRAWNY (potwierdzona rotacja RPM wrzeciona)
                         finalDominantClass = "normal";
                         finalConfidence = avgProbs.getOrDefault("normal", 0.90f);
-                        customRecommendation = "Dysk sprawny (" + detectedRpmOverall + "). Potwierdzona prędkość obrotowa wrzeciona, brak uszkodzeń głowic.";
+                        customRecommendation = "Dysk sprawny (wykryto stabilną rotację " + detectedRpmOverall
+                                + ", brak sygnatur uszkodzeń mechanicznych).";
                     } else {
-                        // Bramka obecności dysku: brak anomalii i brak rotacji wrzeciona HDD = szum otoczenia / brak dysku
+                        // Stan 3: NIE WIADOMO / BRAK WYKRYTEJ AWARII (szum otoczenia, wentylatory, oczyszczacz)
                         finalDominantClass = "ambient";
                         finalConfidence = avgProbs.getOrDefault("normal", 0.85f);
-                        customRecommendation = "Nie wykryto obecności dysku twardego — słychać wyłącznie szum tła lub inne urządzenie. Przyłóż mikrofon telefonu bezpośrednio do metalowej obudowy dysku.";
+                        customRecommendation = "Nie wiadomo — brak wyraźnych oznak awarii HDD (zarejestrowano szum tła, wentylatory lub inne urządzenie).";
                     }
                 }
 
@@ -319,7 +345,7 @@ public class MainViewModel extends AndroidViewModel {
                     finalDominantClass,
                     finalConfidence,
                     avgProbs,
-                    hasMechanicalAnomaly,
+                    isFinalFault,
                     totalInfTime / numWindows,
                     detectedRpmOverall,
                     customRecommendation
@@ -328,7 +354,7 @@ public class MainViewModel extends AndroidViewModel {
                 DiagnosticModel diagnosticModel = new DiagnosticModel(
                     hddName,
                     System.currentTimeMillis(),
-                    hasMechanicalAnomaly,
+                    isFinalFault,
                     specPath,
                     finalDominantClass,
                     finalConfidence

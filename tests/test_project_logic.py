@@ -76,6 +76,7 @@ def run_tests():
         "tests/verify_cnn_model.py",
         "tests/profile_normalization_quality.py",
         "tests/stress_test_vram.py",
+        "tests/verify_binary_verdict_and_real_drives.py",
     ]
     all_ast_ok = True
     for s in scripts:

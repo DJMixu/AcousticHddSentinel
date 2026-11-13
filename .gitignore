@@ -27,6 +27,7 @@ stress_test_output/
 .idea/
 .vscode/
 models_backup/
+training_output/models/
 tests/adversarial_lab/samples/
 
 # Artefakty i pliki tymczasowe projektu mobilnego Android

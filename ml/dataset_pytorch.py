@@ -156,11 +156,13 @@ def discover_classes_and_files(
 def compute_balanced_class_weights(
     labels: List[int],
     num_classes: int,
-    use_sqrt_smoothing: bool = True
+    use_sqrt_smoothing: bool = True,
+    classes: Optional[List[str]] = None
 ) -> torch.Tensor:
     """
-    Oblicza zrównoważone wagi klas (z opcjonalnym wygładzaniem pierwiastkowym np.clip(sqrt(w), 0.5, 3.5)).
-    Zwraca wagowy tensor PyTorch do przekazania do nn.CrossEntropyLoss(weight=weights).
+    Oblicza zrównoważone wagi klas pod kątem eliminacji fałszywych alarmów:
+    - Ogranicza wagi klas uszkodzeń (beeping, clicking, scratching) do przedziału [0.7, 1.5]
+    - Klasie 'normal' nadaje priorytetową wagę 1.5, wymuszając konserwatywne zgłaszanie awarii.
     """
     unique_present = np.unique(labels)
     computed = compute_class_weight(class_weight="balanced", classes=unique_present, y=labels)
@@ -170,7 +172,13 @@ def compute_balanced_class_weights(
     for i in range(num_classes):
         w = weight_dict.get(i, 1.0)
         if use_sqrt_smoothing:
-            w = float(np.clip(np.sqrt(w), 0.5, 3.5))
+            w = float(np.clip(np.sqrt(w), 0.7, 1.5))
+        else:
+            w = float(np.clip(w, 0.7, 1.5))
+
+        c_name = classes[i] if (classes and i < len(classes)) else None
+        if c_name == "normal" or (classes is None and i == 2):
+            w = 1.5
         weights.append(w)
 
     return torch.tensor(weights, dtype=torch.float32)
@@ -195,7 +203,7 @@ def create_pytorch_dataloaders(
     _, val_files, val_labels = discover_classes_and_files(val_dir, expected_classes=classes)
     _, test_files, test_labels = discover_classes_and_files(test_dir, expected_classes=classes)
 
-    class_weights = compute_balanced_class_weights(train_labels, num_classes=len(classes))
+    class_weights = compute_balanced_class_weights(train_labels, num_classes=len(classes), classes=classes)
 
     train_ds = HddNpyDataset(train_files, train_labels, is_training=True, augment=augment_train, preload=preload)
     val_ds = HddNpyDataset(val_files, val_labels, is_training=False, augment=False, preload=preload)

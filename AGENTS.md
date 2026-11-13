@@ -82,13 +82,11 @@ AcousticHddSentinel/
 │   └── README.md                      # Instrukcja uruchomienia i testowania w Android Studio
 │
 ├── data/                              # Baza surowych nagrań laboratoryjnych (Ground Truth)
-│   └── raw/
-│       ├── northwind/                 # 82 autentyczne pliki MP3 z nazwami laboratoryjnymi
-│       ├── additional/                # 13 nowych nagrań laboratoryjnych uszkodzeń HDD
-│       └── aesonlabs/                 # 9 nagrań uszkodzeń Aesonlabs Data Recovery
+│   └── raw/                           # 288 autentycznych nagrań audio (northwind, aesonlabs, archive, freesound, web, verified_real)
+│       └── PROCESSED_SOURCES_REGISTRY.json # Rejestr unikalnych próbek i sum kontrolnych MD5
 │
-├── dataset_categorized/               # 134 nagrania podzielone na 4 klasy (beeping, clicking, normal, scratching)
-├── dataset_encoded/                   # 1598 tensorów .npy (1389 train, 92 validate, 117 test)
+├── dataset_categorized/               # Nagrania źródłowe podzielone na 4 klasy
+├── dataset_encoded/                   # 2269 tensorów .npy (Zero Data Leakage: train, validate, test)
 │
 ├── training_output/                   # Produkcyjny model, wagi i raporty ewaluacji (Accuracy 83.8%, Macro F1 84.6%)
 │   ├── best_hdd_cnn_model.pt          # Wagi najlepszego pojedynczego modelu PyTorch (seed 777)

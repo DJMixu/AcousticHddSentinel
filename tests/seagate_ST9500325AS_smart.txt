@@ -1,0 +1,41 @@
+=== RAPORT SMART DYSKU SEAGATE (ST9500325AS) ===
+Model: Seagate Momentus 5400.6 (ST9500325AS)
+Numer seryjny: 5VEL6G17
+Rewizja firmware: D005DEM1
+Pojemność: 500.1 GB (465.8 GiB)
+Prędkość obrotowa: 5400 RPM
+Format: 2.5 cala
+Data odczytu: 2026-11-13 17:27:59
+
+Status ogólny: SPRAWNY (PASSED)
+Liczba uszkodzonych sektorów: 0
+Czas pracy: 3866 godzin (161 dni)
+Aktualna temperatura: 23°C
+
+ID#  NAZWA ATRYBUTU               VALUE WORST THRESH RAW VALUE      INTERPRETACJA
+-------------------------------------------------------------------------------------
+   1 raw-read-error-rate            115    99      6       86653001 Seagate Raw Format (składowe ECC)
+   3 spin-up-time                    98    98     85              0 
+   4 start-stop-count                98    98     20           2441 
+   5 reallocated-sector-count       100   100     36              0 OK (Brak realokowanych sektorów)
+   7 seek-error-rate                 82    60     30      199796451 Seagate Raw Format (Seek count)
+   9 power-on-hours                  96    96      0    13917600000 3866 godz. pracy
+  10 spin-retry-count               100   100     97              0 
+  12 power-cycle-count               98    98     20           2411 
+ 184 end-to-end-error               100   100     99              0 
+ 187 reported-uncorrect             100   100      0              0 
+ 188 command-timeout                100   100      0              0 
+ 189 high-fly-writes                100   100      0              0 
+ 190 airflow-temperature-celsius     76    37     45         297150 23°C (Przekroczenie progu w przeszłości)
+ 191 g-sense-error-rate             100   100      0            309 309 zarejestrowanych wstrząsów
+ 192 power-off-retract-count        100   100      0            105 
+ 193 load-cycle-count                67    67      0          66671 66671 cykli parkowania głowic
+ 194 temperature-celsius-2           24    63      0         297150 23°C
+ 195 hardware-ecc-recovered          48    39      0       86653001 
+ 197 current-pending-sector         100   100      0              0 OK (Brak niestabilnych sektorów)
+ 198 offline-uncorrectable          100   100      0              0 OK (Brak niekorygowalnych błędów)
+ 199 udma-crc-error-count           200   200      0              0 
+ 240 head-flying-hours              100   253      0    11631600000 
+ 241 total-lbas-written             100   253      0     8882103064 
+ 242 total-lbas-read                100   253      0    60701668529 
+ 254 attribute-254                  100   100      0              0 

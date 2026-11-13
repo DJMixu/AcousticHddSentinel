@@ -65,6 +65,9 @@ public final class ClassificationResult {
     }
 
     public static String generateRecommendation(String predictedClass, boolean isAnomaly) {
+        if ("ambient".equalsIgnoreCase(predictedClass)) {
+            return "Nie wykryto pracującego dysku HDD (szum otoczenia / wentylatory). Przyłóż mikrofon bezpośrednio do obudowy dysku.";
+        }
         if (!isAnomaly || "normal".equalsIgnoreCase(predictedClass)) {
             return "Dysk sprawny. Profil akustyczny łożyska i głowic w normie.";
         }

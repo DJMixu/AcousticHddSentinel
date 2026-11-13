@@ -1,0 +1,1987 @@
+{
+  "results": {
+    "phases": {
+      "idle": {
+        "n_chunks": 20,
+        "pt_normal_count": 0,
+        "pt_accuracy": 0.0,
+        "pt_mean_conf": 0.28691366314888,
+        "onnx_normal_count": 7,
+        "onnx_accuracy": 0.35,
+        "onnx_mean_conf": 0.30306814014911654,
+        "pt_predictions": [
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "beeping",
+          "scratching",
+          "beeping",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "beeping",
+          "scratching"
+        ],
+        "onnx_predictions": [
+          "scratching",
+          "beeping",
+          "normal",
+          "normal",
+          "normal",
+          "beeping",
+          "beeping",
+          "normal",
+          "beeping",
+          "normal",
+          "beeping",
+          "normal",
+          "normal",
+          "beeping",
+          "scratching",
+          "beeping",
+          "beeping",
+          "beeping",
+          "beeping",
+          "beeping"
+        ]
+      },
+      "write": {
+        "n_chunks": 20,
+        "pt_normal_count": 0,
+        "pt_accuracy": 0.0,
+        "pt_mean_conf": 0.30710534155368807,
+        "onnx_normal_count": 0,
+        "onnx_accuracy": 0.0,
+        "onnx_mean_conf": 0.305484713613987,
+        "pt_predictions": [
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching"
+        ],
+        "onnx_predictions": [
+          "scratching",
+          "beeping",
+          "scratching",
+          "beeping",
+          "scratching",
+          "beeping",
+          "beeping",
+          "beeping",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "beeping",
+          "beeping",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching"
+        ]
+      },
+      "read": {
+        "n_chunks": 20,
+        "pt_normal_count": 0,
+        "pt_accuracy": 0.0,
+        "pt_mean_conf": 0.3151694506406784,
+        "onnx_normal_count": 0,
+        "onnx_accuracy": 0.0,
+        "onnx_mean_conf": 0.32132437974214556,
+        "pt_predictions": [
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching"
+        ],
+        "onnx_predictions": [
+          "beeping",
+          "beeping",
+          "beeping",
+          "beeping",
+          "scratching",
+          "beeping",
+          "beeping",
+          "beeping",
+          "beeping",
+          "beeping",
+          "scratching",
+          "beeping",
+          "beeping",
+          "beeping",
+          "beeping",
+          "beeping",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching"
+        ]
+      },
+      "mixed": {
+        "n_chunks": 20,
+        "pt_normal_count": 0,
+        "pt_accuracy": 0.0,
+        "pt_mean_conf": 0.30828444957733153,
+        "onnx_normal_count": 0,
+        "onnx_accuracy": 0.0,
+        "onnx_mean_conf": 0.32208864092826844,
+        "pt_predictions": [
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching",
+          "scratching"
+        ],
+        "onnx_predictions": [
+          "beeping",
+          "beeping",
+          "beeping",
+          "scratching",
+          "scratching",
+          "beeping",
+          "beeping",
+          "beeping",
+          "beeping",
+          "scratching",
+          "scratching",
+          "beeping",
+          "beeping",
+          "beeping",
+          "scratching",
+          "beeping",
+          "beeping",
+          "scratching",
+          "beeping",
+          "beeping"
+        ]
+      }
+    },
+    "summary": {
+      "total_windows": 80,
+      "pt_total_accuracy": 0.0,
+      "onnx_total_accuracy": 0.0875,
+      "false_alarms_pt": 80,
+      "false_alarms_onnx": 73
+    }
+  },
+  "window_details": [
+    {
+      "phase": "idle",
+      "chunk_idx": 0,
+      "time_start": 0.0,
+      "time_end": 3.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3517908453941345,
+      "pt_probs": {
+        "beeping": 0.22028139233589172,
+        "clicking": 0.2072344720363617,
+        "normal": 0.22069329023361206,
+        "scratching": 0.3517908453941345
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.3664637804031372,
+      "onnx_probs": {
+        "beeping": 0.2208995223045349,
+        "clicking": 0.18954703211784363,
+        "normal": 0.22308962047100067,
+        "scratching": 0.3664637804031372
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 1,
+      "time_start": 3.0,
+      "time_end": 6.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.2817212641239166,
+      "pt_probs": {
+        "beeping": 0.2596553564071655,
+        "clicking": 0.2067304402589798,
+        "normal": 0.25189292430877686,
+        "scratching": 0.2817212641239166
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.29345226287841797,
+      "onnx_probs": {
+        "beeping": 0.29345226287841797,
+        "clicking": 0.19188275933265686,
+        "normal": 0.28910672664642334,
+        "scratching": 0.22555826604366302
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 2,
+      "time_start": 6.0,
+      "time_end": 9.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.284410685300827,
+      "pt_probs": {
+        "beeping": 0.25426244735717773,
+        "clicking": 0.2069002240896225,
+        "normal": 0.2544266879558563,
+        "scratching": 0.284410685300827
+      },
+      "onnx_pred": "normal",
+      "onnx_conf": 0.29269471764564514,
+      "onnx_probs": {
+        "beeping": 0.2831091582775116,
+        "clicking": 0.19222624599933624,
+        "normal": 0.29269471764564514,
+        "scratching": 0.2319699078798294
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 3,
+      "time_start": 9.0,
+      "time_end": 12.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.28265565633773804,
+      "pt_probs": {
+        "beeping": 0.25356534123420715,
+        "clicking": 0.20492084324359894,
+        "normal": 0.2588581144809723,
+        "scratching": 0.28265565633773804
+      },
+      "onnx_pred": "normal",
+      "onnx_conf": 0.29797378182411194,
+      "onnx_probs": {
+        "beeping": 0.2794297933578491,
+        "clicking": 0.1920420080423355,
+        "normal": 0.29797378182411194,
+        "scratching": 0.23055435717105865
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 4,
+      "time_start": 12.0,
+      "time_end": 15.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.2853125035762787,
+      "pt_probs": {
+        "beeping": 0.24836301803588867,
+        "clicking": 0.20783869922161102,
+        "normal": 0.25848573446273804,
+        "scratching": 0.2853125035762787
+      },
+      "onnx_pred": "normal",
+      "onnx_conf": 0.3007935881614685,
+      "onnx_probs": {
+        "beeping": 0.2713989019393921,
+        "clicking": 0.1923285722732544,
+        "normal": 0.3007935881614685,
+        "scratching": 0.23547890782356262
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 5,
+      "time_start": 15.0,
+      "time_end": 18.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.29585033655166626,
+      "pt_probs": {
+        "beeping": 0.25486189126968384,
+        "clicking": 0.20849519968032837,
+        "normal": 0.2407926321029663,
+        "scratching": 0.29585033655166626
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.2831716537475586,
+      "onnx_probs": {
+        "beeping": 0.2831716537475586,
+        "clicking": 0.1930108517408371,
+        "normal": 0.26501068472862244,
+        "scratching": 0.25880682468414307
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 6,
+      "time_start": 18.0,
+      "time_end": 21.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.2780773341655731,
+      "pt_probs": {
+        "beeping": 0.2669387757778168,
+        "clicking": 0.20565137267112732,
+        "normal": 0.24933253228664398,
+        "scratching": 0.2780773341655731
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.3078921437263489,
+      "onnx_probs": {
+        "beeping": 0.3078921437263489,
+        "clicking": 0.19112883508205414,
+        "normal": 0.28600186109542847,
+        "scratching": 0.2149772047996521
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 7,
+      "time_start": 21.0,
+      "time_end": 24.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.27011585235595703,
+      "pt_probs": {
+        "beeping": 0.2612384855747223,
+        "clicking": 0.2054893523454666,
+        "normal": 0.26315632462501526,
+        "scratching": 0.27011585235595703
+      },
+      "onnx_pred": "normal",
+      "onnx_conf": 0.30885475873947144,
+      "onnx_probs": {
+        "beeping": 0.2930210530757904,
+        "clicking": 0.1906244456768036,
+        "normal": 0.30885475873947144,
+        "scratching": 0.20749972760677338
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 8,
+      "time_start": 24.0,
+      "time_end": 27.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.27676159143447876,
+      "pt_probs": {
+        "beeping": 0.2682925760746002,
+        "clicking": 0.20541466772556305,
+        "normal": 0.24953116476535797,
+        "scratching": 0.27676159143447876
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.30934926867485046,
+      "onnx_probs": {
+        "beeping": 0.30934926867485046,
+        "clicking": 0.19102323055267334,
+        "normal": 0.28584322333335876,
+        "scratching": 0.21378424763679504
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 9,
+      "time_start": 27.0,
+      "time_end": 30.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.2854692339897156,
+      "pt_probs": {
+        "beeping": 0.255254328250885,
+        "clicking": 0.20531867444515228,
+        "normal": 0.25395774841308594,
+        "scratching": 0.2854692339897156
+      },
+      "onnx_pred": "normal",
+      "onnx_conf": 0.28893113136291504,
+      "onnx_probs": {
+        "beeping": 0.2837356626987457,
+        "clicking": 0.1922857016324997,
+        "normal": 0.28893113136291504,
+        "scratching": 0.23504753410816193
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 10,
+      "time_start": 30.0,
+      "time_end": 33.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.30021238327026367,
+      "pt_probs": {
+        "beeping": 0.2576209604740143,
+        "clicking": 0.2082875669002533,
+        "normal": 0.23387904465198517,
+        "scratching": 0.30021238327026367
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.2881377637386322,
+      "onnx_probs": {
+        "beeping": 0.2881377637386322,
+        "clicking": 0.19293533265590668,
+        "normal": 0.25431346893310547,
+        "scratching": 0.26461347937583923
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 11,
+      "time_start": 33.0,
+      "time_end": 36.0,
+      "pt_pred": "beeping",
+      "pt_conf": 0.26643869280815125,
+      "pt_probs": {
+        "beeping": 0.26643869280815125,
+        "clicking": 0.20632648468017578,
+        "normal": 0.26145657896995544,
+        "scratching": 0.2657782733440399
+      },
+      "onnx_pred": "normal",
+      "onnx_conf": 0.3080589473247528,
+      "onnx_probs": {
+        "beeping": 0.3002333343029022,
+        "clicking": 0.19014301896095276,
+        "normal": 0.3080589473247528,
+        "scratching": 0.20156462490558624
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 12,
+      "time_start": 36.0,
+      "time_end": 39.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.26969626545906067,
+      "pt_probs": {
+        "beeping": 0.26543086767196655,
+        "clicking": 0.2053038775920868,
+        "normal": 0.2595689296722412,
+        "scratching": 0.26969626545906067
+      },
+      "onnx_pred": "normal",
+      "onnx_conf": 0.3016616404056549,
+      "onnx_probs": {
+        "beeping": 0.30015239119529724,
+        "clicking": 0.19063648581504822,
+        "normal": 0.3016616404056549,
+        "scratching": 0.20754946768283844
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 13,
+      "time_start": 39.0,
+      "time_end": 42.0,
+      "pt_pred": "beeping",
+      "pt_conf": 0.2728024125099182,
+      "pt_probs": {
+        "beeping": 0.2728024125099182,
+        "clicking": 0.20699337124824524,
+        "normal": 0.25259020924568176,
+        "scratching": 0.26761394739151
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.3162595331668854,
+      "onnx_probs": {
+        "beeping": 0.3162595331668854,
+        "clicking": 0.19008786976337433,
+        "normal": 0.2919192910194397,
+        "scratching": 0.20173335075378418
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 14,
+      "time_start": 42.0,
+      "time_end": 45.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3150736391544342,
+      "pt_probs": {
+        "beeping": 0.24865466356277466,
+        "clicking": 0.20497815310955048,
+        "normal": 0.23129349946975708,
+        "scratching": 0.3150736391544342
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.2906259000301361,
+      "onnx_probs": {
+        "beeping": 0.2695693075656891,
+        "clicking": 0.19273020327091217,
+        "normal": 0.24707458913326263,
+        "scratching": 0.2906259000301361
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 15,
+      "time_start": 45.0,
+      "time_end": 48.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.29389283061027527,
+      "pt_probs": {
+        "beeping": 0.2571094036102295,
+        "clicking": 0.2090853750705719,
+        "normal": 0.23991239070892334,
+        "scratching": 0.29389283061027527
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.28731614351272583,
+      "onnx_probs": {
+        "beeping": 0.28731614351272583,
+        "clicking": 0.19293054938316345,
+        "normal": 0.2634482979774475,
+        "scratching": 0.2563050389289856
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 16,
+      "time_start": 48.0,
+      "time_end": 51.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.2909358739852905,
+      "pt_probs": {
+        "beeping": 0.25757771730422974,
+        "clicking": 0.20962151885032654,
+        "normal": 0.24186484515666962,
+        "scratching": 0.2909358739852905
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.2921641170978546,
+      "onnx_probs": {
+        "beeping": 0.2921641170978546,
+        "clicking": 0.1927679181098938,
+        "normal": 0.27028414607048035,
+        "scratching": 0.24478378891944885
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 17,
+      "time_start": 51.0,
+      "time_end": 54.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.28310444951057434,
+      "pt_probs": {
+        "beeping": 0.2592754662036896,
+        "clicking": 0.20963674783706665,
+        "normal": 0.24798330664634705,
+        "scratching": 0.28310444951057434
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.29773029685020447,
+      "onnx_probs": {
+        "beeping": 0.29773029685020447,
+        "clicking": 0.19196277856826782,
+        "normal": 0.286058247089386,
+        "scratching": 0.2242487072944641
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 18,
+      "time_start": 54.0,
+      "time_end": 57.0,
+      "pt_pred": "beeping",
+      "pt_conf": 0.2730947434902191,
+      "pt_probs": {
+        "beeping": 0.2730947434902191,
+        "clicking": 0.20812639594078064,
+        "normal": 0.25014927983283997,
+        "scratching": 0.2686295807361603
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.3192543685436249,
+      "onnx_probs": {
+        "beeping": 0.3192543685436249,
+        "clicking": 0.19005762040615082,
+        "normal": 0.2893155813217163,
+        "scratching": 0.2013723999261856
+      }
+    },
+    {
+      "phase": "idle",
+      "chunk_idx": 19,
+      "time_start": 57.0,
+      "time_end": 60.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.2808566689491272,
+      "pt_probs": {
+        "beeping": 0.2679356634616852,
+        "clicking": 0.20591266453266144,
+        "normal": 0.24529501795768738,
+        "scratching": 0.2808566689491272
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.31057700514793396,
+      "onnx_probs": {
+        "beeping": 0.31057700514793396,
+        "clicking": 0.19136935472488403,
+        "normal": 0.2779884338378906,
+        "scratching": 0.2200651615858078
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 0,
+      "time_start": 0.0,
+      "time_end": 3.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3175879120826721,
+      "pt_probs": {
+        "beeping": 0.24751833081245422,
+        "clicking": 0.2144763469696045,
+        "normal": 0.22041741013526917,
+        "scratching": 0.3175879120826721
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.32287293672561646,
+      "onnx_probs": {
+        "beeping": 0.2588095963001251,
+        "clicking": 0.19231602549552917,
+        "normal": 0.22600139677524567,
+        "scratching": 0.32287293672561646
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 1,
+      "time_start": 3.0,
+      "time_end": 6.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.2923945188522339,
+      "pt_probs": {
+        "beeping": 0.2702578008174896,
+        "clicking": 0.21345120668411255,
+        "normal": 0.22389645874500275,
+        "scratching": 0.2923945188522339
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.3126509487628937,
+      "onnx_probs": {
+        "beeping": 0.3126509487628937,
+        "clicking": 0.19223734736442566,
+        "normal": 0.23855282366275787,
+        "scratching": 0.256558895111084
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 2,
+      "time_start": 6.0,
+      "time_end": 9.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3076348602771759,
+      "pt_probs": {
+        "beeping": 0.2624390125274658,
+        "clicking": 0.2142469733953476,
+        "normal": 0.2156791388988495,
+        "scratching": 0.3076348602771759
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.292940229177475,
+      "onnx_probs": {
+        "beeping": 0.29057577252388,
+        "clicking": 0.19267553091049194,
+        "normal": 0.2238084375858307,
+        "scratching": 0.292940229177475
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 3,
+      "time_start": 9.0,
+      "time_end": 12.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.2862095236778259,
+      "pt_probs": {
+        "beeping": 0.2704715132713318,
+        "clicking": 0.21324744820594788,
+        "normal": 0.2300715297460556,
+        "scratching": 0.2862095236778259
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.32278716564178467,
+      "onnx_probs": {
+        "beeping": 0.32278716564178467,
+        "clicking": 0.19170807301998138,
+        "normal": 0.25298401713371277,
+        "scratching": 0.23252077400684357
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 4,
+      "time_start": 12.0,
+      "time_end": 15.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.31802263855934143,
+      "pt_probs": {
+        "beeping": 0.25098755955696106,
+        "clicking": 0.21584729850292206,
+        "normal": 0.21514254808425903,
+        "scratching": 0.31802263855934143
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.32185378670692444,
+      "onnx_probs": {
+        "beeping": 0.2652813196182251,
+        "clicking": 0.19265934824943542,
+        "normal": 0.22020559012889862,
+        "scratching": 0.32185378670692444
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 5,
+      "time_start": 15.0,
+      "time_end": 18.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.300216943025589,
+      "pt_probs": {
+        "beeping": 0.26123231649398804,
+        "clicking": 0.21336404979228973,
+        "normal": 0.22518672049045563,
+        "scratching": 0.300216943025589
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.2891610860824585,
+      "onnx_probs": {
+        "beeping": 0.2891610860824585,
+        "clicking": 0.19278618693351746,
+        "normal": 0.23775628209114075,
+        "scratching": 0.2802964746952057
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 6,
+      "time_start": 18.0,
+      "time_end": 21.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3042587637901306,
+      "pt_probs": {
+        "beeping": 0.262939453125,
+        "clicking": 0.21097169816493988,
+        "normal": 0.22183005511760712,
+        "scratching": 0.3042587637901306
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.2909114360809326,
+      "onnx_probs": {
+        "beeping": 0.2909114360809326,
+        "clicking": 0.19239211082458496,
+        "normal": 0.23272483050823212,
+        "scratching": 0.2839715778827667
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 7,
+      "time_start": 21.0,
+      "time_end": 24.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.29887500405311584,
+      "pt_probs": {
+        "beeping": 0.26372918486595154,
+        "clicking": 0.21189045906066895,
+        "normal": 0.22550535202026367,
+        "scratching": 0.29887500405311584
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.29744982719421387,
+      "onnx_probs": {
+        "beeping": 0.29744982719421387,
+        "clicking": 0.19258451461791992,
+        "normal": 0.2406178116798401,
+        "scratching": 0.2693478465080261
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 8,
+      "time_start": 24.0,
+      "time_end": 27.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.30918577313423157,
+      "pt_probs": {
+        "beeping": 0.2542632818222046,
+        "clicking": 0.21676038205623627,
+        "normal": 0.21979059278964996,
+        "scratching": 0.30918577313423157
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.3103705048561096,
+      "onnx_probs": {
+        "beeping": 0.2705870568752289,
+        "clicking": 0.19291891157627106,
+        "normal": 0.22612355649471283,
+        "scratching": 0.3103705048561096
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 9,
+      "time_start": 27.0,
+      "time_end": 30.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3103518784046173,
+      "pt_probs": {
+        "beeping": 0.2590482532978058,
+        "clicking": 0.21349787712097168,
+        "normal": 0.21710199117660522,
+        "scratching": 0.3103518784046173
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.3031916916370392,
+      "onnx_probs": {
+        "beeping": 0.2803625464439392,
+        "clicking": 0.19232335686683655,
+        "normal": 0.22412244975566864,
+        "scratching": 0.3031916916370392
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 10,
+      "time_start": 30.0,
+      "time_end": 33.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3127499520778656,
+      "pt_probs": {
+        "beeping": 0.25811535120010376,
+        "clicking": 0.21201442182064056,
+        "normal": 0.21712027490139008,
+        "scratching": 0.3127499520778656
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.3059183657169342,
+      "onnx_probs": {
+        "beeping": 0.278057336807251,
+        "clicking": 0.19210991263389587,
+        "normal": 0.22391441464424133,
+        "scratching": 0.3059183657169342
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 11,
+      "time_start": 33.0,
+      "time_end": 36.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3168620467185974,
+      "pt_probs": {
+        "beeping": 0.2567019760608673,
+        "clicking": 0.20990535616874695,
+        "normal": 0.21653065085411072,
+        "scratching": 0.3168620467185974
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.31009936332702637,
+      "onnx_probs": {
+        "beeping": 0.2751070559024811,
+        "clicking": 0.19181062281131744,
+        "normal": 0.22298292815685272,
+        "scratching": 0.31009936332702637
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 12,
+      "time_start": 36.0,
+      "time_end": 39.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3013469874858856,
+      "pt_probs": {
+        "beeping": 0.2636174261569977,
+        "clicking": 0.21225598454475403,
+        "normal": 0.22277963161468506,
+        "scratching": 0.3013469874858856
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.29985758662223816,
+      "onnx_probs": {
+        "beeping": 0.29985758662223816,
+        "clicking": 0.19271624088287354,
+        "normal": 0.2371293157339096,
+        "scratching": 0.2702969014644623
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 13,
+      "time_start": 39.0,
+      "time_end": 42.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.2920662462711334,
+      "pt_probs": {
+        "beeping": 0.26060953736305237,
+        "clicking": 0.21626338362693787,
+        "normal": 0.23106084764003754,
+        "scratching": 0.2920662462711334
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.29506435990333557,
+      "onnx_probs": {
+        "beeping": 0.29506435990333557,
+        "clicking": 0.19334004819393158,
+        "normal": 0.2501276433467865,
+        "scratching": 0.26146796345710754
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 14,
+      "time_start": 42.0,
+      "time_end": 45.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3074074983596802,
+      "pt_probs": {
+        "beeping": 0.2588317096233368,
+        "clicking": 0.21367882192134857,
+        "normal": 0.22008195519447327,
+        "scratching": 0.3074074983596802
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.29416728019714355,
+      "onnx_probs": {
+        "beeping": 0.2834554612636566,
+        "clicking": 0.1927705854177475,
+        "normal": 0.22960668802261353,
+        "scratching": 0.29416728019714355
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 15,
+      "time_start": 45.0,
+      "time_end": 48.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3076431155204773,
+      "pt_probs": {
+        "beeping": 0.2544369101524353,
+        "clicking": 0.21585401892662048,
+        "normal": 0.22206591069698334,
+        "scratching": 0.3076431155204773
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.3028394877910614,
+      "onnx_probs": {
+        "beeping": 0.273477703332901,
+        "clicking": 0.1932041049003601,
+        "normal": 0.2304787039756775,
+        "scratching": 0.3028394877910614
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 16,
+      "time_start": 48.0,
+      "time_end": 51.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.31606924533843994,
+      "pt_probs": {
+        "beeping": 0.25792428851127625,
+        "clicking": 0.21117980778217316,
+        "normal": 0.21482667326927185,
+        "scratching": 0.31606924533843994
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.3068537414073944,
+      "onnx_probs": {
+        "beeping": 0.27949419617652893,
+        "clicking": 0.19214163720607758,
+        "normal": 0.2215104103088379,
+        "scratching": 0.3068537414073944
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 17,
+      "time_start": 51.0,
+      "time_end": 54.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.30974170565605164,
+      "pt_probs": {
+        "beeping": 0.2588616609573364,
+        "clicking": 0.2109805792570114,
+        "normal": 0.22041605412960052,
+        "scratching": 0.30974170565605164
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.2979767918586731,
+      "onnx_probs": {
+        "beeping": 0.28078174591064453,
+        "clicking": 0.1923007220029831,
+        "normal": 0.22894078493118286,
+        "scratching": 0.2979767918586731
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 18,
+      "time_start": 54.0,
+      "time_end": 57.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.31411778926849365,
+      "pt_probs": {
+        "beeping": 0.25257736444473267,
+        "clicking": 0.21623991429805756,
+        "normal": 0.2170649617910385,
+        "scratching": 0.31411778926849365
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.31585022807121277,
+      "onnx_probs": {
+        "beeping": 0.26838400959968567,
+        "clicking": 0.19287095963954926,
+        "normal": 0.22289475798606873,
+        "scratching": 0.31585022807121277
+      }
+    },
+    {
+      "phase": "write",
+      "chunk_idx": 19,
+      "time_start": 57.0,
+      "time_end": 60.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.31936442852020264,
+      "pt_probs": {
+        "beeping": 0.25074222683906555,
+        "clicking": 0.21120452880859375,
+        "normal": 0.21868883073329926,
+        "scratching": 0.31936442852020264
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.31687745451927185,
+      "onnx_probs": {
+        "beeping": 0.2657143473625183,
+        "clicking": 0.19205214083194733,
+        "normal": 0.2253561019897461,
+        "scratching": 0.31687745451927185
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 0,
+      "time_start": 0.0,
+      "time_end": 3.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3163363039493561,
+      "pt_probs": {
+        "beeping": 0.25883132219314575,
+        "clicking": 0.2082316279411316,
+        "normal": 0.2166007161140442,
+        "scratching": 0.3163363039493561
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.2925918698310852,
+      "onnx_probs": {
+        "beeping": 0.2925918698310852,
+        "clicking": 0.19257844984531403,
+        "normal": 0.2284121811389923,
+        "scratching": 0.2864174544811249
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 1,
+      "time_start": 3.0,
+      "time_end": 6.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3077327609062195,
+      "pt_probs": {
+        "beeping": 0.25771746039390564,
+        "clicking": 0.2117680460214615,
+        "normal": 0.22278176248073578,
+        "scratching": 0.3077327609062195
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.2989215552806854,
+      "onnx_probs": {
+        "beeping": 0.2989215552806854,
+        "clicking": 0.19350363314151764,
+        "normal": 0.24138599634170532,
+        "scratching": 0.2661888003349304
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 2,
+      "time_start": 6.0,
+      "time_end": 9.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3130670487880707,
+      "pt_probs": {
+        "beeping": 0.2611100375652313,
+        "clicking": 0.20964641869068146,
+        "normal": 0.21617645025253296,
+        "scratching": 0.3130670487880707
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.29905760288238525,
+      "onnx_probs": {
+        "beeping": 0.29905760288238525,
+        "clicking": 0.19271355867385864,
+        "normal": 0.22844500839710236,
+        "scratching": 0.27978387475013733
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 3,
+      "time_start": 9.0,
+      "time_end": 12.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3125689923763275,
+      "pt_probs": {
+        "beeping": 0.25786295533180237,
+        "clicking": 0.20968489348888397,
+        "normal": 0.21988311409950256,
+        "scratching": 0.3125689923763275
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.2934843897819519,
+      "onnx_probs": {
+        "beeping": 0.2934843897819519,
+        "clicking": 0.1929754763841629,
+        "normal": 0.23435388505458832,
+        "scratching": 0.27918627858161926
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 4,
+      "time_start": 12.0,
+      "time_end": 15.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3187328577041626,
+      "pt_probs": {
+        "beeping": 0.2583252191543579,
+        "clicking": 0.20927351713180542,
+        "normal": 0.21366837620735168,
+        "scratching": 0.3187328577041626
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.30097267031669617,
+      "onnx_probs": {
+        "beeping": 0.28508469462394714,
+        "clicking": 0.1923476755619049,
+        "normal": 0.22159495949745178,
+        "scratching": 0.30097267031669617
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 5,
+      "time_start": 15.0,
+      "time_end": 18.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.29896974563598633,
+      "pt_probs": {
+        "beeping": 0.2666948437690735,
+        "clicking": 0.2093374878168106,
+        "normal": 0.22499793767929077,
+        "scratching": 0.29896974563598633
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.31584566831588745,
+      "onnx_probs": {
+        "beeping": 0.31584566831588745,
+        "clicking": 0.192206472158432,
+        "normal": 0.24488693475723267,
+        "scratching": 0.2470608651638031
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 6,
+      "time_start": 18.0,
+      "time_end": 21.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3100859522819519,
+      "pt_probs": {
+        "beeping": 0.2638760209083557,
+        "clicking": 0.20833851397037506,
+        "normal": 0.21769949793815613,
+        "scratching": 0.3100859522819519
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.3024008572101593,
+      "onnx_probs": {
+        "beeping": 0.3024008572101593,
+        "clicking": 0.19234199821949005,
+        "normal": 0.23030947148799896,
+        "scratching": 0.2749477028846741
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 7,
+      "time_start": 21.0,
+      "time_end": 24.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.283621609210968,
+      "pt_probs": {
+        "beeping": 0.2795146703720093,
+        "clicking": 0.20982517302036285,
+        "normal": 0.22703854739665985,
+        "scratching": 0.283621609210968
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.3498883545398712,
+      "onnx_probs": {
+        "beeping": 0.3498883545398712,
+        "clicking": 0.189681276679039,
+        "normal": 0.250398725271225,
+        "scratching": 0.21003170311450958
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 8,
+      "time_start": 24.0,
+      "time_end": 27.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.30173632502555847,
+      "pt_probs": {
+        "beeping": 0.26934438943862915,
+        "clicking": 0.20846767723560333,
+        "normal": 0.22045165300369263,
+        "scratching": 0.30173632502555847
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.3227272927761078,
+      "onnx_probs": {
+        "beeping": 0.3227272927761078,
+        "clicking": 0.19184648990631104,
+        "normal": 0.23756952583789825,
+        "scratching": 0.24785667657852173
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 9,
+      "time_start": 27.0,
+      "time_end": 30.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3101431131362915,
+      "pt_probs": {
+        "beeping": 0.2604779303073883,
+        "clicking": 0.21093986928462982,
+        "normal": 0.21843907237052917,
+        "scratching": 0.3101431131362915
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.30204537510871887,
+      "onnx_probs": {
+        "beeping": 0.30204537510871887,
+        "clicking": 0.19310078024864197,
+        "normal": 0.23332108557224274,
+        "scratching": 0.27153280377388
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 10,
+      "time_start": 30.0,
+      "time_end": 33.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3403041660785675,
+      "pt_probs": {
+        "beeping": 0.24583418667316437,
+        "clicking": 0.2060038298368454,
+        "normal": 0.2078578621149063,
+        "scratching": 0.3403041660785675
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.34039464592933655,
+      "onnx_probs": {
+        "beeping": 0.25788068771362305,
+        "clicking": 0.19072724878787994,
+        "normal": 0.21099744737148285,
+        "scratching": 0.34039464592933655
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 11,
+      "time_start": 33.0,
+      "time_end": 36.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.2986983358860016,
+      "pt_probs": {
+        "beeping": 0.2690129578113556,
+        "clicking": 0.20850028097629547,
+        "normal": 0.22378842532634735,
+        "scratching": 0.2986983358860016
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.3218212425708771,
+      "onnx_probs": {
+        "beeping": 0.3218212425708771,
+        "clicking": 0.19186101853847504,
+        "normal": 0.24308033287525177,
+        "scratching": 0.2432374507188797
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 12,
+      "time_start": 36.0,
+      "time_end": 39.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.30270299315452576,
+      "pt_probs": {
+        "beeping": 0.2654174864292145,
+        "clicking": 0.21084345877170563,
+        "normal": 0.22103607654571533,
+        "scratching": 0.30270299315452576
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.31744226813316345,
+      "onnx_probs": {
+        "beeping": 0.31744226813316345,
+        "clicking": 0.1925140619277954,
+        "normal": 0.2393704652786255,
+        "scratching": 0.25067320466041565
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 13,
+      "time_start": 39.0,
+      "time_end": 42.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.2980955243110657,
+      "pt_probs": {
+        "beeping": 0.27342021465301514,
+        "clicking": 0.21042180061340332,
+        "normal": 0.21806250512599945,
+        "scratching": 0.2980955243110657
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.33518993854522705,
+      "onnx_probs": {
+        "beeping": 0.33518993854522705,
+        "clicking": 0.1913747638463974,
+        "normal": 0.23405176401138306,
+        "scratching": 0.23938356339931488
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 14,
+      "time_start": 42.0,
+      "time_end": 45.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.30806851387023926,
+      "pt_probs": {
+        "beeping": 0.26944035291671753,
+        "clicking": 0.2066355049610138,
+        "normal": 0.21585558354854584,
+        "scratching": 0.30806851387023926
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.3150636851787567,
+      "onnx_probs": {
+        "beeping": 0.3150636851787567,
+        "clicking": 0.1917952299118042,
+        "normal": 0.2281404584646225,
+        "scratching": 0.2650006413459778
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 15,
+      "time_start": 45.0,
+      "time_end": 48.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3007611334323883,
+      "pt_probs": {
+        "beeping": 0.26605549454689026,
+        "clicking": 0.2107541263103485,
+        "normal": 0.2224292755126953,
+        "scratching": 0.3007611334323883
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.3181670606136322,
+      "onnx_probs": {
+        "beeping": 0.3181670606136322,
+        "clicking": 0.19243112206459045,
+        "normal": 0.24144388735294342,
+        "scratching": 0.24795791506767273
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 16,
+      "time_start": 48.0,
+      "time_end": 51.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.32965967059135437,
+      "pt_probs": {
+        "beeping": 0.2504231333732605,
+        "clicking": 0.207601398229599,
+        "normal": 0.21231581270694733,
+        "scratching": 0.32965967059135437
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.3222462832927704,
+      "onnx_probs": {
+        "beeping": 0.2680322229862213,
+        "clicking": 0.19171001017093658,
+        "normal": 0.2180114984512329,
+        "scratching": 0.3222462832927704
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 17,
+      "time_start": 51.0,
+      "time_end": 54.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.34998223185539246,
+      "pt_probs": {
+        "beeping": 0.22500549256801605,
+        "clicking": 0.2190977782011032,
+        "normal": 0.2059144675731659,
+        "scratching": 0.34998223185539246
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.36365702748298645,
+      "onnx_probs": {
+        "beeping": 0.22793124616146088,
+        "clicking": 0.20191459357738495,
+        "normal": 0.20649714767932892,
+        "scratching": 0.36365702748298645
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 18,
+      "time_start": 54.0,
+      "time_end": 57.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.36522379517555237,
+      "pt_probs": {
+        "beeping": 0.22632253170013428,
+        "clicking": 0.20648056268692017,
+        "normal": 0.2019730657339096,
+        "scratching": 0.36522379517555237
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.37957948446273804,
+      "onnx_probs": {
+        "beeping": 0.22887778282165527,
+        "clicking": 0.1897796094417572,
+        "normal": 0.20176304876804352,
+        "scratching": 0.37957948446273804
+      }
+    },
+    {
+      "phase": "read",
+      "chunk_idx": 19,
+      "time_start": 57.0,
+      "time_end": 60.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.33689793944358826,
+      "pt_probs": {
+        "beeping": 0.2440098077058792,
+        "clicking": 0.20768345892429352,
+        "normal": 0.2114088237285614,
+        "scratching": 0.33689793944358826
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.33499032258987427,
+      "onnx_probs": {
+        "beeping": 0.25730252265930176,
+        "clicking": 0.1914612352848053,
+        "normal": 0.2162458598613739,
+        "scratching": 0.33499032258987427
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 0,
+      "time_start": 0.0,
+      "time_end": 3.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.292285293340683,
+      "pt_probs": {
+        "beeping": 0.27431800961494446,
+        "clicking": 0.21205773949623108,
+        "normal": 0.2213388979434967,
+        "scratching": 0.292285293340683
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.33207154273986816,
+      "onnx_probs": {
+        "beeping": 0.33207154273986816,
+        "clicking": 0.1914384514093399,
+        "normal": 0.2377704381942749,
+        "scratching": 0.2387196123600006
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 1,
+      "time_start": 3.0,
+      "time_end": 6.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.30571743845939636,
+      "pt_probs": {
+        "beeping": 0.26799413561820984,
+        "clicking": 0.2112744003534317,
+        "normal": 0.2150140106678009,
+        "scratching": 0.30571743845939636
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.3060843348503113,
+      "onnx_probs": {
+        "beeping": 0.3060843348503113,
+        "clicking": 0.19222114980220795,
+        "normal": 0.22461913526058197,
+        "scratching": 0.2770753502845764
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 2,
+      "time_start": 6.0,
+      "time_end": 9.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.28514325618743896,
+      "pt_probs": {
+        "beeping": 0.2805618345737457,
+        "clicking": 0.21093596518039703,
+        "normal": 0.2233588993549347,
+        "scratching": 0.28514325618743896
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.34592244029045105,
+      "onnx_probs": {
+        "beeping": 0.34592244029045105,
+        "clicking": 0.1902197152376175,
+        "normal": 0.24088282883167267,
+        "scratching": 0.2229749709367752
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 3,
+      "time_start": 9.0,
+      "time_end": 12.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.31738966703414917,
+      "pt_probs": {
+        "beeping": 0.26212790608406067,
+        "clicking": 0.2082907110452652,
+        "normal": 0.21219173073768616,
+        "scratching": 0.31738966703414917
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.302557110786438,
+      "onnx_probs": {
+        "beeping": 0.2872777581214905,
+        "clicking": 0.19170628488063812,
+        "normal": 0.21845883131027222,
+        "scratching": 0.302557110786438
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 4,
+      "time_start": 12.0,
+      "time_end": 15.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.31325313448905945,
+      "pt_probs": {
+        "beeping": 0.2636546790599823,
+        "clicking": 0.2109232097864151,
+        "normal": 0.21216896176338196,
+        "scratching": 0.31325313448905945
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.29683369398117065,
+      "onnx_probs": {
+        "beeping": 0.2921741008758545,
+        "clicking": 0.19209054112434387,
+        "normal": 0.21890170872211456,
+        "scratching": 0.29683369398117065
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 5,
+      "time_start": 15.0,
+      "time_end": 18.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.30730873346328735,
+      "pt_probs": {
+        "beeping": 0.26375705003738403,
+        "clicking": 0.21317645907402039,
+        "normal": 0.21575778722763062,
+        "scratching": 0.30730873346328735
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.29601454734802246,
+      "onnx_probs": {
+        "beeping": 0.29601454734802246,
+        "clicking": 0.19269327819347382,
+        "normal": 0.2248292714357376,
+        "scratching": 0.2864629626274109
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 6,
+      "time_start": 18.0,
+      "time_end": 21.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.2999565601348877,
+      "pt_probs": {
+        "beeping": 0.27202385663986206,
+        "clicking": 0.21197780966758728,
+        "normal": 0.21604174375534058,
+        "scratching": 0.2999565601348877
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.3180919289588928,
+      "onnx_probs": {
+        "beeping": 0.3180919289588928,
+        "clicking": 0.19193758070468903,
+        "normal": 0.22707268595695496,
+        "scratching": 0.2628978192806244
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 7,
+      "time_start": 21.0,
+      "time_end": 24.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.30520668625831604,
+      "pt_probs": {
+        "beeping": 0.2683846354484558,
+        "clicking": 0.21325740218162537,
+        "normal": 0.21315129101276398,
+        "scratching": 0.30520668625831604
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.3075065016746521,
+      "onnx_probs": {
+        "beeping": 0.3075065016746521,
+        "clicking": 0.19249308109283447,
+        "normal": 0.22187665104866028,
+        "scratching": 0.2781237065792084
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 8,
+      "time_start": 24.0,
+      "time_end": 27.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.31143298745155334,
+      "pt_probs": {
+        "beeping": 0.2674838602542877,
+        "clicking": 0.20721200108528137,
+        "normal": 0.21387118101119995,
+        "scratching": 0.31143298745155334
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.30130696296691895,
+      "onnx_probs": {
+        "beeping": 0.30130696296691895,
+        "clicking": 0.1917927861213684,
+        "normal": 0.22227352857589722,
+        "scratching": 0.28462672233581543
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 9,
+      "time_start": 27.0,
+      "time_end": 30.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3329777717590332,
+      "pt_probs": {
+        "beeping": 0.24647681415081024,
+        "clicking": 0.21088603138923645,
+        "normal": 0.20965932309627533,
+        "scratching": 0.3329777717590332
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.3411794900894165,
+      "onnx_probs": {
+        "beeping": 0.255874902009964,
+        "clicking": 0.19116434454917908,
+        "normal": 0.21178123354911804,
+        "scratching": 0.3411794900894165
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 10,
+      "time_start": 30.0,
+      "time_end": 33.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.34170305728912354,
+      "pt_probs": {
+        "beeping": 0.24286971986293793,
+        "clicking": 0.20912788808345795,
+        "normal": 0.206299290060997,
+        "scratching": 0.34170305728912354
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.3517669439315796,
+      "onnx_probs": {
+        "beeping": 0.25034162402153015,
+        "clicking": 0.1903650015592575,
+        "normal": 0.20752644538879395,
+        "scratching": 0.3517669439315796
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 11,
+      "time_start": 33.0,
+      "time_end": 36.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.30097460746765137,
+      "pt_probs": {
+        "beeping": 0.27280211448669434,
+        "clicking": 0.2122361809015274,
+        "normal": 0.2139870971441269,
+        "scratching": 0.30097460746765137
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.31991416215896606,
+      "onnx_probs": {
+        "beeping": 0.31991416215896606,
+        "clicking": 0.191878080368042,
+        "normal": 0.2238619327545166,
+        "scratching": 0.26434582471847534
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 12,
+      "time_start": 36.0,
+      "time_end": 39.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.29400578141212463,
+      "pt_probs": {
+        "beeping": 0.27762070298194885,
+        "clicking": 0.2122083157300949,
+        "normal": 0.2161651998758316,
+        "scratching": 0.29400578141212463
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.3370014727115631,
+      "onnx_probs": {
+        "beeping": 0.3370014727115631,
+        "clicking": 0.1910722553730011,
+        "normal": 0.22862806916236877,
+        "scratching": 0.24329818785190582
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 13,
+      "time_start": 39.0,
+      "time_end": 42.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.30623659491539,
+      "pt_probs": {
+        "beeping": 0.26700469851493835,
+        "clicking": 0.21315476298332214,
+        "normal": 0.2136039137840271,
+        "scratching": 0.30623659491539
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.3008953630924225,
+      "onnx_probs": {
+        "beeping": 0.3008953630924225,
+        "clicking": 0.19233140349388123,
+        "normal": 0.2215164601802826,
+        "scratching": 0.2852567732334137
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 14,
+      "time_start": 42.0,
+      "time_end": 45.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.3565887212753296,
+      "pt_probs": {
+        "beeping": 0.23364439606666565,
+        "clicking": 0.2059784084558487,
+        "normal": 0.20378848910331726,
+        "scratching": 0.3565887212753296
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.3697417080402374,
+      "onnx_probs": {
+        "beeping": 0.2374715507030487,
+        "clicking": 0.1887853592634201,
+        "normal": 0.20400136709213257,
+        "scratching": 0.3697417080402374
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 15,
+      "time_start": 45.0,
+      "time_end": 48.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.30700382590293884,
+      "pt_probs": {
+        "beeping": 0.2685968279838562,
+        "clicking": 0.21155935525894165,
+        "normal": 0.2128399908542633,
+        "scratching": 0.30700382590293884
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.30723705887794495,
+      "onnx_probs": {
+        "beeping": 0.30723705887794495,
+        "clicking": 0.1922301948070526,
+        "normal": 0.22131191194057465,
+        "scratching": 0.2792208194732666
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 16,
+      "time_start": 48.0,
+      "time_end": 51.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.29534387588500977,
+      "pt_probs": {
+        "beeping": 0.2746904194355011,
+        "clicking": 0.2143937647342682,
+        "normal": 0.21557199954986572,
+        "scratching": 0.29534387588500977
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.3260926902294159,
+      "onnx_probs": {
+        "beeping": 0.3260926902294159,
+        "clicking": 0.19186116755008698,
+        "normal": 0.2265745997428894,
+        "scratching": 0.25547149777412415
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 17,
+      "time_start": 51.0,
+      "time_end": 54.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.31351423263549805,
+      "pt_probs": {
+        "beeping": 0.2646856904029846,
+        "clicking": 0.2104220688343048,
+        "normal": 0.21137799322605133,
+        "scratching": 0.31351423263549805
+      },
+      "onnx_pred": "scratching",
+      "onnx_conf": 0.29752787947654724,
+      "onnx_probs": {
+        "beeping": 0.29299649596214294,
+        "clicking": 0.1918792575597763,
+        "normal": 0.2175963968038559,
+        "scratching": 0.29752787947654724
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 18,
+      "time_start": 54.0,
+      "time_end": 57.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.2881884276866913,
+      "pt_probs": {
+        "beeping": 0.28206342458724976,
+        "clicking": 0.21187753975391388,
+        "normal": 0.21787062287330627,
+        "scratching": 0.2881884276866913
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.35155102610588074,
+      "onnx_probs": {
+        "beeping": 0.35155102610588074,
+        "clicking": 0.19003252685070038,
+        "normal": 0.23177282512187958,
+        "scratching": 0.2266436219215393
+      }
+    },
+    {
+      "phase": "mixed",
+      "chunk_idx": 19,
+      "time_start": 57.0,
+      "time_end": 60.0,
+      "pt_pred": "scratching",
+      "pt_conf": 0.2914583384990692,
+      "pt_probs": {
+        "beeping": 0.27556663751602173,
+        "clicking": 0.21458585560321808,
+        "normal": 0.2183891236782074,
+        "scratching": 0.2914583384990692
+      },
+      "onnx_pred": "beeping",
+      "onnx_conf": 0.3324759602546692,
+      "onnx_probs": {
+        "beeping": 0.3324759602546692,
+        "clicking": 0.19158139824867249,
+        "normal": 0.23189526796340942,
+        "scratching": 0.24404744803905487
+      }
+    }
+  ]
+}

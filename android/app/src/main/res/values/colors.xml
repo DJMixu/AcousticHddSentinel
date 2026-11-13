@@ -16,6 +16,8 @@
     <color name="status_fault_text">#B91C1C</color>
     <color name="status_warning_bg">#FEF3C7</color>
     <color name="status_warning_text">#B45309</color>
+    <color name="status_ambient_bg">#E2E8F0</color>
+    <color name="status_ambient_text">#475569</color>
 
     <!-- Kolory wykresów klas -->
     <color name="color_normal">#22C55E</color>

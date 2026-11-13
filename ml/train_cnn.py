@@ -186,6 +186,11 @@ def run_training(
     patience: int = 8,
     device_name: Optional[str] = None
 ):
+    torch.manual_seed(777)
+    np.random.seed(777)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(777)
+
     print("=" * 70)
     print("TRENING MODELU 2D CNN W PYTORCH (ACOUSTIC HDD SENTINEL)")
     print("=" * 70)

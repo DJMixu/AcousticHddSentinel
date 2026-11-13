@@ -230,23 +230,34 @@ public class MainActivity extends AppCompatActivity {
 
         binding.cardResult.setVisibility(View.VISIBLE);
         binding.tvResultHddName.setText(model.getHddName());
-        binding.tvResultClass.setText(model.getPredictedClass().toUpperCase(Locale.US));
 
         if (model.hasAnomaly()) {
             binding.ivResultIcon.setImageResource(R.drawable.ic_warning);
             binding.tvResultBadge.setText("AWARIA");
             binding.tvResultBadge.setBackground(ContextCompat.getDrawable(this, R.drawable.bg_badge_anomaly));
             binding.tvResultBadge.setTextColor(ContextCompat.getColor(this, R.color.status_fault_text));
+            binding.tvResultClass.setText(formatFaultClassName(model.getPredictedClass()));
+            binding.tvResultConfidence.setText(String.format(Locale.US,
+                "Pewność: %.1f%% (czas inferencji: %d ms)",
+                model.getConfidence() * 100.0f, result.getInferenceTimeMs()));
+        } else if ("ambient".equalsIgnoreCase(model.getPredictedClass())) {
+            binding.ivResultIcon.setImageResource(R.drawable.ic_info);
+            binding.tvResultBadge.setText("BRAK OBECNOŚCI DYSKU");
+            binding.tvResultBadge.setBackground(ContextCompat.getDrawable(this, R.drawable.bg_badge_ambient));
+            binding.tvResultBadge.setTextColor(ContextCompat.getColor(this, R.color.status_ambient_text));
+            binding.tvResultClass.setText("SZUM TŁA / INNE URZĄDZENIE");
+            binding.tvResultConfidence.setText("Brak harmonicznych obrotów silnika 5400/7200 RPM");
         } else {
             binding.ivResultIcon.setImageResource(R.drawable.ic_check_circle);
-            binding.tvResultBadge.setText("SPRAWNY");
+            binding.tvResultBadge.setText("DYSK SPRAWNY");
             binding.tvResultBadge.setBackground(ContextCompat.getDrawable(this, R.drawable.bg_badge_normal));
             binding.tvResultBadge.setTextColor(ContextCompat.getColor(this, R.color.status_normal_text));
+            String rpmInfo = result.getDetectedRpm() != null ? " (" + result.getDetectedRpm() + ")" : "";
+            binding.tvResultClass.setText("PROFIL PRAWIDŁOWY" + rpmInfo);
+            binding.tvResultConfidence.setText(String.format(Locale.US,
+                "Pewność: %.1f%% (czas inferencji: %d ms)",
+                model.getConfidence() * 100.0f, result.getInferenceTimeMs()));
         }
-
-        binding.tvResultConfidence.setText(String.format(Locale.US,
-            "Pewność: %.1f%% (czas inferencji: %d ms)",
-            model.getConfidence() * 100.0f, result.getInferenceTimeMs()));
 
         binding.tvResultRecommendation.setText(result.getRecommendation());
 
@@ -316,5 +327,15 @@ public class MainActivity extends AppCompatActivity {
         builder.setPositiveButton("Zamknij", null)
             .setNeutralButton("Usuń wpis", (dialog, which) -> viewModel.deleteHistoryItem(item))
             .show();
+    }
+
+    private static String formatFaultClassName(String rawClass) {
+        if (rawClass == null) return "NIEZNANA AWARIA";
+        switch (rawClass.toLowerCase(Locale.US)) {
+            case "clicking": return "STUKANIE GŁOWIC (CLICK OF DEATH)";
+            case "beeping": return "ZABLOKOWANE WRZECIONO (STICTION)";
+            case "scratching": return "TARCIE GŁOWIC O TALERZ (HEAD CRASH)";
+            default: return rawClass.toUpperCase(Locale.US);
+        }
     }
 }

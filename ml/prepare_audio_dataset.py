@@ -16,6 +16,7 @@ Główne zadania:
 
 import os
 import sys
+import json
 import shutil
 from pathlib import Path
 import numpy as np
@@ -37,8 +38,11 @@ RAW_NORTHWIND_DIR = DATA_RAW_DIR / "northwind"
 RAW_ADDITIONAL_DIR = DATA_RAW_DIR / "additional"
 RAW_AESON_DIR = DATA_RAW_DIR / "aesonlabs"
 RAW_VERIFIED_DIR = DATA_RAW_DIR / "verified_real"
+RAW_FREESOUND_DIR = DATA_RAW_DIR / "freesound_hdd"
+RAW_INDEPENDENT_DIR = DATA_RAW_DIR / "independent_web_hdd"
 RAW_AMBIENT_DIR = DATA_RAW_DIR / "computer_ambient"
 RAW_OUTLIERS_DIR = DATA_RAW_DIR / "outliers_oe"
+STUDY_RECORDINGS_DIR = PROJECT_ROOT / "tests" / "recordings_4min_study"
 CATEGORIZED_DIR = Path("dataset_categorized")
 
 
@@ -146,6 +150,35 @@ def categorize_real_files(output_dir: Path = CATEGORIZED_DIR):
     for c in ["clicking", "beeping", "scratching", "normal"]:
         (output_dir / c).mkdir(parents=True, exist_ok=True)
 
+    # 1. Wczytanie metadanych z independent_web_hdd
+    indep_metadata = {}
+    indep_meta_path = RAW_INDEPENDENT_DIR / "metadata.json"
+    if indep_meta_path.exists():
+        try:
+            with open(indep_meta_path, "r", encoding="utf-8") as f:
+                raw_meta = json.load(f)
+                for k, v in raw_meta.items():
+                    target_file = v.get("file")
+                    hint = v.get("category_hint")
+                    if target_file and hint:
+                        indep_metadata[target_file] = hint
+        except Exception as e:
+            print(f"[Ostrzeżenie] Nie udało się wczytać metadata.json dla independent_web_hdd: {e}")
+
+    # 2. Wczytanie wyników VAD mowy dla freesound_hdd (odrzucenie plików ze speech_pct > 5.0%)
+    speech_rejected_files = set()
+    vad_path = RAW_FREESOUND_DIR / "speech_vad_results.json"
+    if vad_path.exists():
+        try:
+            with open(vad_path, "r", encoding="utf-8") as f:
+                vad_meta = json.load(f)
+                for item in vad_meta.values():
+                    if item.get("speech_pct", 0.0) > 5.0 and item.get("file"):
+                        speech_rejected_files.add(item["file"])
+            print(f"Odrzucono {len(speech_rejected_files)} plików z mową ludzką (speech_pct > 5.0%) z freesound_hdd.")
+        except Exception as e:
+            print(f"[Ostrzeżenie] Błąd podczas wczytywania speech_vad_results.json: {e}")
+
     candidate_files = []
     # 1. Northwind
     if RAW_NORTHWIND_DIR.exists():
@@ -161,8 +194,21 @@ def categorize_real_files(output_dir: Path = CATEGORIZED_DIR):
         for vf in RAW_VERIFIED_DIR.glob("*.*"):
             if vf.suffix.lower() in [".wav", ".ogg", ".mp3"]:
                 candidate_files.append(vf)
+    # 5. Zewnętrzne nagrania Freesound HDD (z odrzuceniem mowy ludzkiej)
+    if RAW_FREESOUND_DIR.exists():
+        for ff in RAW_FREESOUND_DIR.glob("*.*"):
+            if ff.suffix.lower() in [".wav", ".ogg", ".mp3"]:
+                if ff.name in speech_rejected_files:
+                    print(f"  [VAD Mowy Odrzucono] {ff.name}")
+                    continue
+                candidate_files.append(ff)
+    # 6. Zewnętrzne nagrania Independent Web HDD
+    if RAW_INDEPENDENT_DIR.exists():
+        for iwf in RAW_INDEPENDENT_DIR.glob("*.*"):
+            if iwf.suffix.lower() in [".wav", ".ogg", ".mp3"]:
+                candidate_files.append(iwf)
 
-    print(f"Znaleziono {len(candidate_files)} plików źródłowych.")
+    print(f"Znaleziono {len(candidate_files)} plików źródłowych do kategoryzacji.")
     counts = {"scratching": 0, "beeping": 0, "clicking": 0, "normal": 0}
 
     specific_overrides = {
@@ -170,27 +216,69 @@ def categorize_real_files(output_dir: Path = CATEGORIZED_DIR):
         "wd_500gb_bad_bearings.mp3": "beeping",
         "ibm_40gb_bad_heads_rattles_squeals.mp3": "scratching",
         "Aesonlabs Data Recovery_Seagate 8TB Clicking Due To Scratches ST8000DM004.wav": "clicking",
-        # Nowe zweryfikowane nagrania autentyczne
         "TOSHIBA_HDWR480_7200rpm_healthy_spinup.wav": "normal",
         "Seagate_ST3250823A_7200rpm_healthy_seek.ogg": "normal",
         "WD102AA_Scratched_area_read_retries.ogg": "scratching",
         "WD_bad_heads_click_of_death.ogg": "clicking",
+        "wd6400aals.mp3": "clicking",
+        "WD5000AAKS.mp3": "clicking",
+        "WDRaptorX.mp3": "clicking",
+        "WD800_Motor_Heads.mp3": "clicking",
+        "ecc-seagate-500-A78103.mp3": "scratching",
+        "freesound_86744_admirals_experience_with_western_digital.wav": "clicking",
+        "freesound_90869_broken_harddrive_wav.wav": "clicking",
+        "freesound_90957_Dying_Hard_Drive_wav.wav": "clicking",
+        "freesound_71929_ns_hardrive_wav.wav": "clicking",
+        "freesound_860383_HARD_DRIVE_FAILURE-1.wav": "clicking",
+        "freesound_378913_Failing_Hard_Drive.wav": "clicking",
+        "freesound_840484_Hard_Disk_Drive_Mechanical_Failure.wav": "clicking",
+        "freesound_272341_0__Hard_Drives_Found_Failing__wav.wav": "clicking",
+        "freesound_569970_Broken_iPod_1_8_quot__Hard_Drive_tries_t.wav": "clicking",
+        "freesound_804471_disk_drive_failing.wav": "clicking",
+        "freesound_840282_Broken_Hard_Drive_turning_off.wav": "clicking",
+        "freesound_205512_Broken_Hard_Drive.wav": "clicking",
+        "freesound_529757_hd-com-defeito_wav.wav": "clicking",
+        "freesound_149220_WD_Protege_BB_-_5400rpm_-_BB.wav": "clicking",
+        "freesound_563344_Skreechy_hard_drive.wav": "scratching",
+        "freesound_272346_fujitsu_20gb_bad_media_scratches_mp3.wav": "scratching",
+        "freesound_562411_Hard_drive_read_failure_beep_StoreJet_Tr.wav": "beeping",
+        "freesound_443025_Hard_Drive_Beep.wav": "beeping",
+        "freesound_272343_hitachi_1_click_with_beep_mp3.wav": "beeping",
+        "freesound_273736_computer_startup_wav.wav": "normal",
+        "freesound_353240_Dell_Dimension_L600r.wav": "normal",
+        "freesound_262872_Electronic__Computer__Hard_Drive_-_1990s.wav": "normal",
+        "freesound_114172_MTrk_Internal_Hard_Drive_Defrag_Clicks_C.wav": "normal",
+        "freesound_114173_MTrk_Internal_Hard_Drive_Defrag_Clicks_C.wav": "normal",
+        "freesound_114174_MTrk_Internal_Hard_Drive_Defrag_Clicks_C.wav": "normal",
+        "freesound_570733_computer_hard_drive_access_fan_click_wav.wav": "normal",
+        "freesound_144006_remix_3_of_143917__klerrp__fujitsu-mhv22.wav": "normal",
+        "freesound_116033_Caviar_32500-W_wav.wav": "normal",
+        "freesound_251549_R05_0037_mp3.wav": "normal",
     }
 
+    skipped_count = 0
     for p in tqdm(candidate_files, desc="Kategoryzacja audio"):
         fname = p.name
         nl = fname.lower()
 
+        cls = None
         if fname in specific_overrides:
             cls = specific_overrides[fname]
-        elif any(k in nl for k in ["spinup", "healthy", "spin_normal"]):
+        elif fname in indep_metadata and indep_metadata[fname]:
+            cls = indep_metadata[fname]
+        elif any(k in nl for k in ["spinup", "healthy", "spin_normal", "idle", "read", "write", "defrag", "access", "hum", "spinning", "spindown"]):
             cls = "normal"
-        elif any(k in nl for k in ["surface", "scratch", "ring", "grinding", "drilling", "screech", "bad_media", "bad_sectors"]):
+        elif any(k in nl for k in ["surface", "scratch", "ring", "grinding", "drilling", "screech", "bad_media", "bad_sectors", "skreechy", "rattle", "scratched"]):
             cls = "scratching"
-        elif any(k in nl for k in ["stiction", "spindle", "lock", "siren", "melody", "buzzing", "beep"]):
+        elif any(k in nl for k in ["stiction", "spindle", "lock", "siren", "melody", "buzzing", "beep", "nospin", "buzz"]):
             cls = "beeping"
-        else:
+        elif any(k in nl for k in ["click", "heads", "head", "knock", "clunk", "sweep", "preamp", "dying", "death", "failing", "broken", "failure", "defeito", "batendo", "clicks"]):
             cls = "clicking"
+        else:
+            # Bezpieczne pominięcie niejednoznacznych nagrań (usunięto niebezpieczny fallback else: cls = 'clicking')
+            print(f"  [Ostrzeżenie: pomijam niesklasyfikowany plik] {fname}")
+            skipped_count += 1
+            continue
 
         dest = output_dir / cls / fname
         
@@ -205,6 +293,9 @@ def categorize_real_files(output_dir: Path = CATEGORIZED_DIR):
             print(f"  [Błąd wczytywania] {p}: {e}")
             shutil.copy2(p, dest)
             counts[cls] += 1
+
+    if skipped_count > 0:
+        print(f"Pominięto łącznie {skipped_count} niejednoznacznych lub nie-HDD plików.")
 
     # 5. Dołączenie nagrań wentylatorów komputera do klasy 'normal'
     if RAW_AMBIENT_DIR.exists():
@@ -230,6 +321,32 @@ def categorize_real_files(output_dir: Path = CATEGORIZED_DIR):
                 counts["normal"] += 1
             except Exception as e:
                 print(f"  [Błąd wczytywania OE] {oef}: {e}")
+
+    # 7. Dołączenie autentycznych nagrań zdrowych dysków z badań 4-minutowych (Toshiba, WD, Seagate, HGST)
+    if STUDY_RECORDINGS_DIR.exists():
+        print("\nDołączanie reprezentatywnych wycinków zdrowych dysków z tests/recordings_4min_study/...")
+        for drive in ["HGST", "Seagate", "Toshiba", "WD"]:
+            drive_dir = STUDY_RECORDINGS_DIR / drive
+            if not drive_dir.exists():
+                continue
+            for phase in ["idle", "read", "write", "mixed"]:
+                matches = list(drive_dir.glob(f"*{phase}*.wav"))
+                for mf in matches:
+                    try:
+                        y, sr = librosa.load(str(mf), sr=TARGET_SR)
+                        y_boosted = check_and_boost_audio(y)
+                        len_24s = int(24.0 * TARGET_SR)
+                        if len(y_boosted) >= len_24s * 2:
+                            part1 = y_boosted[:len_24s]
+                            part2 = y_boosted[len_24s:len_24s * 2]
+                            sf.write(str(output_dir / "normal" / f"study_{drive}_{phase}_part1.wav"), part1, TARGET_SR, subtype="PCM_16")
+                            sf.write(str(output_dir / "normal" / f"study_{drive}_{phase}_part2.wav"), part2, TARGET_SR, subtype="PCM_16")
+                            counts["normal"] += 2
+                        else:
+                            sf.write(str(output_dir / "normal" / f"study_{drive}_{phase}.wav"), y_boosted, TARGET_SR, subtype="PCM_16")
+                            counts["normal"] += 1
+                    except Exception as e:
+                        print(f"  [Błąd wczytywania study recording] {mf}: {e}")
 
     print("\nPodsumowanie kategoryzacji zbioru danych:")
     for c, cnt in counts.items():

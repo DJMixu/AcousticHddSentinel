@@ -75,6 +75,7 @@ def run_tests():
         "ml/prepare_audio_dataset.py",
         "tests/verify_cnn_model.py",
         "tests/profile_normalization_quality.py",
+        "tests/stress_test_vram.py",
     ]
     all_ast_ok = True
     for s in scripts:

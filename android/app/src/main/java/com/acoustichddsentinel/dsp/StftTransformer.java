@@ -12,6 +12,12 @@ public final class StftTransformer {
     private final int numFftBins; // 1 + nFft / 2 = 513
     private final float[] hannWindow;
 
+    // Prealokowane bufory robocze eliminujące narzut Garbage Collectora (AUD-06)
+    private final float[] preallocatedPadded;
+    private final float[] preallocatedReal;
+    private final float[] preallocatedImag;
+    private final float[][] preallocatedPower;
+
     public StftTransformer(int nFft, int hopLength) {
         this.nFft = nFft;
         this.hopLength = hopLength;
@@ -22,6 +28,12 @@ public final class StftTransformer {
         for (int i = 0; i < nFft; i++) {
             hannWindow[i] = 0.5f * (1.0f - (float) Math.cos(2.0 * Math.PI * i / nFft));
         }
+
+        int standardPaddedLen = DspConstants.CHUNK_SAMPLES + nFft;
+        this.preallocatedPadded = new float[standardPaddedLen];
+        this.preallocatedReal = new float[nFft];
+        this.preallocatedImag = new float[nFft];
+        this.preallocatedPower = new float[numFftBins][DspConstants.TIME_STEPS];
     }
 
     public StftTransformer() {
@@ -38,9 +50,10 @@ public final class StftTransformer {
         int pad = nFft / 2; // 512
         int signalLen = signal.length;
         int paddedLen = signalLen + 2 * pad;
+        boolean usePrealloc = (signalLen == DspConstants.CHUNK_SAMPLES);
 
         // Dopełnienie symetryczne (reflect padding) - zgodne z librosa center=True
-        float[] padded = new float[paddedLen];
+        float[] padded = usePrealloc ? preallocatedPadded : new float[paddedLen];
         // Środek
         System.arraycopy(signal, 0, padded, pad, signalLen);
         // Lewe odbicie (indeksy 1, 2, ... pad)
@@ -61,10 +74,12 @@ public final class StftTransformer {
         }
 
         int numFrames = (paddedLen - nFft) / hopLength + 1; // 259 ramek dla 66150 próbek
-        float[][] powerSpectrogram = new float[numFftBins][numFrames];
+        float[][] powerSpectrogram = (usePrealloc && numFrames == DspConstants.TIME_STEPS)
+                ? preallocatedPower
+                : new float[numFftBins][numFrames];
 
-        float[] real = new float[nFft];
-        float[] imag = new float[nFft];
+        float[] real = usePrealloc ? preallocatedReal : new float[nFft];
+        float[] imag = usePrealloc ? preallocatedImag : new float[nFft];
 
         for (int frameIdx = 0; frameIdx < numFrames; frameIdx++) {
             int offset = frameIdx * hopLength;

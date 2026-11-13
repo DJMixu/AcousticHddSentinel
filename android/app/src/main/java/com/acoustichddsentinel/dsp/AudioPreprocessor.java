@@ -17,6 +17,8 @@ public final class AudioPreprocessor {
 
     private final StftTransformer stftTransformer;
     private final MelFilterBank melFilterBank;
+    private final float[] preallocatedChunk;
+    private final float[] preallocatedFlatTensor;
 
     // Współczynniki jądra Savitzky-Golay dla 2. pochodnej (wielomian st. 2, szerokość 9)
     // Numeratory: [28, 7, -8, -17, -20, -17, -8, 7, 28] / 462.0
@@ -35,6 +37,8 @@ public final class AudioPreprocessor {
     public AudioPreprocessor() {
         this.stftTransformer = new StftTransformer();
         this.melFilterBank = new MelFilterBank();
+        this.preallocatedChunk = new float[DspConstants.CHUNK_SAMPLES];
+        this.preallocatedFlatTensor = new float[DspConstants.TENSOR_FLAT_SIZE];
     }
 
     /**
@@ -43,9 +47,18 @@ public final class AudioPreprocessor {
      * @param rawSamples surowe próbki audio float z mikrofonu
      * @return spłaszczony bufor float[] o długości 99456 (format [1, 3, 128, 259])
      */
-    public float[] processAudioChunkToFlatTensor(float[] rawSamples) {
+    public synchronized float[] processAudioChunkToFlatTensor(float[] rawSamples) {
         // 1. Dopasowanie długości do dokładnie CHUNK_SAMPLES (66150)
-        float[] chunk = prepareFixedChunk(rawSamples, DspConstants.CHUNK_SAMPLES);
+        float[] chunk;
+        if (rawSamples != null && rawSamples.length == DspConstants.CHUNK_SAMPLES) {
+            System.arraycopy(rawSamples, 0, preallocatedChunk, 0, DspConstants.CHUNK_SAMPLES);
+            chunk = preallocatedChunk;
+        } else {
+            chunk = prepareFixedChunk(rawSamples, DspConstants.CHUNK_SAMPLES);
+        }
+
+        // 1b. Soft Pre-Amp: łagodne wzmocnienie programowe dla cichych nagrań
+        chunk = checkAndBoostAudio(chunk, DspConstants.TARGET_BOOST_RMS);
 
         // 2. Normalizacja szczytowa fali (Peak Normalization) do [-1.0, 1.0] z usunięciem DC offsetu
         normalizeWaveformPeak(chunk);
@@ -57,13 +70,13 @@ public final class AudioPreprocessor {
         float[][] delta1 = computeDelta1(logMel);
         float[][] delta2 = computeDelta2(logMel);
 
-        // 5. Standaryzacja Z-score osobno dla każdego kanału
-        normalizeChannelZScore(logMel);
-        normalizeChannelZScore(delta1);
-        normalizeChannelZScore(delta2);
+        // 5. Standaryzacja Z-score z fizycznymi progami minimalnego odchylenia standardowego (Noise Floor)
+        normalizeChannelZScore(logMel, DspConstants.MIN_STD_LOG_MEL);
+        normalizeChannelZScore(delta1, DspConstants.MIN_STD_DELTA);
+        normalizeChannelZScore(delta2, DspConstants.MIN_STD_DELTA_DELTA);
 
         // 6. Spłaszczenie do bufora NCHW: Channel 0 (Mel), Channel 1 (Delta), Channel 2 (Delta-Delta)
-        float[] flatTensor = new float[DspConstants.TENSOR_FLAT_SIZE];
+        float[] flatTensor = preallocatedFlatTensor;
         int numMels = DspConstants.N_MELS;
         int timeSteps = DspConstants.TIME_STEPS;
         int channelStride = numMels * timeSteps;
@@ -275,6 +288,14 @@ public final class AudioPreprocessor {
      * (x - mean) / std z zabezpieczeniem epsilon.
      */
     public static void normalizeChannelZScore(float[][] channel) {
+        normalizeChannelZScore(channel, DspConstants.EPSILON);
+    }
+
+    /**
+     * Standaryzacja Z-score z konfigurowalnym progiem minimalnego odchylenia standardowego (minStd).
+     * Zapobiega nadmiernemu wzmacnianiu mikroszumów tła w kanałach różniczkowych (Delta/Delta-Delta).
+     */
+    public static void normalizeChannelZScore(float[][] channel, float minStd) {
         int rows = channel.length;
         int cols = channel[0].length;
         int total = rows * cols;
@@ -295,8 +316,9 @@ public final class AudioPreprocessor {
             }
         }
         float std = (float) Math.sqrt(sumSq / total);
-        if (std < DspConstants.EPSILON) {
-            std = DspConstants.EPSILON;
+        float floor = Math.max(minStd, DspConstants.EPSILON);
+        if (std < floor) {
+            std = floor;
         }
 
         for (int r = 0; r < rows; r++) {
@@ -304,5 +326,88 @@ public final class AudioPreprocessor {
                 channel[r][c] = (channel[r][c] - mean) / std;
             }
         }
+    }
+
+    /**
+     * Wzmacnia ciche nagrania (RMS < 0.002), aby uniknąć odrzucenia przez bramkę DSP,
+     * analogicznie do potoku trenowania w prepare_audio_dataset.py.
+     */
+    public static float[] checkAndBoostAudio(float[] waveform, float targetRms) {
+        if (waveform == null || waveform.length == 0) return waveform;
+        float rms = computeRms(waveform);
+        if (rms >= DspConstants.RMS_SILENCE_THRESHOLD && rms < DspConstants.RMS_QUIET_BOOST_THRESHOLD) {
+            float gain = targetRms / rms;
+            gain = Math.min(gain, 40.0f); // Ograniczenie maksymalnego wzmocnienia do +32 dB
+            float[] boosted = new float[waveform.length];
+            for (int i = 0; i < waveform.length; i++) {
+                boosted[i] = waveform[i] * gain;
+            }
+            return boosted;
+        }
+        return waveform;
+    }
+
+    /**
+     * Weryfikuje na podstawie fizyki akustycznej, czy analizowany wycinek dźwiękowy reprezentuje
+     * jednostajny szum aerodynamiczny (wentylator PC, cooler procesora/karty graficznej, oczyszczacz powietrza),
+     * który nie może być klasyfikowany jako mechaniczne klikanie głowicy HDD.
+     */
+    public static boolean isAerodynamicFanNoise(float[] waveform, float crestFactor, float[][] logMelSpectrogram) {
+        if (waveform == null || waveform.length < 1024) return false;
+
+        // 1. Warunek braku ostrych uderzeń mechanicznych (Click of Death ma CF > 3.5, typowo 6.0 - 15.0)
+        if (crestFactor > 4.2f) {
+            return false;
+        }
+
+        // 2. Kurtoza fali czasowej (gaussowski szum przepływu powietrza ma kurtozę ~3.0, a klikanie > 6.0)
+        double sum = 0.0;
+        for (float s : waveform) sum += s;
+        double mean = sum / waveform.length;
+        double m2 = 0.0, m4 = 0.0;
+        for (float s : waveform) {
+            double d = s - mean;
+            m2 += d * d;
+            m4 += d * d * d * d;
+        }
+        double variance = m2 / waveform.length;
+        double kurtosis = variance > 1e-12 ? (m4 / waveform.length) / (variance * variance) : 3.0;
+
+        if (kurtosis > 5.5) {
+            return false;
+        }
+
+        // 3. Nachylenie widma (szum aerodynamiczny opada ze wzrostem częstotliwości: 1/f)
+        if (logMelSpectrogram != null && logMelSpectrogram.length >= 128) {
+            float lowEnergySum = 0.0f;
+            int lowCount = 0;
+            // Pasmo niskie/średnie: filtry 5 - 35 (ok. 100 - 1500 Hz)
+            for (int m = 5; m <= 35; m++) {
+                for (int t = 0; t < logMelSpectrogram[m].length; t++) {
+                    lowEnergySum += logMelSpectrogram[m][t];
+                    lowCount++;
+                }
+            }
+            float avgLow = lowCount > 0 ? lowEnergySum / lowCount : 0.0f;
+
+            float highEnergySum = 0.0f;
+            int highCount = 0;
+            // Pasmo wysokie: filtry 80 - 120 (ok. 4000 - 9000 Hz)
+            for (int m = 80; m <= 120; m++) {
+                for (int t = 0; t < logMelSpectrogram[m].length; t++) {
+                    highEnergySum += logMelSpectrogram[m][t];
+                    highCount++;
+                }
+            }
+            float avgHigh = highCount > 0 ? highEnergySum / highCount : 0.0f;
+
+            // Szum powietrza ma wyraźną dominację energii w niskim paśmie
+            float spectralDropDb = avgLow - avgHigh;
+            if (spectralDropDb > 12.0f && crestFactor < 3.8f) {
+                return true;
+            }
+        }
+
+        return (crestFactor < 2.8f && kurtosis < 4.0);
     }
 }

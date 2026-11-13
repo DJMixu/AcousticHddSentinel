@@ -35,7 +35,7 @@ class HybridSentinelEngine:
             
         cp = torch.load(model_path, map_location=self.device)
         if "state_dict" in cp:
-            self.model.load_state_dict(cp["state_dict"])
+            self.model.load_state_dict(cp["state_dict"], strict=False)
             self.classes = cp["classes"]
         else:
             self.model.load_state_dict(cp)

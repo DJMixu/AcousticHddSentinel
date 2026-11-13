@@ -1,0 +1,11 @@
+=== RAPORT SMART DYSKU TOSHIBA P300 6TB (HDWD260) ===
+Model: Toshiba P300 6TB (HDWD260)
+Numer seryjny: X481S3JNS5FH
+Prędkość obrotowa: 5400 RPM
+Format: 3.5 cala
+Czas pracy: 2525 godzin
+Temperatura: 18°C
+Status ogólny: SPRAWNY (PASSED)
+
+ID#  NAZWA ATRYBUTU               VALUE WORST THRESH RAW VALUE
+----------------------------------------------------------------------

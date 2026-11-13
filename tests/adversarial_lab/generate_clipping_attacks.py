@@ -280,9 +280,9 @@ class AudioAttackEvaluator:
         tensor = encode_audio_chunk(chunk, sr=sr)
         tensor_cf = np.transpose(tensor, (2, 0, 1))[np.newaxis, ...].astype(np.float32)
 
-        raw_logits = self.session.run(None, {self.input_name: tensor_cf})[0]
-        exp_logits = np.exp(raw_logits - np.max(raw_logits))
-        raw_probs = (exp_logits / np.sum(exp_logits))[0]
+        onnx_outputs = self.session.run(None, {self.input_name: tensor_cf})[0]
+        # Model ONNX posiada już końcową warstwę Softmax (wraz z bramką OOD)
+        raw_probs = np.squeeze(onnx_outputs, axis=0)
 
         raw_pred = CLASSES[np.argmax(raw_probs)]
         raw_conf = float(np.max(raw_probs))

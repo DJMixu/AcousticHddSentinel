@@ -1,0 +1,33 @@
+=== RAPORT SMART DYSKU WESTERN DIGITAL (WD5000LPVX) ===
+Model: WD Blue 2.5'' (WDC WD5000LPVX-00V0TT0)
+Numer seryjny: WD-WXD1A24C7866
+Rewizja firmware: 01.01A01
+Pojemność: 500.1 GB (465.8 GiB)
+Prędkość obrotowa: 5400 RPM
+Format: 2.5 cala
+Data odczytu: 2026-11-13 17:30:53
+
+Status ogólny: SPRAWNY (PASSED)
+Liczba uszkodzonych sektorów: 0
+Czas pracy: 14360 godzin (598 dni)
+Aktualna temperatura: 23°C
+
+ID#  NAZWA ATRYBUTU               VALUE WORST THRESH RAW VALUE      INTERPRETACJA
+-------------------------------------------------------------------------------------
+   1 raw-read-error-rate            200   200     51              0 OK
+   3 spin-up-time                   152   148     21           1383 
+   4 start-stop-count               100   100      0            213 
+   5 reallocated-sector-count       200   200    140              0 OK (Zero realokacji)
+   7 seek-error-rate                200   200      0              0 
+   9 power-on-hours                  81    81      0    51696000000 14360 godz. pracy
+  10 spin-retry-count               100   100      0              0 
+  11 calibration-retry-count        100   253      0              0 
+  12 power-cycle-count              100   100      0             71 
+ 192 power-off-retract-count        200   200      0             57 
+ 193 load-cycle-count                 1     1      0         890464 890464 cykli parkowania głowic
+ 194 temperature-celsius-2          119    94      0         297150 23°C
+ 196 reallocated-event-count        200   200      0              0 
+ 197 current-pending-sector         200   200      0              0 OK (Brak niestabilnych sektorów)
+ 198 offline-uncorrectable          100   253      0              0 OK (Brak niekorygowalnych błędów)
+ 199 udma-crc-error-count           200   200      0              0 OK
+ 200 multi-zone-error-rate          100   253      0              0 

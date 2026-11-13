@@ -49,8 +49,23 @@ public final class DspConstants {
     /** Szerokość okna różniczkowego dla wyznaczania kanałów Delta i Delta-Delta. */
     public static final int DELTA_WIDTH = 9;
 
-    /** Próg bramki ciszy (RMS Gate) - wartości poniżej oznaczają brak kontaktu z dyskiem. */
-    public static final float RMS_SILENCE_THRESHOLD = 0.002f;
+    /** Próg bramki ciszy (RMS Gate) - wartości poniżej oznaczają brak kontaktu z dyskiem lub całkowitą ciszę. */
+    public static final float RMS_SILENCE_THRESHOLD = 0.0004f;
+
+    /** Próg energii, poniżej którego aktywowane jest programowe podbicie cichych nagrań. */
+    public static final float RMS_QUIET_BOOST_THRESHOLD = 0.005f;
+
+    /** Docelowy poziom RMS po automatycznym wzmocnieniu cichego sygnału. */
+    public static final float TARGET_BOOST_RMS = 0.025f;
+
+    /** Fizyczny próg minimalnej wariancji dynamicznej (Noise Floor) dla kanału 0 (Log-Mel w dB). */
+    public static final float MIN_STD_LOG_MEL = 1.0f;
+
+    /** Fizyczny próg minimalnej wariancji dynamicznej (Noise Floor) dla kanału 1 (Delta transjentów). */
+    public static final float MIN_STD_DELTA = 0.15f;
+
+    /** Fizyczny próg minimalnej wariancji dynamicznej (Noise Floor) dla kanału 2 (Delta-Delta dynamiki). */
+    public static final float MIN_STD_DELTA_DELTA = 0.08f;
 
     /** Zakres dynamiki w skali dB (top_db w librosa.power_to_db). */
     public static final float TOP_DB = 80.0f;

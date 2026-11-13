@@ -1,10 +1,10 @@
               precision    recall  f1-score   support
 
-     beeping     0.6000    0.1364    0.2222        22
-    clicking     0.6567    0.6567    0.6567        67
-      normal     0.8958    1.0000    0.9451        43
-  scratching     0.2571    0.3913    0.3103        23
+     beeping     0.2121    0.2800    0.2414        25
+    clicking     0.4839    0.7229    0.5797        83
+      normal     0.7990    0.8659    0.8311       179
+  scratching     0.1429    0.0141    0.0256        71
 
-    accuracy                         0.6387       155
-   macro avg     0.6024    0.5461    0.5336       155
-weighted avg     0.6557    0.6387    0.6236       155
+    accuracy                         0.6229       358
+   macro avg     0.4095    0.4707    0.4195       358
+weighted avg     0.5548    0.6229    0.5719       358

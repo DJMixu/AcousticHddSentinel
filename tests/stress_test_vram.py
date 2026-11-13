@@ -175,14 +175,13 @@ def run_vram_stress_test(
     total_nan_count = 0
     total_inf_count = 0
 
-    # Rozgrzewka GPU (Warmup & Kompilacja grafu tf.function)
-    print("  -> Rozgrzewka GPU i kompilacja grafu tf.function...")
-    with tf.device(device_name):
-        warmup_batch = gpu_tensor_pool[:batch_size]
-        for _ in range(10):
-            _ = gpu_infer_step(warmup_batch)
+    # Rozgrzewka GPU (Warmup)
+    print("  -> Rozgrzewka GPU...")
+    warmup_batch = gpu_tensor_pool[:batch_size]
+    for _ in range(10):
+        _ = gpu_infer_step(warmup_batch)
 
-    print("  -> Graf tf.function skompilowany na GPU. Rozpoczynanie pętli ciągłej!")
+    print(f"  -> Rozgrzewka GPU na {device} zakończona. Rozpoczynanie pętli ciągłej!")
 
     start_time = time.time()
     last_log_time = start_time
@@ -277,7 +276,7 @@ def run_vram_stress_test(
 
     # Zapis raportu do JSON
     report_dict = {
-        "device": device_name,
+        "device": str(device),
         "batch_size": batch_size,
         "vram_pool_tensors": pool_size,
         "vram_pool_mb": pool_vram_mb,

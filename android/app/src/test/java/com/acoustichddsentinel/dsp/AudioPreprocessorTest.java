@@ -67,10 +67,10 @@ public class AudioPreprocessorTest {
     public void testRmsSilenceThreshold() {
         float[] silence = new float[1000];
         for (int i = 0; i < silence.length; i++) {
-            silence[i] = 0.0005f;
+            silence[i] = 0.0002f;
         }
         float rmsSilence = AudioPreprocessor.computeRms(silence);
-        assertTrue("Cichy sygnał musi być poniżej progu bramki ciszy (0.002)",
+        assertTrue("Cichy sygnał musi być poniżej progu bramki ciszy (0.0004)",
             rmsSilence < DspConstants.RMS_SILENCE_THRESHOLD);
 
         float[] sound = new float[1000];
@@ -78,7 +78,7 @@ public class AudioPreprocessorTest {
             sound[i] = 0.1f;
         }
         float rmsSound = AudioPreprocessor.computeRms(sound);
-        assertTrue("Głośny sygnał musi przekraczać próg bramki ciszy (0.002)",
+        assertTrue("Głośny sygnał musi przekraczać próg bramki ciszy (0.0004)",
             rmsSound > DspConstants.RMS_SILENCE_THRESHOLD);
     }
 

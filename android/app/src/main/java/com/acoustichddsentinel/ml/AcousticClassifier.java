@@ -46,16 +46,22 @@ public class AcousticClassifier implements AutoCloseable {
 
         byte[] modelBytes;
         String loadedName;
+        OrtSession loadedSession = null;
+
         try {
-            modelBytes = readAssetToByteArray(context, MODEL_ASSET_FP32);
-            loadedName = MODEL_ASSET_FP32;
-        } catch (IOException e) {
             modelBytes = readAssetToByteArray(context, MODEL_ASSET_INT8);
+            loadedSession = environment.createSession(modelBytes, options);
             loadedName = MODEL_ASSET_INT8;
+            Log.i(TAG, "Pomyślnie załadowano model ONNX INT8: " + loadedName + " (" + modelBytes.length + " bajtów)");
+        } catch (Exception e) {
+            Log.w(TAG, "Nie udało się uruchomić sesji dla modelu INT8 (" + e.getMessage() + "), automatyczny fallback na model bazowy FP32...");
+            modelBytes = readAssetToByteArray(context, MODEL_ASSET_FP32);
+            loadedSession = environment.createSession(modelBytes, options);
+            loadedName = MODEL_ASSET_FP32;
+            Log.i(TAG, "Pomyślnie załadowano model bazowy ONNX FP32: " + loadedName + " (" + modelBytes.length + " bajtów)");
         }
 
-        this.session = environment.createSession(modelBytes, options);
-        Log.i(TAG, "Pomyślnie załadowano model ONNX: " + loadedName + " (" + modelBytes.length + " bajtów)");
+        this.session = loadedSession;
     }
 
     /**

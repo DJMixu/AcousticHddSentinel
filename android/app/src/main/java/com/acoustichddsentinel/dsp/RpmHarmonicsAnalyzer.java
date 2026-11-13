@@ -83,8 +83,8 @@ public class RpmHarmonicsAnalyzer {
         }
         float meanEnergy = totalEnergy / Math.max(1, numBins);
 
-        // 3. Ocena profilu 5400 RPM (f0 = 90 Hz)
-        CombScore score5400 = evaluateComb(avgSpectrum, 90.0f, new float[]{180.0f, 270.0f, 360.0f, 450.0f, 540.0f, 1080.0f});
+        // 3. Ocena profilu 5400 RPM (f0 = 90 Hz) - rozszerzona o harmoniczne biegunów stojana 8x, 9x, 10x
+        CombScore score5400 = evaluateComb(avgSpectrum, 90.0f, new float[]{180.0f, 270.0f, 360.0f, 450.0f, 540.0f, 720.0f, 810.0f, 900.0f, 1080.0f});
 
         // 4. Ocena profilu 7200 RPM (f0 = 120 Hz)
         CombScore score7200 = evaluateComb(avgSpectrum, 120.0f, new float[]{240.0f, 360.0f, 480.0f, 600.0f, 720.0f, 1440.0f});
@@ -109,12 +109,12 @@ public class RpmHarmonicsAnalyzer {
             f0Found = score5400.exactF0Hz;
         }
 
-        // 5. Test pisku zatartego silnika (Stall Beep w paśmie 800 - 3500 Hz)
+        // 5. Test pisku zatartego silnika (Stall Beep w paśmie 1050 - 3500 Hz)
         boolean hasStallBeep = false;
         float stallBeepFreq = 0f;
 
         if (!hasRotation) {
-            int binMin = (int) (800.0f / FREQ_BIN_WIDTH);
+            int binMin = (int) (1050.0f / FREQ_BIN_WIDTH);
             int binMax = Math.min(numBins - 1, (int) (3500.0f / FREQ_BIN_WIDTH));
             float maxPeakVal = 0f;
             int maxPeakBin = -1;
@@ -181,11 +181,12 @@ public class RpmHarmonicsAnalyzer {
         float localBg = bgCount > 0 ? (bgSum / bgCount) : 1e-6f;
         float f0Prominence = maxF0Val / Math.max(1e-6f, localBg);
 
-        // Dopasowanie wyższych harmonicznych
+        // Dopasowanie wyższych harmonicznych (tolerancja adaptacyjna proporcjonalna do częstotliwości)
         int harmonicHits = 0;
         for (float hFreq : harmonics) {
-            int hBinMin = Math.max(0, (int) ((hFreq - 6.0f) / FREQ_BIN_WIDTH));
-            int hBinMax = Math.min(spectrum.length - 1, (int) ((hFreq + 6.0f) / FREQ_BIN_WIDTH));
+            float tol = Math.max(6.0f, hFreq * 0.02f);
+            int hBinMin = Math.max(0, (int) ((hFreq - tol) / FREQ_BIN_WIDTH));
+            int hBinMax = Math.min(spectrum.length - 1, (int) ((hFreq + tol) / FREQ_BIN_WIDTH));
             float maxHVal = 0f;
             for (int b = hBinMin; b <= hBinMax; b++) {
                 if (spectrum[b] > maxHVal) {
@@ -204,13 +205,13 @@ public class RpmHarmonicsAnalyzer {
                 }
             }
             float hBg = hBgCount > 0 ? (hBgSum / hBgCount) : 1e-6f;
-            if (maxHVal / Math.max(1e-6f, hBg) > 1.7f) {
+            if (maxHVal / Math.max(1e-6f, hBg) > 1.6f) {
                 harmonicHits++;
             }
         }
 
         float score = (f0Prominence * 0.4f) + ((float) harmonicHits / harmonics.length * 6.0f);
-        boolean detected = (f0Prominence >= 1.9f && harmonicHits >= 2) || (f0Prominence >= 3.2f && harmonicHits >= 1);
+        boolean detected = (f0Prominence >= 1.6f && harmonicHits >= 2) || (f0Prominence >= 3.0f && harmonicHits >= 1) || (harmonicHits >= 3);
 
         return new CombScore(detected, score, exactF0Hz);
     }

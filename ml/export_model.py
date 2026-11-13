@@ -64,13 +64,17 @@ def export_pipeline(
     checkpoint = torch.load(weights_path, map_location=device)
     if isinstance(checkpoint, dict):
         if "state_dict" in checkpoint:
-            model.load_state_dict(checkpoint["state_dict"])
+            model.load_state_dict(checkpoint["state_dict"], strict=False)
         elif "model_state_dict" in checkpoint:
-            model.load_state_dict(checkpoint["model_state_dict"])
+            model.load_state_dict(checkpoint["model_state_dict"], strict=False)
         else:
-            model.load_state_dict(checkpoint)
+            model.load_state_dict(checkpoint, strict=False)
     else:
-        model.load_state_dict(checkpoint)
+        model.load_state_dict(checkpoint, strict=False)
+
+    if (isinstance(checkpoint, dict) and checkpoint.get("open_set_calibrated", False)) or model.fault_prototypes.abs().sum() > 0:
+        model.use_open_set.copy_(torch.tensor(True, dtype=torch.bool))
+        print("🛡️ Aktywowano wbudowaną bramkę OOD Prototype Rejection (Open-Set Recognition).")
 
     model.eval()
     print("✅ Model PyTorch pomyślnie załadowany w trybie eval.")

@@ -120,7 +120,7 @@ class AcousticHddSentinelCNN(nn.Module):
         # OOD PROTOTYPE REJECTION (Open-Set Recognition wewnątrz sieci)
         # Bufory dla znanych klas uszkodzeń: [beeping (0), clicking (1), scratching (3)]
         # =========================================================================
-        self.use_open_set: bool = False
+        self.register_buffer("use_open_set", torch.tensor(False, dtype=torch.bool))
         self.register_buffer("fault_prototypes", torch.zeros((3, 128), dtype=torch.float32))
         self.register_buffer("fault_thresholds", torch.full((3,), 0.40, dtype=torch.float32))
         self.register_buffer("gamma", torch.tensor(12.0, dtype=torch.float32))
@@ -203,11 +203,8 @@ class AcousticHddSentinelCNN(nn.Module):
         # Klasyfikator
         logits = self.predictions(feat)
 
-        if return_logits:
-            return logits
-
         # OOD Open-Set Rejection w fazie inferencji (działa również natywnie w ONNX!)
-        if self.use_open_set and not self.training:
+        if bool(self.use_open_set.item()) and not self.training:
             # 1. Normalizacja cech L2
             z_norm = F.normalize(dense_feat, p=2, dim=1)
             p_norm = F.normalize(self.fault_prototypes, p=2, dim=1)
@@ -225,8 +222,10 @@ class AcousticHddSentinelCNN(nn.Module):
             zero_pad = torch.zeros_like(b_supp)
 
             full_suppression = torch.cat([b_supp, c_supp, zero_pad, s_supp], dim=1)  # (B, 4)
-            mod_logits = logits + full_suppression
-            return F.softmax(mod_logits, dim=-1)
+            logits = logits + full_suppression
+
+        if return_logits:
+            return logits
 
         if self.num_classes == 1:
             return torch.sigmoid(logits)
@@ -267,7 +266,7 @@ class AcousticHddSentinelCNN(nn.Module):
         self.fault_prototypes.copy_(prototypes)
         self.fault_thresholds.copy_(thresholds)
         self.gamma.copy_(torch.tensor(gamma, dtype=torch.float32))
-        self.use_open_set = True
+        self.use_open_set.fill_(True)
 
     @torch.no_grad()
     def predict_proba(self, x: Union[np.ndarray, torch.Tensor]) -> np.ndarray:

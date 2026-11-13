@@ -25,6 +25,21 @@ public class AudioRecorder {
 
     private static final String TAG = "AudioRecorder";
 
+    // Współczynniki 2-sekcyjnego kaskadowego filtru Butterwortha 4. rzędu (fc = 9500 Hz przy fs = 44100 Hz)
+    // Sekcja 1
+    private static final float B0_1 = 0.058872744f;
+    private static final float B1_1 = 0.11774549f;
+    private static final float B2_1 = 0.058872744f;
+    private static final float A1_1 = -0.22665857f;
+    private static final float A2_1 = 0.051437586f;
+
+    // Sekcja 2
+    private static final float B0_2 = 1.0f;
+    private static final float B1_2 = 2.0f;
+    private static final float B2_2 = 1.0f;
+    private static final float A1_2 = -0.31385655f;
+    private static final float A2_2 = 0.4559369f;
+
     public interface RecordCallback {
         void onProgress(int elapsedMs, int totalMs, float currentRms);
         void onRecordingComplete(List<AudioChunk> chunks, float overallRms);
@@ -94,23 +109,9 @@ public class AudioRecorder {
         }
 
         int bufferSize = Math.max(minBufferSize * 2, 4096);
-        try {
-            audioRecord = new AudioRecord(
-                MediaRecorder.AudioSource.MIC,
-                hardwareSr,
-                channelConfig,
-                audioFormat,
-                bufferSize
-            );
-        } catch (IllegalArgumentException e) {
-            callback.onError("Błąd inicjalizacji AudioRecord: " + e.getMessage());
-            return;
-        }
-
-        if (audioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
+        audioRecord = createAudioRecordWithFallback(hardwareSr, channelConfig, audioFormat, bufferSize);
+        if (audioRecord == null) {
             callback.onError("Nie udało się zainicjalizować mikrofonu sprzętowego.");
-            audioRecord.release();
-            audioRecord = null;
             return;
         }
 
@@ -128,7 +129,7 @@ public class AudioRecorder {
 
             int windowSize = DspConstants.CHUNK_SAMPLES; // 66150 próbek (3.0s)
             int step = windowSize / 2;                   // 33075 próbek (1.5s - 50% overlap)
-            int maxWindows = 5;
+            int maxWindows = Math.max(1, (maxSeconds * 2) - 1);
             int maxCapacity = maxSeconds * targetSr + 16384;
 
             float[] sampleBuffer = new float[maxCapacity];
@@ -141,8 +142,9 @@ public class AudioRecorder {
             List<AudioChunk> evaluatedChunks = new ArrayList<>();
             int nextWindowIndex = 0;
             boolean stoppedEarly = false;
-            boolean hasLeftover = false;
-            float leftover = 0.0f;
+            float s1_1 = 0.0f, s2_1 = 0.0f;
+            float s1_2 = 0.0f, s2_2 = 0.0f;
+            boolean decimateToggle = false;
 
             while (isRecording.get() && (System.currentTimeMillis() - startTime) < maxDurationMs) {
                 int readShorts = audioRecord.read(readBuffer, 0, readBuffer.length);
@@ -150,18 +152,24 @@ public class AudioRecorder {
                     float sumSq = 0.0f;
 
                     if (finalHardwareSr == DspConstants.FALLBACK_SAMPLE_RATE) {
-                        // Decymacja 2:1 z 44100 Hz do 22050 Hz w czasie rzeczywistym
+                        // Antyaliasingowa filtracja Butterwortha 4. rzędu + decymacja 2:1 z 44100 Hz do 22050 Hz
                         for (int i = 0; i < readShorts; i++) {
                             float s = readBuffer[i] / 32768.0f;
                             sumSq += s * s;
-                            if (hasLeftover) {
-                                if (sampleCount < maxCapacity) {
-                                    sampleBuffer[sampleCount++] = 0.5f * (leftover + s);
-                                }
-                                hasLeftover = false;
-                            } else {
-                                leftover = s;
-                                hasLeftover = true;
+
+                            // Kaskada Biquad Sekcja 1
+                            float y1 = B0_1 * s + s1_1;
+                            s1_1 = B1_1 * s - A1_1 * y1 + s2_1;
+                            s2_1 = B2_1 * s - A2_1 * y1;
+
+                            // Kaskada Biquad Sekcja 2
+                            float y2 = B0_2 * y1 + s1_2;
+                            s1_2 = B1_2 * y1 - A1_2 * y2 + s2_2;
+                            s2_2 = B2_2 * y1 - A2_2 * y2;
+
+                            decimateToggle = !decimateToggle;
+                            if (decimateToggle && sampleCount < maxCapacity) {
+                                sampleBuffer[sampleCount++] = y2;
                             }
                         }
                     } else {
@@ -185,8 +193,11 @@ public class AudioRecorder {
                         int start = nextWindowIndex * step;
                         float[] windowSamples = new float[windowSize];
                         System.arraycopy(sampleBuffer, start, windowSamples, 0, windowSize);
-                        float windowRms = AudioPreprocessor.computeRms(windowSamples);
-                        AudioChunk chunk = new AudioChunk(nextWindowIndex, windowSamples, targetSr, windowRms, System.currentTimeMillis());
+
+                        // Automatyczne podbicie cichego sygnału (zgodne z potokiem przygotowania danych)
+                        float[] processedSamples = AudioPreprocessor.checkAndBoostAudio(windowSamples, DspConstants.TARGET_BOOST_RMS);
+                        float windowRms = AudioPreprocessor.computeRms(processedSamples);
+                        AudioChunk chunk = new AudioChunk(nextWindowIndex, processedSamples, targetSr, windowRms, System.currentTimeMillis());
                         evaluatedChunks.add(chunk);
 
                         boolean shouldStopEarly = callback.onWindowReady(nextWindowIndex, chunk);
@@ -297,6 +308,38 @@ public class AudioRecorder {
             } finally {
                 audioRecord = null;
             }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private static AudioRecord createAudioRecordWithFallback(int sampleRate, int channelConfig, int audioFormat, int bufferSize) {
+        int[] audioSources = new int[] {
+            MediaRecorder.AudioSource.UNPROCESSED,
+            MediaRecorder.AudioSource.VOICE_RECOGNITION,
+            MediaRecorder.AudioSource.MIC
+        };
+
+        for (int source : audioSources) {
+            try {
+                AudioRecord record = new AudioRecord(source, sampleRate, channelConfig, audioFormat, bufferSize);
+                if (record.getState() == AudioRecord.STATE_INITIALIZED) {
+                    Log.i(TAG, "AudioRecord zainicjalizowany pomyślnie ze źródłem: " + getSourceName(source) + " (" + sampleRate + " Hz)");
+                    return record;
+                }
+                record.release();
+            } catch (Exception e) {
+                Log.w(TAG, "Próba inicjalizacji AudioRecord ze źródłem " + getSourceName(source) + " nie powiodła się: " + e.getMessage());
+            }
+        }
+        return null;
+    }
+
+    private static String getSourceName(int source) {
+        switch (source) {
+            case MediaRecorder.AudioSource.UNPROCESSED: return "UNPROCESSED";
+            case MediaRecorder.AudioSource.VOICE_RECOGNITION: return "VOICE_RECOGNITION";
+            case MediaRecorder.AudioSource.MIC: return "MIC";
+            default: return String.valueOf(source);
         }
     }
 }

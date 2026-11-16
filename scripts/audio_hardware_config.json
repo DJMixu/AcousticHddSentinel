@@ -1,0 +1,19 @@
+{
+  "description": "Konfiguracja fizycznego mikrofonu i toru audio użytkownika w systemie Linux (PipeWire / PulseAudio)",
+  "active_microphone": {
+    "source_name": "alsa_input.pci-0000_7b_00.6.analog-stereo",
+    "device_description": "Ryzen HD Audio Controller / Realtek ALC1220 Analog (Płyta główna)",
+    "status": "PRIMARY_ACTIVE_MIC",
+    "notes": "Fizyczny mikrofon użytkownika, do którego puszczane są dźwięki testowe i szum. Zawsze używać tego źródła."
+  },
+  "inactive_microphones": [
+    {
+      "source_name": "alsa_input.usb-C-Media_Electronics_Inc._USB_Advanced_Audio_Device-00.analog-stereo",
+      "device_description": "USB Advanced Audio Device",
+      "status": "INACTIVE_OR_HEADSET_DONGLE",
+      "warning": "ZAKAZ UŻYWANIA: Rejestruje szum cyfrowy RMS ~0.00007, to nie jest fizyczny mikrofon użytkownika!"
+    }
+  ],
+  "sample_rate_hz": 22050,
+  "channels": 1
+}

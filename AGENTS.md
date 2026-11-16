@@ -66,6 +66,8 @@ AcousticHddSentinel/
 │
 ├── scripts/                           # 🛠️ Skrypty narzędziowe i orkiestracja lokalnych modeli LLM
 │   ├── install_apk.sh                 # Automatyczna instalacja APK i uruchomienie na telefonie Android
+│   ├── record_mic.sh                  # Skrypt nagrywania z fizycznego mikrofonu (ALC1220 Analog)
+│   ├── audio_hardware_config.json     # Konfiguracja fizycznych źródeł audio w systemie Linux
 │   ├── local_llm_bridge.py            # Most orkiestrujący lokalne modele Ollama (27B + Coder 14B)
 │   ├── start_services.sh              # Skrypt uruchamiania usług Ollama i Open WebUI
 │   └── stop_services.sh               # Skrypt zatrzymywania usług Ollama i Open WebUI
@@ -216,3 +218,30 @@ Agent AGY (Antigravity) posiada pełne uprawnienie i zalecenie do autonomicznego
 3. **Zasady koordynacji:**
    - Subagenci raportują wyniki asynchronicznie poprzez system wiadomości (`send_message`).
    - Agent główny nie polluje w pętli – oczekuje reaktywnie na powiadomienia o zakończeniu prac subagentów.
+
+---
+
+## 8. Niezmiennik Sprzętowy: Konfiguracja Mikrofonu Fizycznego Użytkownika (ZAKAZ POMYŁEK)
+W systemie Linux użytkownika zainstalowane są różne urządzenia wejściowe audio w PipeWire / PulseAudio:
+- **JEDYNY WŁAŚCIWY MIKROFON FIZYCZNY:**
+  `alsa_input.pci-0000_7b_00.6.analog-stereo`
+  (Opis urządzenia: *Ryzen HD Audio Controller / Realtek ALC1220 Analog* na płycie głównej komputera).
+  Do tego złącza podłączony jest fizyczny mikrofon, do którego użytkownik mówi, puszcza dźwięki otoczenia i szum.
+- **BEZWZGLĘDNY ZAKAZ UŻYWANIA:**
+  `alsa_input.usb-C-Media_Electronics_Inc._USB_Advanced_Audio_Device-00.analog-stereo`
+  (Jest to dongle / słuchawki bez podpiętego mikrofonu – rejestruje wyłącznie sztuczny szum cyfrowy o energii RMS ~0.00007).
+  Nigdy nie używać źródła `default` bez uprzedniego upewnienia się, że wskazuje na kartę PCI ALC1220!
+- **Gotowy skrypt rejestracji audio:**
+  Każdy agent nagrywający dźwięk z otoczenia MUSI korzystać z gotowego skryptu lub jawnego źródła:
+  ```bash
+  # Użycie gotowego skryptu:
+  ./scripts/record_mic.sh <czas_w_sekundach> <ścieżka_wyjściowa.wav>
+  
+  # Lub bezpośrednio przez ffmpeg:
+  ffmpeg -y -f pulse -i alsa_input.pci-0000_7b_00.6.analog-stereo -t 10 -ar 22050 -ac 1 output.wav
+  ```
+  Przed nagraniem agent może upewnić się o poprawnym źródle za pomocą:
+  `pactl set-default-source alsa_input.pci-0000_7b_00.6.analog-stereo`
+- **Plik konfiguracyjny Single Source of Truth:**
+  [scripts/audio_hardware_config.json](file:///home/DJMixu/Pulpit/AcousticHddSentinel/scripts/audio_hardware_config.json)
+

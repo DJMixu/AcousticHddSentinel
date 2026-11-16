@@ -65,6 +65,7 @@ AcousticHddSentinel/
 │   └── testEpok.py                    # Diagnostyka stabilności uczenia dla różnej liczby epok
 │
 ├── scripts/                           # 🛠️ Skrypty narzędziowe i orkiestracja lokalnych modeli LLM
+│   ├── install_apk.sh                 # Automatyczna instalacja APK i uruchomienie na telefonie Android
 │   ├── local_llm_bridge.py            # Most orkiestrujący lokalne modele Ollama (27B + Coder 14B)
 │   ├── start_services.sh              # Skrypt uruchamiania usług Ollama i Open WebUI
 │   └── stop_services.sh               # Skrypt zatrzymywania usług Ollama i Open WebUI

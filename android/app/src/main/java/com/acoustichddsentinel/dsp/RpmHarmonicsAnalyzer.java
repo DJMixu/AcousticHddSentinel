@@ -15,6 +15,12 @@ import java.util.Arrays;
  *    Obsługuje spadek prędkości obrotowej w agonalnych dyskach 2.5" z uszkodzonymi łożyskami.
  * 2. Brak rotacji i pisk stojana zablokowanego silnika (Stall Beep w paśmie 1050 - 3500 Hz).
  * 3. Odrzucanie szumu wentylatorów PC i basowego szumu otoczenia.
+ *
+ * Optymalizacje wydajnościowe (Java 17 / Android):
+ * - Prealokacja buforów roboczych FFT, okna Hanna, widma mocy i mediany (Zero GC Allocation).
+ * - Okno okresowe Hanna (fftbins=True, dzielenie przez nFft) zgodne z scipy.signal.welch.
+ * - Uśrednianie widma mocy PSD z pierwiastkiem kwadratowym (scaling='spectrum').
+ * - Obliczanie mediany lokalnego tła odporne na zakłócenia sąsiednich prążków.
  */
 public class RpmHarmonicsAnalyzer {
 
@@ -26,6 +32,21 @@ public class RpmHarmonicsAnalyzer {
 
     // Mnożniki harmonicznych obrotu dla 7200 RPM
     private static final float[] MULTIPLIERS_7200 = {2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 12.0f};
+
+    // Prealokowane bufory robocze - Zero GC Allocation podczas analizy widmowej
+    private final float[] hannWindow = new float[FFT_SIZE];
+    private final float[] realBuffer = new float[FFT_SIZE];
+    private final float[] imagBuffer = new float[FFT_SIZE];
+    private final float[] avgPowerBuffer = new float[FFT_SIZE / 2 + 1];
+    private final float[] avgSpectrumBuffer = new float[FFT_SIZE / 2 + 1];
+    private final float[] medianScratchBuffer = new float[256];
+
+    public RpmHarmonicsAnalyzer() {
+        // Okno okresowe Hanna (zgodne z scipy.signal.welch, sym=False)
+        for (int i = 0; i < FFT_SIZE; i++) {
+            hannWindow[i] = (float) (0.5 * (1.0 - Math.cos(2.0 * Math.PI * i / FFT_SIZE)));
+        }
+    }
 
     public static class RpmResult {
         public final boolean hasRotation;
@@ -73,7 +94,7 @@ public class RpmHarmonicsAnalyzer {
     /**
      * Analizuje 3-sekundowy bufor próbek audio (66150 próbek przy 22050 Hz).
      */
-    public RpmResult analyzeChunk(float[] samples) {
+    public synchronized RpmResult analyzeChunk(float[] samples) {
         if (samples == null || samples.length == 0) {
             return new RpmResult(false, null, 0, 0f, 0f, false, 0f, 0f);
         }
@@ -154,18 +175,18 @@ public class RpmHarmonicsAnalyzer {
                     if (val > maxPeakVal && val > meanEnergy * 5.0f) {
                         // Sprawdzenie lokalnej dominacji (szczyt lokalny)
                         if (b > 0 && b < numBins - 1 && val > avgSpectrum[b - 1] && val > avgSpectrum[b + 1]) {
-                            // Weryfikacja wyrazistości piku (prominence) względem lokalnego tła w otoczeniu +/-12 binów (~ +/-65 Hz)
+                            // Weryfikacja wyrazistości piku (prominence) względem mediany lokalnego tła w otoczeniu +/-12 binów
                             int bgLow = Math.max(0, b - 12);
                             int bgHigh = Math.min(numBins - 1, b + 12);
-                            double bgSum = 0.0;
                             int bgCount = 0;
                             for (int k = bgLow; k <= bgHigh; k++) {
                                 if (Math.abs(k - b) > 2) {
-                                    bgSum += avgSpectrum[k];
-                                    bgCount++;
+                                    if (bgCount < medianScratchBuffer.length) {
+                                        medianScratchBuffer[bgCount++] = avgSpectrum[k];
+                                    }
                                 }
                             }
-                            float localBg = (bgCount > 0) ? (float) (bgSum / bgCount) : meanEnergy;
+                            float localBg = (bgCount > 0) ? computeMedian(medianScratchBuffer, bgCount) : meanEnergy;
                             float prominenceRatio = val / Math.max(localBg, 1e-12f);
 
                             // Autentyczny pisk stojana zablokowanego silnika to czysty, wąskopasmowy ton sinusoidalny (prominence >= 3.0x)
@@ -240,18 +261,18 @@ public class RpmHarmonicsAnalyzer {
         float exactF0Hz = bestF0Bin * FREQ_BIN_WIDTH;
         double harmonicEnergy = (double) maxF0Val * maxF0Val;
 
-        // 2. Szacowanie lokalnego tła wokół f0 (poza pasmem piku)
+        // 2. Szacowanie mediany lokalnego tła wokół f0 (poza pasmem piku)
         int bgBinMin = Math.max(0, (int) ((targetF0 - 25.0f) / FREQ_BIN_WIDTH));
         int bgBinMax = Math.min(spectrum.length - 1, (int) ((targetF0 + 25.0f) / FREQ_BIN_WIDTH));
-        float bgSum = 0f;
         int bgCount = 0;
         for (int b = bgBinMin; b <= bgBinMax; b++) {
             if (b < binF0Min || b > binF0Max) {
-                bgSum += spectrum[b];
-                bgCount++;
+                if (bgCount < medianScratchBuffer.length) {
+                    medianScratchBuffer[bgCount++] = spectrum[b];
+                }
             }
         }
-        float localBg = bgCount > 0 ? (bgSum / bgCount) : 1e-6f;
+        float localBg = bgCount > 0 ? computeMedian(medianScratchBuffer, bgCount) : 1e-6f;
         float f0Prominence = maxF0Val / Math.max(1e-6f, localBg);
 
         // 3. Dynamiczne śledzenie wyższych harmonicznych proporcjonalnie do znalezionego exactF0Hz
@@ -276,15 +297,15 @@ public class RpmHarmonicsAnalyzer {
 
             int hBgMin = Math.max(0, (int) ((hFreq - 30.0f) / FREQ_BIN_WIDTH));
             int hBgMax = Math.min(spectrum.length - 1, (int) ((hFreq + 30.0f) / FREQ_BIN_WIDTH));
-            float hBgSum = 0f;
             int hBgCount = 0;
             for (int b = hBgMin; b <= hBgMax; b++) {
                 if (b < hBinMin || b > hBinMax) {
-                    hBgSum += spectrum[b];
-                    hBgCount++;
+                    if (hBgCount < medianScratchBuffer.length) {
+                        medianScratchBuffer[hBgCount++] = spectrum[b];
+                    }
                 }
             }
-            float hBg = hBgCount > 0 ? (hBgSum / hBgCount) : 1e-6f;
+            float hBg = hBgCount > 0 ? computeMedian(medianScratchBuffer, hBgCount) : 1e-6f;
             if (maxHVal / Math.max(1e-6f, hBg) > 1.6f) {
                 harmonicHits++;
                 harmonicEnergy += (double) maxHVal * maxHVal;
@@ -304,33 +325,41 @@ public class RpmHarmonicsAnalyzer {
     }
 
     /**
-     * Oblicza uśrednione widmo amplitudowe z oknem Hann.
+     * Oblicza medianę z pierwszych 'count' elementów bufora.
+     */
+    private float computeMedian(float[] buf, int count) {
+        if (count <= 0) return 1e-6f;
+        if (count == 1) return buf[0];
+        Arrays.sort(buf, 0, count);
+        if ((count & 1) == 1) {
+            return buf[count / 2];
+        } else {
+            return 0.5f * (buf[count / 2 - 1] + buf[count / 2]);
+        }
+    }
+
+    /**
+     * Oblicza uśrednione widmo amplitudowe z oknem Hann (zgodne z scipy.signal.welch, scaling='spectrum').
+     * Wykorzystuje prealokowane tablice w pamięci, eliminując alokację obiektów GC.
      */
     private float[] computeWelchSpectrum(float[] samples, int nFft) {
         int halfFft = nFft / 2 + 1;
-        float[] avgSpec = new float[halfFft];
+        Arrays.fill(avgPowerBuffer, 0f);
+        Arrays.fill(avgSpectrumBuffer, 0f);
         int hop = nFft / 2;
         int numSegments = 0;
 
-        float[] window = new float[nFft];
-        for (int i = 0; i < nFft; i++) {
-            window[i] = (float) (0.5 * (1.0 - Math.cos(2.0 * Math.PI * i / (nFft - 1))));
-        }
-
-        float[] real = new float[nFft];
-        float[] imag = new float[nFft];
-
         for (int offset = 0; offset + nFft <= samples.length; offset += hop) {
             for (int i = 0; i < nFft; i++) {
-                real[i] = samples[offset + i] * window[i];
-                imag[i] = 0f;
+                realBuffer[i] = samples[offset + i] * hannWindow[i];
+                imagBuffer[i] = 0f;
             }
 
-            radix2Fft(real, imag, nFft);
+            radix2Fft(realBuffer, imagBuffer, nFft);
 
             for (int k = 0; k < halfFft; k++) {
-                float mag = (float) Math.sqrt(real[k] * real[k] + imag[k] * imag[k]);
-                avgSpec[k] += mag;
+                float pwr = realBuffer[k] * realBuffer[k] + imagBuffer[k] * imagBuffer[k];
+                avgPowerBuffer[k] += pwr;
             }
             numSegments++;
         }
@@ -338,10 +367,10 @@ public class RpmHarmonicsAnalyzer {
         if (numSegments > 0) {
             float invSeg = 1.0f / numSegments;
             for (int k = 0; k < halfFft; k++) {
-                avgSpec[k] *= invSeg;
+                avgSpectrumBuffer[k] = (float) Math.sqrt(avgPowerBuffer[k] * invSeg);
             }
         }
-        return avgSpec;
+        return avgSpectrumBuffer;
     }
 
     private void radix2Fft(float[] real, float[] imag, int n) {

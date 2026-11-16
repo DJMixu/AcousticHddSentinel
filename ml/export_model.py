@@ -73,7 +73,7 @@ def export_pipeline(
         model.load_state_dict(checkpoint, strict=False)
 
     if (isinstance(checkpoint, dict) and checkpoint.get("open_set_calibrated", False)) or model.fault_prototypes.abs().sum() > 0:
-        model.use_open_set.copy_(torch.tensor(True, dtype=torch.bool))
+        model.use_open_set.fill_(True)
         print("🛡️ Aktywowano wbudowaną bramkę OOD Prototype Rejection (Open-Set Recognition).")
 
     model.eval()

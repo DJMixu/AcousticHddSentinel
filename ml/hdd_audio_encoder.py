@@ -84,6 +84,9 @@ def normalize_waveform_rms(y: np.ndarray, target_rms: float = 0.05, eps: float =
     return y
 
 
+MIN_STD: float = 1e-2  # Bezpieczny dolny próg odchylenia standardowego zapobiegający wzmacnianiu szumu
+
+
 def normalize_tensor_zscore(tensor: np.ndarray, channel_axis: int = -1, eps: float = 1e-6) -> np.ndarray:
     """
     Standaryzacja Z-score osobno dla każdego kanału (Log-Mel, Delta, Delta-Delta)
@@ -91,6 +94,7 @@ def normalize_tensor_zscore(tensor: np.ndarray, channel_axis: int = -1, eps: flo
     - Kanał 0 (Log-Mel): min_std = 1.0 (w dB)
     - Kanał 1 (Delta): min_std = 0.15
     - Kanał 2 (Delta-Delta): min_std = 0.08
+    - Bezpieczny próg globalny MIN_STD = 1e-2 zapobiega rozciąganiu mikroszumów kwantyzacji.
     """
     norm_tensor = np.empty_like(tensor, dtype=np.float32)
     num_channels = tensor.shape[channel_axis]
@@ -101,7 +105,7 @@ def normalize_tensor_zscore(tensor: np.ndarray, channel_axis: int = -1, eps: flo
         mean = np.mean(channel_slice)
         std = np.std(channel_slice)
         min_std = channel_min_stds[c] if c < len(channel_min_stds) else eps
-        eff_std = max(float(std), float(min_std), eps)
+        eff_std = max(float(std), float(min_std), MIN_STD, eps)
         normalized_channel = (channel_slice - mean) / eff_std
         if channel_axis == -1 or channel_axis == tensor.ndim - 1:
             norm_tensor[..., c] = normalized_channel

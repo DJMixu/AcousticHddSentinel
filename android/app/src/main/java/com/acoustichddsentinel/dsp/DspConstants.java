@@ -58,6 +58,9 @@ public final class DspConstants {
     /** Docelowy poziom RMS po automatycznym wzmocnieniu cichego sygnału. */
     public static final float TARGET_BOOST_RMS = 0.025f;
 
+    /** Bezpieczny dolny próg wariancji chroniący przed sztucznym wzmacnianiem mikroszumów tła. */
+    public static final float MIN_STD = 1e-2f;
+
     /** Fizyczny próg minimalnej wariancji dynamicznej (Noise Floor) dla kanału 0 (Log-Mel w dB). */
     public static final float MIN_STD_LOG_MEL = 1.0f;
 

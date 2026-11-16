@@ -308,10 +308,10 @@ public final class AudioPreprocessor {
 
     /**
      * Standaryzacja Z-score dla dwuwymiarowej macierzy kanału:
-     * (x - mean) / std z zabezpieczeniem epsilon.
+     * (x - mean) / std z bezpiecznym progiem minimalnego odchylenia standardowego MIN_STD.
      */
     public static void normalizeChannelZScore(float[][] channel) {
-        normalizeChannelZScore(channel, DspConstants.EPSILON);
+        normalizeChannelZScore(channel, DspConstants.MIN_STD);
     }
 
     /**
@@ -339,7 +339,7 @@ public final class AudioPreprocessor {
             }
         }
         float std = (float) Math.sqrt(sumSq / total);
-        float floor = Math.max(minStd, DspConstants.EPSILON);
+        float floor = Math.max(minStd, DspConstants.MIN_STD);
         if (std < floor) {
             std = floor;
         }

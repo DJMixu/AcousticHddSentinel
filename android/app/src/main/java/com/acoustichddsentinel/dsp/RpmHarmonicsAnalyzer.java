@@ -116,40 +116,55 @@ public class RpmHarmonicsAnalyzer {
         if (!hasRotation) {
             int binMin = (int) (1050.0f / FREQ_BIN_WIDTH);
             int binMax = Math.min(numBins - 1, (int) (3500.0f / FREQ_BIN_WIDTH));
-            float maxPeakVal = 0f;
-            int maxPeakBin = -1;
 
-            for (int b = binMin; b <= binMax; b++) {
-                float val = avgSpectrum[b];
-                if (val > maxPeakVal && val > meanEnergy * 5.0f) {
-                    // Sprawdzenie lokalnej dominacji (szczyt lokalny)
-                    if (b > 0 && b < numBins - 1 && val > avgSpectrum[b - 1] && val > avgSpectrum[b + 1]) {
-                        // Weryfikacja wyrazistości piku (prominence) względem lokalnego tła w otoczeniu +/-12 binów (~ +/-65 Hz)
-                        int bgLow = Math.max(0, b - 12);
-                        int bgHigh = Math.min(numBins - 1, b + 12);
-                        double bgSum = 0.0;
-                        int bgCount = 0;
-                        for (int k = bgLow; k <= bgHigh; k++) {
-                            if (Math.abs(k - b) > 2) {
-                                bgSum += avgSpectrum[k];
-                                bgCount++;
-                            }
-                        }
-                        float localBg = (bgCount > 0) ? (float) (bgSum / bgCount) : meanEnergy;
-                        float prominenceRatio = val / Math.max(localBg, 1e-12f);
-
-                        // Autentyczny pisk stojana zablokowanego silnika to czysty, wąskopasmowy ton sinusoidalny (prominence >= 3.0x)
-                        if (prominenceRatio >= 3.0f) {
-                            maxPeakVal = val;
-                            maxPeakBin = b;
-                        }
-                    }
+            // Weryfikacja minimalnego udziału energii pasma pisku stojana (min. 0.5% całkowitej energii)
+            double beepBandEnergy = 0.0;
+            double fullSpectrumEnergy = 1e-12;
+            for (int b = 0; b < numBins; b++) {
+                float v = avgSpectrum[b];
+                double pwr = (double) v * v;
+                fullSpectrumEnergy += pwr;
+                if (b >= binMin && b <= binMax) {
+                    beepBandEnergy += pwr;
                 }
             }
 
-            if (maxPeakBin > 0) {
-                hasStallBeep = true;
-                stallBeepFreq = maxPeakBin * FREQ_BIN_WIDTH;
+            if (beepBandEnergy / fullSpectrumEnergy >= 0.005) {
+                float maxPeakVal = 0f;
+                int maxPeakBin = -1;
+
+                for (int b = binMin; b <= binMax; b++) {
+                    float val = avgSpectrum[b];
+                    if (val > maxPeakVal && val > meanEnergy * 5.0f) {
+                        // Sprawdzenie lokalnej dominacji (szczyt lokalny)
+                        if (b > 0 && b < numBins - 1 && val > avgSpectrum[b - 1] && val > avgSpectrum[b + 1]) {
+                            // Weryfikacja wyrazistości piku (prominence) względem lokalnego tła w otoczeniu +/-12 binów (~ +/-65 Hz)
+                            int bgLow = Math.max(0, b - 12);
+                            int bgHigh = Math.min(numBins - 1, b + 12);
+                            double bgSum = 0.0;
+                            int bgCount = 0;
+                            for (int k = bgLow; k <= bgHigh; k++) {
+                                if (Math.abs(k - b) > 2) {
+                                    bgSum += avgSpectrum[k];
+                                    bgCount++;
+                                }
+                            }
+                            float localBg = (bgCount > 0) ? (float) (bgSum / bgCount) : meanEnergy;
+                            float prominenceRatio = val / Math.max(localBg, 1e-12f);
+
+                            // Autentyczny pisk stojana zablokowanego silnika to czysty, wąskopasmowy ton sinusoidalny (prominence >= 3.0x)
+                            if (prominenceRatio >= 3.0f) {
+                                maxPeakVal = val;
+                                maxPeakBin = b;
+                            }
+                        }
+                    }
+                }
+
+                if (maxPeakBin > 0) {
+                    hasStallBeep = true;
+                    stallBeepFreq = maxPeakBin * FREQ_BIN_WIDTH;
+                }
             }
         }
 
@@ -173,6 +188,11 @@ public class RpmHarmonicsAnalyzer {
         int binF0Min = Math.max(0, (int) ((targetF0 - f0Tolerance) / FREQ_BIN_WIDTH));
         int binF0Max = Math.min(spectrum.length - 1, (int) ((targetF0 + f0Tolerance) / FREQ_BIN_WIDTH));
 
+        double totalEnergy = 1e-12;
+        for (float v : spectrum) {
+            totalEnergy += v * v;
+        }
+
         int bestF0Bin = binF0Min;
         float maxF0Val = 0f;
         for (int b = binF0Min; b <= binF0Max; b++) {
@@ -183,6 +203,7 @@ public class RpmHarmonicsAnalyzer {
         }
 
         float exactF0Hz = bestF0Bin * FREQ_BIN_WIDTH;
+        double harmonicEnergy = (double) maxF0Val * maxF0Val;
 
         // Szacowanie lokalnego tła wokół f0 (poza pasmem piku)
         int bgBinMin = Math.max(0, (int) ((targetF0 - 20.0f) / FREQ_BIN_WIDTH));
@@ -224,14 +245,18 @@ public class RpmHarmonicsAnalyzer {
             float hBg = hBgCount > 0 ? (hBgSum / hBgCount) : 1e-6f;
             if (maxHVal / Math.max(1e-6f, hBg) > 1.6f) {
                 harmonicHits++;
+                harmonicEnergy += (double) maxHVal * maxHVal;
             }
         }
 
         float score = (f0Prominence * 0.4f) + ((float) harmonicHits / harmonics.length * 6.0f);
-        // Wymóg rotacji HDD: wyraźny f0 oraz harmoniczne (zabezpieczenie przed losowymi pikami szumu tła)
-        boolean detected = (f0Prominence >= 2.2f && harmonicHits >= 2 && score >= 3.0f)
+        float energyRatio = (float) (harmonicEnergy / totalEnergy);
+
+        // Wymóg rotacji HDD: wyraźny f0, harmoniczne oraz realny udział energii grzebienia
+        boolean detected = ((f0Prominence >= 2.2f && harmonicHits >= 2 && score >= 3.0f)
                 || (f0Prominence >= 3.5f && harmonicHits >= 1 && score >= 3.0f)
-                || (harmonicHits >= 3 && score >= 3.5f);
+                || (f0Prominence >= 1.8f && harmonicHits >= 3 && score >= 3.8f))
+                && (energyRatio >= 0.005f || harmonicHits >= 4);
 
         return new CombScore(detected, score, exactF0Hz);
     }

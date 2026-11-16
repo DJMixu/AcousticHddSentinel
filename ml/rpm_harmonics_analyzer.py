@@ -110,7 +110,7 @@ def evaluate_harmonic_comb(
                 harmonic_energy += (h_peak ** 2)
                 
     comb_score = (f0_prominence * 0.4) + (harmonic_hits / len(harmonics_list) * 6.0)
-    comb_detected = ((f0_prominence >= 2.2 and harmonic_hits >= 2 and comb_score >= 3.0) or (f0_prominence >= 3.5 and harmonic_hits >= 1 and comb_score >= 3.0) or (harmonic_hits >= 3 and comb_score >= 3.5)) and (float(harmonic_energy / total_energy) >= 0.02 or harmonic_hits >= 3)
+    comb_detected = ((f0_prominence >= 2.2 and harmonic_hits >= 2 and comb_score >= 3.0) or (f0_prominence >= 3.5 and harmonic_hits >= 1 and comb_score >= 3.0) or (f0_prominence >= 1.8 and harmonic_hits >= 3 and comb_score >= 3.8)) and (float(harmonic_energy / total_energy) >= 0.005 or harmonic_hits >= 4)
     
     return {
         "detected": bool(comb_detected),
@@ -175,21 +175,24 @@ def analyze_frequency_peaks(y: np.ndarray, sr: int = TARGET_SR) -> Dict[str, Any
     # 4. Test obecności pisku stojana (Stall Beep) przy zatartym silniku:
     # Zatarte silniki wrzeciona (Seized Spindle) emitują ostry pisk między 1050 a 3500 Hz
     # przy braku prawidłowej, stabilnej rotacji silnika (has_rotation == False)!
-    # Próg 1050 Hz chroni przed rezonansami obudów 2.5 cala oraz wyższymi harmonicznymi obrotowymi.
+    # Wymóg min. 0.5% energii w paśmie 1050 - 3500 Hz chroni przed cichymi szumami tła i cewkami zasilaczy.
     has_high_stall_beep = False
     stall_beep_freq = 0.0
     if not has_hdd_rotation:
-        for p in top_peaks:
-            f_p = p["frequency_hz"]
-            if 1050.0 <= f_p <= 3500.0 and p["prominence"] > np.mean(spec) * 6.0:
-                # Weryfikacja wyrazistości piku względem lokalnego tła w otoczeniu +/- 65 Hz
-                m_bg = (freqs >= f_p - 65.0) & (freqs <= f_p + 65.0) & (np.abs(freqs - f_p) > 12.0)
-                local_bg = float(np.median(spec[m_bg])) if np.sum(m_bg) > 0 else float(np.mean(spec))
-                prominence_ratio = p["amplitude"] / (local_bg + 1e-9)
-                if prominence_ratio >= 3.0:
-                    has_high_stall_beep = True
-                    stall_beep_freq = f_p
-                    break
+        m_band = (freqs >= 1050.0) & (freqs <= 3500.0)
+        beep_band_energy_ratio = float(np.sum(spec[m_band]**2) / (np.sum(spec**2) + 1e-12))
+        if beep_band_energy_ratio >= 0.005:
+            for p in top_peaks:
+                f_p = p["frequency_hz"]
+                if 1050.0 <= f_p <= 3500.0 and p["prominence"] > np.mean(spec) * 6.0:
+                    # Weryfikacja wyrazistości piku względem lokalnego tła w otoczeniu +/- 65 Hz
+                    m_bg = (freqs >= f_p - 65.0) & (freqs <= f_p + 65.0) & (np.abs(freqs - f_p) > 12.0)
+                    local_bg = float(np.median(spec[m_bg])) if np.sum(m_bg) > 0 else float(np.mean(spec))
+                    prominence_ratio = p["amplitude"] / (local_bg + 1e-9)
+                    if prominence_ratio >= 3.0:
+                        has_high_stall_beep = True
+                        stall_beep_freq = f_p
+                        break
     
     return {
         "status": "ANALYZED",

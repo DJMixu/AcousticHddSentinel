@@ -325,6 +325,32 @@ class DSPAdversarialGuard:
 
         return False, ""
 
+    def is_city_traffic_noise(
+        self,
+        tensor: Union[np.ndarray, torch.Tensor],
+        waveform: Optional[np.ndarray] = None,
+        sr: int = TARGET_SR,
+    ) -> Tuple[bool, str]:
+        """
+        Zwraca True, jeśli sygnał reprezentuje głośny szum otoczenia miejskiego / ruchu ulicznego
+        o dominacji energii w paśmie basowym < 300 Hz (> 75%) i znikomej energii wysokiej > 4 kHz (< 3.5%).
+        """
+        if waveform is not None and len(waveform) >= 1024:
+            chunk = np.asarray(waveform, dtype=np.float32)
+            rms = float(np.sqrt(np.mean(chunk ** 2)))
+            if rms < 0.002:
+                return False, ""
+            fft = np.abs(np.fft.rfft(chunk))
+            freqs = np.fft.rfftfreq(len(chunk), 1.0 / sr)
+            total_e = np.sum(fft ** 2) + 1e-12
+            p_sub300 = float(np.sum(fft[freqs < 300] ** 2) / total_e)
+            p_over4k = float(np.sum(fft[freqs > 4000] ** 2) / total_e)
+
+            if p_sub300 > 0.75 and p_over4k < 0.035:
+                reason = f"City/Traffic ambient noise (sub300={p_sub300*100:.1f}%, over4k={p_over4k*100:.2f}%)"
+                return True, reason
+        return False, ""
+
     def protect_and_sanitize_predictions(
         self,
         probs: Union[np.ndarray, torch.Tensor],
@@ -344,6 +370,7 @@ class DSPAdversarialGuard:
         is_metro, reason_metro = self.is_periodic_metronome(tensor)
         is_fan, reason_fan = self.is_aerodynamic_fan(tensor, waveform=waveform)
         is_clip, reason_clip = self.is_microphone_clipped_or_distorted(tensor, waveform=waveform)
+        is_city, reason_city = self.is_city_traffic_noise(tensor, waveform=waveform)
         is_ent, reason_ent = self.is_enterprise_spindle_windage(tensor, waveform=waveform)
         feats = self.compute_features(tensor)
 
@@ -372,7 +399,7 @@ class DSPAdversarialGuard:
             return new_p, True, f"Odrzucono fałszywe klikanie (Metronom): {reason_metro}"
 
         # 3. Neutralizacja Szumu Wentylatorów / Turbin PC klasyfikowanego jako CLICKING / SCRATCHING / BEEPING
-        if is_fan and (p[clicking_idx] > 0.25 or p[scratching_idx] > 0.25 or p[beeping_idx] > 0.25):
+        if is_fan and (p[clicking_idx] > 0.15 or p[scratching_idx] > 0.15 or p[beeping_idx] > 0.15):
             new_p = np.copy(p)
             fault_prob = new_p[clicking_idx] + new_p[scratching_idx] + new_p[beeping_idx]
             new_p[clicking_idx] = 0.02
@@ -382,16 +409,27 @@ class DSPAdversarialGuard:
             new_p = new_p / np.sum(new_p)
             return new_p, True, f"Odrzucono fałszywy alarm wentylatora/turbiny: {reason_fan}"
 
-        # 4. Neutralizacja Przesterowania Toru Mikrofonu / THD klasyfikowanego jako SCRATCHING / CLICKING
-        if is_clip and (p[scratching_idx] > 0.20 or p[clicking_idx] > 0.25):
+        # 4. Neutralizacja Przesterowania Toru Mikrofonu / THD klasyfikowanego jako SCRATCHING / CLICKING / BEEPING
+        if is_clip and (p[scratching_idx] > 0.15 or p[clicking_idx] > 0.15 or p[beeping_idx] > 0.15):
             new_p = np.copy(p)
-            stolen = new_p[scratching_idx] + (new_p[clicking_idx] if new_p[clicking_idx] > 0.25 else 0.0)
+            stolen = new_p[scratching_idx] + new_p[clicking_idx] + new_p[beeping_idx]
             new_p[scratching_idx] = 0.02
-            if new_p[clicking_idx] > 0.25:
-                new_p[clicking_idx] = 0.02
+            new_p[clicking_idx] = 0.02
+            new_p[beeping_idx] = 0.02
             new_p[normal_idx] += stolen * 0.98
             new_p = new_p / np.sum(new_p)
             return new_p, True, f"Odrzucono fałszywy alarm przesterowania mikrofonu: {reason_clip}"
+
+        # 5. Neutralizacja Szumu Miasta / Ruchu Ulicznego (dominacja pasma < 300 Hz)
+        if is_city and (p[clicking_idx] > 0.15 or p[scratching_idx] > 0.15 or p[beeping_idx] > 0.15):
+            new_p = np.copy(p)
+            fault_prob = new_p[clicking_idx] + new_p[scratching_idx] + new_p[beeping_idx]
+            new_p[clicking_idx] = 0.02
+            new_p[scratching_idx] = 0.02
+            new_p[beeping_idx] = 0.02
+            new_p[normal_idx] += fault_prob * 0.95
+            new_p = new_p / np.sum(new_p)
+            return new_p, True, f"Odrzucono fałszywy alarm szumu miejskiego: {reason_city}"
 
         # 5. Neutralizacja fałszywego klikania bez transjentów (Zero-transient false clicking)
         # Fizyczny Click of Death wymaga uderzeń pozycjonera (num_events >= 2).

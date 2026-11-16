@@ -110,7 +110,7 @@ def evaluate_harmonic_comb(
                 harmonic_energy += (h_peak ** 2)
                 
     comb_score = (f0_prominence * 0.4) + (harmonic_hits / len(harmonics_list) * 6.0)
-    comb_detected = (f0_prominence >= 2.0 and harmonic_hits >= 2) or (f0_prominence >= 3.5 and harmonic_hits >= 1)
+    comb_detected = ((f0_prominence >= 2.2 and harmonic_hits >= 2 and comb_score >= 3.0) or (f0_prominence >= 3.5 and harmonic_hits >= 1 and comb_score >= 3.0) or (harmonic_hits >= 3 and comb_score >= 3.5)) and (float(harmonic_energy / total_energy) >= 0.02 or harmonic_hits >= 3)
     
     return {
         "detected": bool(comb_detected),
@@ -173,16 +173,23 @@ def analyze_frequency_peaks(y: np.ndarray, sr: int = TARGET_SR) -> Dict[str, Any
     has_hdd_rotation = (best_rpm is not None)
 
     # 4. Test obecności pisku stojana (Stall Beep) przy zatartym silniku:
-    # Zatarte silniki wrzeciona (Seized Spindle) emitują ostry pisk między 800 a 3500 Hz
+    # Zatarte silniki wrzeciona (Seized Spindle) emitują ostry pisk między 1050 a 3500 Hz
     # przy braku prawidłowej, stabilnej rotacji silnika (has_rotation == False)!
+    # Próg 1050 Hz chroni przed rezonansami obudów 2.5 cala oraz wyższymi harmonicznymi obrotowymi.
     has_high_stall_beep = False
     stall_beep_freq = 0.0
     if not has_hdd_rotation:
         for p in top_peaks:
-            if 800.0 <= p["frequency_hz"] <= 3500.0 and p["prominence"] > np.mean(spec) * 6.0:
-                has_high_stall_beep = True
-                stall_beep_freq = p["frequency_hz"]
-                break
+            f_p = p["frequency_hz"]
+            if 1050.0 <= f_p <= 3500.0 and p["prominence"] > np.mean(spec) * 6.0:
+                # Weryfikacja wyrazistości piku względem lokalnego tła w otoczeniu +/- 65 Hz
+                m_bg = (freqs >= f_p - 65.0) & (freqs <= f_p + 65.0) & (np.abs(freqs - f_p) > 12.0)
+                local_bg = float(np.median(spec[m_bg])) if np.sum(m_bg) > 0 else float(np.mean(spec))
+                prominence_ratio = p["amplitude"] / (local_bg + 1e-9)
+                if prominence_ratio >= 3.0:
+                    has_high_stall_beep = True
+                    stall_beep_freq = f_p
+                    break
     
     return {
         "status": "ANALYZED",

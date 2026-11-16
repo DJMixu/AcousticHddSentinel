@@ -121,11 +121,28 @@ public class RpmHarmonicsAnalyzer {
 
             for (int b = binMin; b <= binMax; b++) {
                 float val = avgSpectrum[b];
-                if (val > maxPeakVal && val > meanEnergy * 6.0f) {
+                if (val > maxPeakVal && val > meanEnergy * 5.0f) {
                     // Sprawdzenie lokalnej dominacji (szczyt lokalny)
                     if (b > 0 && b < numBins - 1 && val > avgSpectrum[b - 1] && val > avgSpectrum[b + 1]) {
-                        maxPeakVal = val;
-                        maxPeakBin = b;
+                        // Weryfikacja wyrazistości piku (prominence) względem lokalnego tła w otoczeniu +/-12 binów (~ +/-65 Hz)
+                        int bgLow = Math.max(0, b - 12);
+                        int bgHigh = Math.min(numBins - 1, b + 12);
+                        double bgSum = 0.0;
+                        int bgCount = 0;
+                        for (int k = bgLow; k <= bgHigh; k++) {
+                            if (Math.abs(k - b) > 2) {
+                                bgSum += avgSpectrum[k];
+                                bgCount++;
+                            }
+                        }
+                        float localBg = (bgCount > 0) ? (float) (bgSum / bgCount) : meanEnergy;
+                        float prominenceRatio = val / Math.max(localBg, 1e-12f);
+
+                        // Autentyczny pisk stojana zablokowanego silnika to czysty, wąskopasmowy ton sinusoidalny (prominence >= 3.0x)
+                        if (prominenceRatio >= 3.0f) {
+                            maxPeakVal = val;
+                            maxPeakBin = b;
+                        }
                     }
                 }
             }
@@ -211,7 +228,10 @@ public class RpmHarmonicsAnalyzer {
         }
 
         float score = (f0Prominence * 0.4f) + ((float) harmonicHits / harmonics.length * 6.0f);
-        boolean detected = (f0Prominence >= 1.6f && harmonicHits >= 2) || (f0Prominence >= 3.0f && harmonicHits >= 1) || (harmonicHits >= 3);
+        // Wymóg rotacji HDD: wyraźny f0 oraz harmoniczne (zabezpieczenie przed losowymi pikami szumu tła)
+        boolean detected = (f0Prominence >= 2.2f && harmonicHits >= 2 && score >= 3.0f)
+                || (f0Prominence >= 3.5f && harmonicHits >= 1 && score >= 3.0f)
+                || (harmonicHits >= 3 && score >= 3.5f);
 
         return new CombScore(detected, score, exactF0Hz);
     }

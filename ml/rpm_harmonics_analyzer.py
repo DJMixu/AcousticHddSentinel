@@ -20,25 +20,25 @@ import scipy.signal as signal
 
 TARGET_SR = 22050
 
-# Profile prędkości obrotowych HDD
+# Profile prędkości obrotowych HDD z dynamicznym oknem śledzenia częstotliwości podstawowej
 RPM_PROFILES = {
     "5400_rpm": {
         "nominal_rpm": 5400,
         "f0": 90.0,
-        "f_range": (88.5, 91.5),
-        "harmonics": [180.0, 270.0, 360.0, 450.0, 540.0, 1080.0],
+        "f_range": (85.5, 94.5),  # +/- 4.5 Hz (tolerancja degradacji łożysk)
+        "multipliers": [2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 9.0, 10.0, 12.0],
     },
     "7200_rpm": {
         "nominal_rpm": 7200,
         "f0": 120.0,
-        "f_range": (118.0, 122.0),
-        "harmonics": [240.0, 360.0, 480.0, 600.0, 720.0, 1440.0],
+        "f_range": (114.0, 126.0),  # +/- 6.0 Hz (tolerancja degradacji łożysk)
+        "multipliers": [2.0, 3.0, 4.0, 5.0, 6.0, 12.0],
     },
     "10000_rpm": {
         "nominal_rpm": 10000,
         "f0": 166.67,
-        "f_range": (164.0, 169.0),
-        "harmonics": [333.3, 500.0, 666.7, 1000.0, 2000.0],
+        "f_range": (160.0, 173.0),
+        "multipliers": [2.0, 3.0, 4.0, 6.0, 12.0],
     }
 }
 
@@ -68,16 +68,20 @@ def evaluate_harmonic_comb(
     freqs: np.ndarray,
     spec: np.ndarray,
     f0_target: float,
-    harmonics_list: List[float],
-    bandwidth_hz: float = 3.0
+    f_range: Tuple[float, float],
+    multipliers: List[float],
+    bandwidth_hz: float = 3.5
 ) -> Dict[str, Any]:
     """
-    Ocenia obecność grzebienia harmonicznego dla zadanej częstotliwości bazowej f0.
+    Dynamic Harmonic Tracking via Pitch Harmonizer:
+    Wyszukuje optymalny f0 w przedziale f_range (uwzględniając spadek prędkości obrotowej wywołany uszkodzeniem łożysk),
+    a następnie dynamicznie śledzi wyższe harmoniczne h_freq = m * f0_exact_freq.
     """
     total_energy = np.sum(spec**2) + 1e-12
     
-    # 1. Sprawdzenie piku podstawowego f0
-    idx_f0 = np.where((freqs >= f0_target - bandwidth_hz) & (freqs <= f0_target + bandwidth_hz))[0]
+    # 1. Sprawdzenie piku podstawowego f0 w dynamicznym oknie f_range
+    f_min, f_max = f_range
+    idx_f0 = np.where((freqs >= f_min) & (freqs <= f_max))[0]
     if len(idx_f0) == 0:
         return {"detected": False, "score": 0.0, "f0_found": 0.0, "prominence": 0.0}
     
@@ -86,30 +90,35 @@ def evaluate_harmonic_comb(
     f0_exact_freq = freqs[f0_max_idx]
     
     # Tło lokalne wokół f0 (poza pasmem piku)
-    local_bg_idx = np.where((freqs >= f0_target - 15.0) & (freqs <= f0_target + 15.0))[0]
+    local_bg_idx = np.where((freqs >= f0_target - 25.0) & (freqs <= f0_target + 25.0))[0]
     local_bg_idx = [i for i in local_bg_idx if abs(freqs[i] - f0_exact_freq) > bandwidth_hz]
     local_bg = np.median(spec[local_bg_idx]) if len(local_bg_idx) > 0 else 1e-6
     
     f0_prominence = f0_peak_val / (local_bg + 1e-9)
     
-    # 2. Sprawdzenie wyższych harmonicznych
+    # 2. Dynamiczne śledzenie wyższych harmonicznych proporcjonalnie do f0_exact_freq
     harmonic_hits = 0
     harmonic_energy = (f0_peak_val ** 2)
     
-    for h_freq in harmonics_list:
-        idx_h = np.where((freqs >= h_freq - bandwidth_hz * 1.5) & (freqs <= h_freq + bandwidth_hz * 1.5))[0]
+    for m in multipliers:
+        h_freq = f0_exact_freq * m
+        if h_freq >= (TARGET_SR / 2.0) - 60.0:
+            continue
+
+        h_tol = max(bandwidth_hz * 1.5, h_freq * 0.025)
+        idx_h = np.where((freqs >= h_freq - h_tol) & (freqs <= h_freq + h_tol))[0]
         if len(idx_h) > 0:
             h_peak = np.max(spec[idx_h])
             # Tło lokalne dla danej harmonicznej
-            h_bg_idx = np.where((freqs >= h_freq - 25.0) & (freqs <= h_freq + 25.0))[0]
-            h_bg_idx = [i for i in h_bg_idx if abs(freqs[i] - h_freq) > bandwidth_hz * 1.5]
+            h_bg_idx = np.where((freqs >= h_freq - 30.0) & (freqs <= h_freq + 30.0))[0]
+            h_bg_idx = [i for i in h_bg_idx if abs(freqs[i] - h_freq) > h_tol]
             h_bg = np.median(spec[h_bg_idx]) if len(h_bg_idx) > 0 else 1e-6
             
-            if h_peak / (h_bg + 1e-9) > 1.8:
+            if h_peak / (h_bg + 1e-9) > 1.6:
                 harmonic_hits += 1
                 harmonic_energy += (h_peak ** 2)
                 
-    comb_score = (f0_prominence * 0.4) + (harmonic_hits / len(harmonics_list) * 6.0)
+    comb_score = (f0_prominence * 0.4) + (harmonic_hits / len(multipliers) * 6.0)
     comb_detected = ((f0_prominence >= 2.2 and harmonic_hits >= 2 and comb_score >= 3.0) or (f0_prominence >= 3.5 and harmonic_hits >= 1 and comb_score >= 3.0) or (f0_prominence >= 1.8 and harmonic_hits >= 3 and comb_score >= 3.8)) and (float(harmonic_energy / total_energy) >= 0.005 or harmonic_hits >= 4)
     
     return {
@@ -118,7 +127,7 @@ def evaluate_harmonic_comb(
         "f0_found": float(f0_exact_freq),
         "f0_prominence": float(f0_prominence),
         "harmonics_matched": int(harmonic_hits),
-        "harmonics_total": len(harmonics_list),
+        "harmonics_total": len(multipliers),
         "harmonic_energy_ratio": float(harmonic_energy / total_energy)
     }
 
@@ -144,13 +153,13 @@ def analyze_frequency_peaks(y: np.ndarray, sr: int = TARGET_SR) -> Dict[str, Any
 
     freqs, spec = compute_high_res_spectrum(y, sr=sr, n_fft=8192)
     
-    # 1. Weryfikacja profili RPM
+    # 1. Weryfikacja profili RPM z dynamicznym śledzeniem harmonicznych
     best_rpm = None
     best_rpm_data = None
     best_score = 0.0
     
     for rpm_key, profile in RPM_PROFILES.items():
-        res = evaluate_harmonic_comb(freqs, spec, profile["f0"], profile["harmonics"])
+        res = evaluate_harmonic_comb(freqs, spec, profile["f0"], profile["f_range"], profile["multipliers"])
         if res["detected"] and res["score"] > best_score:
             best_score = res["score"]
             best_rpm = rpm_key

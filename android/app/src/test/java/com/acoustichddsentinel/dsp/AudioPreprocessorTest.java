@@ -139,4 +139,68 @@ public class AudioPreprocessorTest {
         assertEquals("Średnia po normalizacji Z-score musi wynosić ~0.0", 0.0f, mean, 1e-4f);
         assertEquals("Odchylenie standardowe po Z-score musi wynosić ~1.0", 1.0f, std, 1e-4f);
     }
+
+    @Test
+    public void testDynamicHarmonicTrackingDrifted5400() {
+        RpmHarmonicsAnalyzer analyzer = new RpmHarmonicsAnalyzer();
+        int nSamples = DspConstants.CHUNK_SAMPLES;
+        float[] samples = new float[nSamples];
+
+        // Symulacja agonalnego dysku 2.5": silnik zwolnił z 90 Hz do 87.5 Hz (-2.5 Hz dryfu)
+        float f0 = 87.5f;
+        for (int i = 0; i < nSamples; i++) {
+            float t = (float) i / DspConstants.SAMPLE_RATE;
+            samples[i] = (float) (
+                0.25 * Math.sin(2.0 * Math.PI * f0 * t) +
+                0.15 * Math.sin(2.0 * Math.PI * (2.0 * f0) * t) +
+                0.12 * Math.sin(2.0 * Math.PI * (3.0 * f0) * t) +
+                0.10 * Math.sin(2.0 * Math.PI * (4.0 * f0) * t) +
+                0.08 * Math.sin(2.0 * Math.PI * (6.0 * f0) * t)
+            );
+        }
+
+        RpmHarmonicsAnalyzer.RpmResult res = analyzer.analyzeChunk(samples);
+        assertTrue("Dynamic Harmonic Tracking musi wykryć rotację dla silnika z dryfem 87.5 Hz", res.hasRotation);
+        assertEquals("Wykryty profil musi odpowiadać 5400 RPM", "5400_rpm", res.detectedRpm);
+        assertEquals("Nominalne RPM musi wynosić 5400", 5400, res.nominalRpm);
+        assertTrue("Wykryte f0 powinno być bliskie 87.5 Hz (+/- 3 Hz)", Math.abs(res.f0FoundHz - 87.5f) < 3.0f);
+    }
+
+    @Test
+    public void testSmartClippingBypassOnCrashStopImpact() {
+        DspPhysicalGuard guard = new DspPhysicalGuard();
+        int nSamples = DspConstants.CHUNK_SAMPLES;
+        float[] samples = new float[nSamples];
+
+        // Syntetyczny sygnał katastrofalnego uderzenia głowicy (Crash Stop):
+        // 1. Wysoka dynamika impulsowa (Crest Factor >= 4.5)
+        // 2. Szerokopasmowa energia tarcia w paśmie > 4 kHz (highFreqFraction > 0.18)
+        // 3. Obcięcie wierzchołków sygnału przez przetwornik ADC (clipping)
+        java.util.Random rnd = new java.util.Random(42);
+        for (int i = 0; i < nSamples; i++) {
+            float t = (float) i / DspConstants.SAMPLE_RATE;
+            samples[i] = (float) (0.12 * (Math.sin(2.0 * Math.PI * 4800.0 * t) + Math.sin(2.0 * Math.PI * 7200.0 * t))
+                    + 0.05 * (rnd.nextFloat() - 0.5));
+        }
+
+        // Dodanie ostrych impulsów uderzeniowych z przesterowaniem (> 2% próbek osiąga szczyt)
+        for (int p = 0; p < 30; p++) {
+            int pos = 1000 + p * 2000;
+            for (int k = 0; k < 50; k++) {
+                if (pos + k < nSamples) {
+                    samples[pos + k] = (k % 2 == 0) ? 0.99f : -0.99f; // Przesterowanie szczytowe
+                }
+            }
+        }
+
+        float[] rawProbs = new float[]{0.05f, 0.75f, 0.10f, 0.10f}; // clicking = 0.75
+        DspPhysicalGuard.SanitizationResult res = guard.sanitizeProbabilities(
+            rawProbs, samples, null, null
+        );
+
+        assertTrue("Sygnał musi zostać zidentyfikowany jako przesterowany", res.isMicrophoneClipped);
+        assertTrue("Smart Clipping Bypass musi być aktywny przy CF >= 4.5 i highFreq > 18%", res.smartClippingBypass);
+        assertFalse("Weto clicking NIE może zostać nałożone przy autentycznym Crash Stopie", res.vetoClicking);
+        assertTrue("Prawdopodobieństwo clicking musi pozostać wysokie", res.sanitizedProbs[1] >= 0.70f);
+    }
 }

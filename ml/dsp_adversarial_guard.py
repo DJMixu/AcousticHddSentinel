@@ -264,9 +264,15 @@ class DSPAdversarialGuard:
             arith_mean = np.mean(power_high)
             flatness_high = float(geom_mean / arith_mean)
 
-            # Safety Veto dla autentycznego uszkodzenia HDD:
+            # Safety Veto dla autentycznego uszkodzenia HDD oraz Smart Clipping Bypass:
             # Prawdziwe tarcie głowic o talerz (scratching) lub uderzenia (clicking)
             # posiadają wysoką dynamikę impulsową (Crest > 3.2) oraz szerokopasmowe widmo tarcia (flatness > 0.18).
+            # Jeśli Crest >= 4.5 oraz energia > 4 kHz > 18%, przesterowanie jest bezpośrednim dowodem Crash Stop.
+            total_e = float(np.sum(fft ** 2) + 1e-12)
+            high_e_frac = float(np.sum(fft[freqs >= 4000] ** 2) / total_e)
+            if crest >= 4.5 and high_e_frac > 0.18:
+                return False, ""  # Smart Clipping Bypass - autentyczna katastrofalna kolizja głowicy
+
             if crest >= 3.2 and flatness_high > 0.18 and clip_ratio < 0.05:
                 return False, ""
 

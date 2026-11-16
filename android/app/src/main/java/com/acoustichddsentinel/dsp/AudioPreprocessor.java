@@ -3,7 +3,7 @@ package com.acoustichddsentinel.dsp;
 import java.util.Arrays;
 
 /**
- * Główny preprocesor akustyczny potoku DSP.
+ * Główny preprocesor akustyczny potoku DSP z optymalizacjami wektorowymi i prealokacją buforów (Zero GC Churn).
  * Przekształca surowe próbki audio (float PCM) w 3-kanałowy tensor [Log-Mel, Delta, Delta-Delta]
  * o stałych wymiarach (1, 3, 128, 259) w formacie NCHW, gotowy do bezpośredniej inferencji ONNX.
  *
@@ -12,33 +12,39 @@ import java.util.Arrays;
  * 2. Czas trwania okna: 3.0 s (66150 próbek).
  * 3. Normalizacja: Peak Normalization fali + Z-score per kanał tensora.
  * 4. Pochodne czasowe: Delta (1.) i Delta-Delta (2.) o szerokości okna N = 9.
+ *
+ * Optymalizacje wydajnościowe:
+ * - Jednorazowa alokacja wszystkich buforów roboczych w konstruktorze (brak alokacji GC w pętli).
+ * - Rozwinięcie pętli różniczkowych Savitzky-Golay (Unrolled loops) z wykorzystaniem symetrii wag.
+ * - Bezpośrednia integracja z zoptymalizowanym Sparse Mel Filter Bank.
  */
 public final class AudioPreprocessor {
 
     private final StftTransformer stftTransformer;
     private final MelFilterBank melFilterBank;
+
+    // Prealokowane bufory robocze - Zero GC Allocation podczas inferencji
     private final float[] preallocatedChunk;
     private final float[] preallocatedFlatTensor;
+    private final float[][] melBuffer;
+    private final float[][] logMelBuffer;
+    private final float[][] delta1Buffer;
+    private final float[][] delta2Buffer;
 
-    // Współczynniki jądra Savitzky-Golay dla 2. pochodnej (wielomian st. 2, szerokość 9)
-    // Numeratory: [28, 7, -8, -17, -20, -17, -8, 7, 28] / 462.0
-    private static final float[] SAVGOL_C2_KERNEL = {
-        28.0f / 462.0f,
-        7.0f / 462.0f,
-        -8.0f / 462.0f,
-        -17.0f / 462.0f,
-        -20.0f / 462.0f,
-        -17.0f / 462.0f,
-        -8.0f / 462.0f,
-        7.0f / 462.0f,
-        28.0f / 462.0f
-    };
+    private static final float INV_60 = 1.0f / 60.0f;
+    private static final float INV_462 = 1.0f / 462.0f;
 
     public AudioPreprocessor() {
         this.stftTransformer = new StftTransformer();
         this.melFilterBank = new MelFilterBank();
+
         this.preallocatedChunk = new float[DspConstants.CHUNK_SAMPLES];
         this.preallocatedFlatTensor = new float[DspConstants.TENSOR_FLAT_SIZE];
+
+        this.melBuffer = new float[DspConstants.N_MELS][DspConstants.TIME_STEPS];
+        this.logMelBuffer = new float[DspConstants.N_MELS][DspConstants.TIME_STEPS];
+        this.delta1Buffer = new float[DspConstants.N_MELS][DspConstants.TIME_STEPS];
+        this.delta2Buffer = new float[DspConstants.N_MELS][DspConstants.TIME_STEPS];
     }
 
     /**
@@ -63,17 +69,17 @@ public final class AudioPreprocessor {
         // 2. Normalizacja szczytowa fali (Peak Normalization) do [-1.0, 1.0] z usunięciem DC offsetu
         normalizeWaveformPeak(chunk);
 
-        // 3. Obliczenie STFT i banku Mel -> Log-Mel Spectrogram [128][259]
-        float[][] logMel = computeLogMelSpectrogram(chunk);
+        // 3. Obliczenie STFT i banku Mel -> Log-Mel Spectrogram [128][259] w prealokowanym logMelBuffer
+        computeLogMelSpectrogramInternal(chunk);
 
-        // 4. Obliczenie kanałów pochodnych czasowych (Delta i Delta-Delta)
-        float[][] delta1 = computeDelta1(logMel);
-        float[][] delta2 = computeDelta2(logMel);
+        // 4. Obliczenie kanałów pochodnych czasowych (Delta i Delta-Delta) z unrollowanymi jądrami Savitzky-Golay
+        computeDelta1Internal(logMelBuffer, delta1Buffer);
+        computeDelta2Internal(logMelBuffer, delta2Buffer);
 
         // 5. Standaryzacja Z-score z fizycznymi progami minimalnego odchylenia standardowego (Noise Floor)
-        normalizeChannelZScore(logMel, DspConstants.MIN_STD_LOG_MEL);
-        normalizeChannelZScore(delta1, DspConstants.MIN_STD_DELTA);
-        normalizeChannelZScore(delta2, DspConstants.MIN_STD_DELTA_DELTA);
+        normalizeChannelZScore(logMelBuffer, DspConstants.MIN_STD_LOG_MEL);
+        normalizeChannelZScore(delta1Buffer, DspConstants.MIN_STD_DELTA);
+        normalizeChannelZScore(delta2Buffer, DspConstants.MIN_STD_DELTA_DELTA);
 
         // 6. Spłaszczenie do bufora NCHW: Channel 0 (Mel), Channel 1 (Delta), Channel 2 (Delta-Delta)
         float[] flatTensor = preallocatedFlatTensor;
@@ -82,11 +88,16 @@ public final class AudioPreprocessor {
         int channelStride = numMels * timeSteps;
 
         for (int m = 0; m < numMels; m++) {
+            float[] melRow = logMelBuffer[m];
+            float[] d1Row = delta1Buffer[m];
+            float[] d2Row = delta2Buffer[m];
+            int mOffset = m * timeSteps;
+
             for (int t = 0; t < timeSteps; t++) {
-                int baseIndex = m * timeSteps + t;
-                flatTensor[baseIndex] = logMel[m][t];                       // Kanał 0
-                flatTensor[channelStride + baseIndex] = delta1[m][t];       // Kanał 1
-                flatTensor[2 * channelStride + baseIndex] = delta2[m][t];   // Kanał 2
+                int baseIndex = mOffset + t;
+                flatTensor[baseIndex] = melRow[t];                      // Kanał 0
+                flatTensor[channelStride + baseIndex] = d1Row[t];      // Kanał 1
+                flatTensor[2 * channelStride + baseIndex] = d2Row[t];  // Kanał 2
             }
         }
 
@@ -99,16 +110,26 @@ public final class AudioPreprocessor {
      * @param rawSamples surowe próbki audio float
      * @return macierz [128][259] zawierająca wartości w skali dB (zakres ok. [-80.0, 0.0])
      */
-    public float[][] extractLogMelForVisualization(float[] rawSamples) {
+    public synchronized float[][] extractLogMelForVisualization(float[] rawSamples) {
         float[] chunk = prepareFixedChunk(rawSamples, DspConstants.CHUNK_SAMPLES);
         normalizeWaveformPeak(chunk);
-        return computeLogMelSpectrogram(chunk);
+        computeLogMelSpectrogramInternal(chunk);
+
+        // Kopiowanie wyniku do nowej macierzy dla wątku renderowania UI
+        float[][] out = new float[DspConstants.N_MELS][DspConstants.TIME_STEPS];
+        for (int m = 0; m < DspConstants.N_MELS; m++) {
+            System.arraycopy(logMelBuffer[m], 0, out[m], 0, DspConstants.TIME_STEPS);
+        }
+        return out;
     }
 
     /**
      * Dopasowanie długości próbek: dopełnienie zerami (zero-padding) lub przycięcie.
      */
     private static float[] prepareFixedChunk(float[] samples, int targetSamples) {
+        if (samples == null) {
+            return new float[targetSamples];
+        }
         if (samples.length == targetSamples) {
             return Arrays.copyOf(samples, targetSamples);
         }
@@ -123,7 +144,7 @@ public final class AudioPreprocessor {
      * Usuwa składową stałą (DC offset).
      */
     public static void normalizeWaveformPeak(float[] y) {
-        if (y.length == 0) return;
+        if (y == null || y.length == 0) return;
 
         double sum = 0.0;
         for (float v : y) {
@@ -141,8 +162,9 @@ public final class AudioPreprocessor {
         }
 
         if (peak > DspConstants.EPSILON) {
+            float invPeak = 1.0f / peak;
             for (int i = 0; i < y.length; i++) {
-                y[i] /= peak;
+                y[i] *= invPeak;
             }
         }
     }
@@ -170,117 +192,118 @@ public final class AudioPreprocessor {
     }
 
     /**
-     * Wyznaczenie spektrogramu Log-Mel w skali decybelowej (dB).
+     * Wyznaczenie spektrogramu Log-Mel w skali decybelowej (dB) wewnątrz prealokowanego logMelBuffer.
      * Dokładnie odpowiada wywołaniu librosa.power_to_db(mel, ref=np.max, top_db=80.0).
      */
-    private float[][] computeLogMelSpectrogram(float[] chunk) {
+    private void computeLogMelSpectrogramInternal(float[] chunk) {
         float[][] power = stftTransformer.computePowerSpectrogram(chunk);
-        float[][] mel = melFilterBank.apply(power);
+        melFilterBank.apply(power, melBuffer);
 
-        int numMels = mel.length;
-        int timeSteps = mel[0].length;
+        int numMels = DspConstants.N_MELS;
+        int timeSteps = DspConstants.TIME_STEPS;
 
         // Wyszukanie wartości maksymalnej jako referencji (ref = np.max)
         float maxVal = 0.0f;
         for (int m = 0; m < numMels; m++) {
+            float[] row = melBuffer[m];
             for (int t = 0; t < timeSteps; t++) {
-                if (mel[m][t] > maxVal) {
-                    maxVal = mel[m][t];
+                if (row[t] > maxVal) {
+                    maxVal = row[t];
                 }
             }
         }
         float ref = Math.max(maxVal, 1e-10f);
+        float invRef = 1.0f / ref;
 
         // Konwersja do dB: 10 * log10(max(val, 1e-10) / ref) z odcięciem na poziomie -80 dB
-        float[][] logMel = new float[numMels][timeSteps];
         for (int m = 0; m < numMels; m++) {
+            float[] melRow = melBuffer[m];
+            float[] logRow = logMelBuffer[m];
             for (int t = 0; t < timeSteps; t++) {
-                float val = Math.max(mel[m][t], 1e-10f);
-                float db = 10.0f * (float) Math.log10(val / ref);
+                float val = Math.max(melRow[t], 1e-10f);
+                float db = 10.0f * (float) Math.log10(val * invRef);
                 if (db < -DspConstants.TOP_DB) {
                     db = -DspConstants.TOP_DB;
                 }
-                logMel[m][t] = db;
+                logRow[t] = db;
             }
         }
-
-        return logMel;
     }
 
     /**
-     * Obliczenie kanału Delta (1. pochodna czasowa) z oknem Savitzky-Golay N = 9.
+     * Obliczenie kanału Delta (1. pochodna czasowa) z rozwiniętym jądrem Savitzky-Golay N = 9.
      * Odpowiada wywołaniu librosa.feature.delta(data, order=1, width=9).
      */
-    private static float[][] computeDelta1(float[][] data) {
-        int numMels = data.length;
-        int timeSteps = data[0].length;
-        float[][] delta = new float[numMels][timeSteps];
-
-        float denom = 60.0f; // 2 * (1^2 + 2^2 + 3^2 + 4^2) = 60
+    private static void computeDelta1Internal(float[][] src, float[][] dst) {
+        int numMels = src.length;
+        int timeSteps = src[0].length;
 
         for (int m = 0; m < numMels; m++) {
-            float[] row = data[m];
-            float[] dRow = delta[m];
+            float[] row = src[m];
+            float[] dRow = dst[m];
 
-            // Punkty wewnętrzne (od 4 do timeSteps - 5)
+            // Punkty wewnętrzne: Unrolled Savitzky-Golay dla rzędu 1
             for (int t = 4; t < timeSteps - 4; t++) {
-                float sum = 0.0f;
-                for (int k = 1; k <= 4; k++) {
-                    sum += k * (row[t + k] - row[t - k]);
-                }
-                dRow[t] = sum / denom;
+                float sum = (row[t + 1] - row[t - 1])
+                          + 2.0f * (row[t + 2] - row[t - 2])
+                          + 3.0f * (row[t + 3] - row[t - 3])
+                          + 4.0f * (row[t + 4] - row[t - 4]);
+                dRow[t] = sum * INV_60;
             }
 
             // Warunki brzegowe zgodne z scipy savgol_filter mode='interp'
             float leftVal = dRow[4];
             float rightVal = dRow[timeSteps - 5];
 
-            for (int t = 0; t < 4; t++) {
-                dRow[t] = leftVal;
-            }
-            for (int t = timeSteps - 4; t < timeSteps; t++) {
-                dRow[t] = rightVal;
-            }
-        }
+            dRow[0] = leftVal;
+            dRow[1] = leftVal;
+            dRow[2] = leftVal;
+            dRow[3] = leftVal;
 
-        return delta;
+            dRow[timeSteps - 4] = rightVal;
+            dRow[timeSteps - 3] = rightVal;
+            dRow[timeSteps - 2] = rightVal;
+            dRow[timeSteps - 1] = rightVal;
+        }
     }
 
     /**
-     * Obliczenie kanału Delta-Delta (2. pochodna czasowa) z oknem Savitzky-Golay N = 9.
+     * Obliczenie kanału Delta-Delta (2. pochodna czasowa) z rozwiniętym symetrycznym jądrem Savitzky-Golay N = 9.
      * Odpowiada wywołaniu librosa.feature.delta(data, order=2, width=9).
+     * Współczynniki symetryczne: [28, 7, -8, -17, -20, -17, -8, 7, 28] / 462.0f
      */
-    private static float[][] computeDelta2(float[][] data) {
-        int numMels = data.length;
-        int timeSteps = data[0].length;
-        float[][] delta2 = new float[numMels][timeSteps];
+    private static void computeDelta2Internal(float[][] src, float[][] dst) {
+        int numMels = src.length;
+        int timeSteps = src[0].length;
 
         for (int m = 0; m < numMels; m++) {
-            float[] row = data[m];
-            float[] dRow = delta2[m];
+            float[] row = src[m];
+            float[] dRow = dst[m];
 
-            // Punkty wewnętrzne
+            // Punkty wewnętrzne: Wykorzystanie symetrii wag Savitzky-Golay (redukcja mnożeń o 45%)
             for (int t = 4; t < timeSteps - 4; t++) {
-                float sum = 0.0f;
-                for (int k = -4; k <= 4; k++) {
-                    sum += SAVGOL_C2_KERNEL[k + 4] * row[t + k];
-                }
-                dRow[t] = sum;
+                float sum = 28.0f * (row[t + 4] + row[t - 4])
+                          + 7.0f * (row[t + 3] + row[t - 3])
+                          - 8.0f * (row[t + 2] + row[t - 2])
+                          - 17.0f * (row[t + 1] + row[t - 1])
+                          - 20.0f * row[t];
+                dRow[t] = sum * INV_462;
             }
 
             // Warunki brzegowe
             float leftVal = dRow[4];
             float rightVal = dRow[timeSteps - 5];
 
-            for (int t = 0; t < 4; t++) {
-                dRow[t] = leftVal;
-            }
-            for (int t = timeSteps - 4; t < timeSteps; t++) {
-                dRow[t] = rightVal;
-            }
-        }
+            dRow[0] = leftVal;
+            dRow[1] = leftVal;
+            dRow[2] = leftVal;
+            dRow[3] = leftVal;
 
-        return delta2;
+            dRow[timeSteps - 4] = rightVal;
+            dRow[timeSteps - 3] = rightVal;
+            dRow[timeSteps - 2] = rightVal;
+            dRow[timeSteps - 1] = rightVal;
+        }
     }
 
     /**
@@ -321,9 +344,11 @@ public final class AudioPreprocessor {
             std = floor;
         }
 
+        float invStd = 1.0f / std;
         for (int r = 0; r < rows; r++) {
+            float[] row = channel[r];
             for (int c = 0; c < cols; c++) {
-                channel[r][c] = (channel[r][c] - mean) / std;
+                row[c] = (row[c] - mean) * invStd;
             }
         }
     }
@@ -383,8 +408,9 @@ public final class AudioPreprocessor {
             int lowCount = 0;
             // Pasmo niskie/średnie: filtry 5 - 35 (ok. 100 - 1500 Hz)
             for (int m = 5; m <= 35; m++) {
-                for (int t = 0; t < logMelSpectrogram[m].length; t++) {
-                    lowEnergySum += logMelSpectrogram[m][t];
+                float[] mRow = logMelSpectrogram[m];
+                for (int t = 0; t < mRow.length; t++) {
+                    lowEnergySum += mRow[t];
                     lowCount++;
                 }
             }
@@ -394,8 +420,9 @@ public final class AudioPreprocessor {
             int highCount = 0;
             // Pasmo wysokie: filtry 80 - 120 (ok. 4000 - 9000 Hz)
             for (int m = 80; m <= 120; m++) {
-                for (int t = 0; t < logMelSpectrogram[m].length; t++) {
-                    highEnergySum += logMelSpectrogram[m][t];
+                float[] mRow = logMelSpectrogram[m];
+                for (int t = 0; t < mRow.length; t++) {
+                    highEnergySum += mRow[t];
                     highCount++;
                 }
             }

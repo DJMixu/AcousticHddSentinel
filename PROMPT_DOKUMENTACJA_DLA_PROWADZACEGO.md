@@ -4720,9 +4720,15 @@ class DSPAdversarialGuard:
             arith_mean = np.mean(power_high)
             flatness_high = float(geom_mean / arith_mean)
 
-            # Safety Veto dla autentycznego uszkodzenia HDD:
+            # Safety Veto dla autentycznego uszkodzenia HDD oraz Smart Clipping Bypass:
             # Prawdziwe tarcie głowic o talerz (scratching) lub uderzenia (clicking)
             # posiadają wysoką dynamikę impulsową (Crest > 3.2) oraz szerokopasmowe widmo tarcia (flatness > 0.18).
+            # Jeśli Crest >= 4.5 oraz energia > 4 kHz > 18%, przesterowanie jest bezpośrednim dowodem Crash Stop.
+            total_e = float(np.sum(fft ** 2) + 1e-12)
+            high_e_frac = float(np.sum(fft[freqs >= 4000] ** 2) / total_e)
+            if crest >= 4.5 and high_e_frac > 0.18:
+                return False, ""  # Smart Clipping Bypass - autentyczna katastrofalna kolizja głowicy
+
             if crest >= 3.2 and flatness_high > 0.18 and clip_ratio < 0.05:
                 return False, ""
 
@@ -5616,6 +5622,536 @@ def analyze_frequency_peaks(y: np.ndarray, sr: int = TARGET_SR) -> Dict[str, Any
     
     for rpm_key, profile in RPM_PROFILES.items():
         res = evaluate_harmonic_comb(freqs, spec, profile["f0"], profile["harmonics"])
+        if res["detected"] and res["score"] > best_score:
+            best_score = res["score"]
+            best_rpm = rpm_key
+            best_rpm_data = res
+
+    # 2. Wykrywanie dominujących ostrych pików w całym paśmie (np. pisk stojana 1000 - 3000 Hz)
+    peaks, properties = signal.find_peaks(spec, prominence=np.mean(spec) * 2.5, distance=15)
+    top_peaks = []
+    if len(peaks) > 0:
+        sorted_indices = np.argsort(spec[peaks])[::-1][:8]
+        for idx in sorted_indices:
+            p_idx = peaks[idx]
+            top_peaks.append({
+                "frequency_hz": round(float(freqs[p_idx]), 1),
+                "amplitude": float(spec[p_idx]),
+                "prominence": round(float(properties["prominences"][idx]), 4)
+            })
+
+    # 3. Sprawdzenie charakteru sygnału (Wentylator PC vs Wirujący HDD)
+    has_hdd_rotation = (best_rpm is not None)
+
+    # 4. Test obecności pisku stojana (Stall Beep) przy zatartym silniku:
+    # Zatarte silniki wrzeciona (Seized Spindle) emitują ostry pisk między 1050 a 3500 Hz
+    # przy braku prawidłowej, stabilnej rotacji silnika (has_rotation == False)!
+    # Wymóg min. 0.5% energii w paśmie 1050 - 3500 Hz chroni przed cichymi szumami tła i cewkami zasilaczy.
+    has_high_stall_beep = False
+    stall_beep_freq = 0.0
+    if not has_hdd_rotation:
+        m_band = (freqs >= 1050.0) & (freqs <= 3500.0)
+        beep_band_energy_ratio = float(np.sum(spec[m_band]**2) / (np.sum(spec**2) + 1e-12))
+        if beep_band_energy_ratio >= 0.005:
+            for p in top_peaks:
+                f_p = p["frequency_hz"]
+                if 1050.0 <= f_p <= 3500.0 and p["prominence"] > np.mean(spec) * 6.0:
+                    # Weryfikacja wyrazistości piku względem lokalnego tła w otoczeniu +/- 65 Hz
+                    m_bg = (freqs >= f_p - 65.0) & (freqs <= f_p + 65.0) & (np.abs(freqs - f_p) > 12.0)
+                    local_bg = float(np.median(spec[m_bg])) if np.sum(m_bg) > 0 else float(np.mean(spec))
+                    prominence_ratio = p["amplitude"] / (local_bg + 1e-9)
+                    if prominence_ratio >= 3.0:
+                        has_high_stall_beep = True
+                        stall_beep_freq = f_p
+                        break
+    
+    return {
+        "status": "ANALYZED",
+        "rms": round(rms, 5),
+        "detected_rpm": best_rpm,
+        "rpm_nominal": RPM_PROFILES[best_rpm]["nominal_rpm"] if best_rpm else None,
+        "rpm_confidence": round(min(best_score / 10.0, 1.0), 3) if best_rpm else 0.0,
+        "rpm_details": best_rpm_data,
+        "has_rotation": has_hdd_rotation,
+        "has_stall_beep": has_high_stall_beep,
+        "stall_beep_freq_hz": round(stall_beep_freq, 1),
+        "dominant_peaks": top_peaks
+    }
+```
+
+### Test odporności na głośny szum miasta i przesterowanie (`tests/noise_experiment/test_city_noise_immunity.py`)
+```python
+"""
+Test weryfikacyjny odporności systemu na głośny szum otoczenia miejskiego (City / Traffic Noise)
+oraz przesterowanie mikrofonu fizycznego (Hard Clipping).
+
+Testuje zarejestrowane nagranie: tests/noise_experiment/city_noise_recorded_from_mic.wav
+Single Source of Truth: ADR-001, AGENTS.md
+"""
+
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+import soundfile as sf
+import numpy as np
+import torch
+from ml.model_cnn import AcousticHddSentinelCNN
+from ml.hdd_audio_encoder import encode_audio_chunk
+from ml.dsp_adversarial_guard import DSPAdversarialGuard
+from ml.rpm_harmonics_analyzer import analyze_frequency_peaks
+
+TARGET_SR = 22050
+CHUNK_LEN = 66150  # 3.0 s
+STEP = CHUNK_LEN // 2  # 1.5 s
+
+def test_city_noise_immunity():
+    audio_path = "tests/noise_experiment/city_noise_recorded_from_mic.wav"
+    data, sr = sf.read(audio_path)
+    if len(data.shape) > 1:
+        data = data[:, 0]
+
+    model = AcousticHddSentinelCNN(num_classes=4)
+    state = torch.load("training_output/best_hdd_cnn_model.pt", map_location="cpu")
+    model.load_state_dict(state["state_dict"])
+    model.eval()
+
+    guard = DSPAdversarialGuard()
+    classes = ["beeping", "clicking", "normal", "scratching"]
+
+    print("=" * 70)
+    print("TEST ODPORNOŚCI NA GŁOŚNY SZUM MIASTA I PRZESTEROWANIE MIKROFONU")
+    print(f"Plik wejściowy: {audio_path}")
+    print(f"Długość: {len(data)/sr:.2f}s, SR: {sr} Hz")
+    print("=" * 70)
+
+    fault_windows = 0
+    total_windows = 0
+
+    for i in range(0, len(data) - CHUNK_LEN + 1, STEP):
+        chunk = data[i:i + CHUNK_LEN].astype(np.float32)
+        t = encode_audio_chunk(chunk, sr)
+        t_torch = torch.from_numpy(t.transpose(2, 0, 1)).unsqueeze(0)
+        with torch.no_grad():
+            logits = model(t_torch)
+            probs = torch.softmax(logits, dim=1).numpy()[0]
+
+        rpm_info = analyze_frequency_peaks(chunk, sr)
+        sanitized_p, sanitized, reason = guard.protect_and_sanitize_predictions(probs, t, waveform=chunk)
+
+        fault_prob = (sanitized_p[0] + sanitized_p[1] + sanitized_p[3]) * 100.0
+        is_fault = (fault_prob >= 70.0)
+
+        peak = float(np.max(np.abs(chunk)))
+        rms = float(np.sqrt(np.mean(chunk**2)))
+        crest = float(peak / max(rms, 1e-12))
+        clip_ratio = float(np.mean(np.abs(chunk) >= 0.985 * peak))
+
+        w_idx = i // STEP
+        t_start = i / sr
+        t_end = (i + CHUNK_LEN) / sr
+
+        print(f"Okno {w_idx} ({t_start:.1f}s - {t_end:.1f}s):")
+        print(f"  P(fault): {fault_prob:.1f}% -> Werdykt okna: {'AWARIA' if is_fault else 'BEZPIECZNY'}")
+        print(f"  Sanityzacja ({sanitized}): {reason if reason else 'Brak interwencji'}")
+        print(f"  RMS: {rms:.4f}, Crest: {crest:.2f}, Clip: {clip_ratio*100:.1f}%")
+        print(f"  RPM: rot={rpm_info['has_rotation']}, stall_beep={rpm_info['has_stall_beep']}")
+
+        if is_fault:
+            fault_windows += 1
+        total_windows += 1
+
+    print("-" * 70)
+    print(f"Podsumowanie: Okien z fałszywym alarmem P(fault) >= 70%: {fault_windows} / {total_windows}")
+    assert fault_windows == 0, f"BŁĄD: Wykryto {fault_windows} fałszywych alarmów na szumie miasta!"
+    print("STATUS: TEST ZDANY W 100% SUKCESEM (0 fałszywych alarmów)")
+    print("=" * 70)
+
+if __name__ == "__main__":
+    test_city_noise_immunity()
+```
+
+### Test weryfikacji binarnego werdyktu i 320 okien rzeczywistych dysków (`tests/verify_binary_verdict_and_real_drives.py`)
+```python
+#!/usr/bin/env python3
+"""
+Test Weryfikacyjny Nowego Paradygmatu Binarnego Werdyktu (Acoustic HDD Sentinel).
+Single Source of Truth: ADR-001, ADR-002, AGENTS.md
+
+Weryfikuje trzy kluczowe filary:
+1. Weryfikacja 320 okien pomiarowych z autentycznych 4-minutowych badań 4 dysków
+   (Toshiba P300 3.5", WD Blue 2.5", Seagate Momentus 2.5", HGST Travelstar 2.5")
+   we wszystkich fazach obciążenia (IDLE, READ, WRITE, MIXED).
+   -> Wymóg: False Positive Rate (FPR) = 0.0% (Zero fałszywych alarmów awarii).
+2. Weryfikacja odporności na szum wentylatorów PC, oczyszczaczy powietrza i zakłóceń OOD.
+   -> Wymóg: False Positive Rate (FPR) = 0.0%.
+3. Weryfikacja na czystym zbiorze testowym dataset_encoded/test w logice binarnej
+   ('USZKODZONY' vs 'SPRAWNY / NIE WIADOMO').
+   -> Wymóg: Recall dla awarii >= 70% przy wysokiej precyzji.
+"""
+
+import sys
+import os
+from pathlib import Path
+import numpy as np
+import soundfile as sf
+import onnxruntime as ort
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from ml.hdd_audio_encoder import encode_audio_chunk
+from ml.dsp_adversarial_guard import DSPAdversarialGuard
+
+TARGET_SR = 22050
+CHUNK_SAMPLES = 66150  # 3.0 s
+CLASSES = ["beeping", "clicking", "normal", "scratching"]
+
+def run_binary_verdict_verification():
+    print("=" * 75)
+    print("AUDYT I WERYFIKACJA PARADYGMATU WERDYKTU BINARNEGO (ACOUSTIC HDD SENTINEL)")
+    print("=" * 75)
+
+    model_path = PROJECT_ROOT / "exported_models" / "best_hdd_cnn_model_int8.onnx"
+    if not model_path.exists():
+        print(f"[BŁĄD] Brak wyeksportowanego modelu ONNX: {model_path}")
+        sys.exit(1)
+
+    print(f"-> Załadowano model ONNX INT8: {model_path.name}")
+    sess = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+    guard = DSPAdversarialGuard()
+
+    # =========================================================================
+    # TEST 1: 320 okien z autentycznych dysków rzeczywistych (4min Study)
+    # =========================================================================
+    print("\n" + "-" * 75)
+    print("[TEST 1/3] Badanie 320 okien rzeczywistych sprawnych dysków HDD...")
+    study_dir = PROJECT_ROOT / "tests" / "recordings_4min_study"
+    study_files = sorted(list(study_dir.glob("*/*.wav")))
+
+    if len(study_files) != 16:
+        print(f"   [UWAGA] Znaleziono {len(study_files)}/16 plików study recordings.")
+
+    total_study_windows = 0
+    false_fault_windows = 0
+    drives_tested = set()
+
+    for wf in study_files:
+        drive_name = wf.parent.name
+        drives_tested.add(drive_name)
+        y, sr = sf.read(str(wf))
+        if y.ndim > 1:
+            y = np.mean(y, axis=1)
+        if sr != TARGET_SR:
+            import librosa
+            y = librosa.resample(y, orig_sr=sr, target_sr=TARGET_SR)
+
+        num_windows = len(y) // CHUNK_SAMPLES
+        for w in range(num_windows):
+            chunk = y[w * CHUNK_SAMPLES : (w + 1) * CHUNK_SAMPLES]
+            tensor = encode_audio_chunk(chunk, sr=TARGET_SR, tensor_format="pytorch")
+            tensor_in = np.expand_dims(tensor, 0).astype(np.float32)
+
+            raw_probs = sess.run(None, {"input_audio_tensor": tensor_in})[0][0]
+            san_probs, guarded, reason = guard.protect_and_sanitize_predictions(
+                raw_probs, tensor, waveform=chunk
+            )
+
+            # P(fault) = beeping + clicking + scratching
+            fault_p = san_probs[0] + san_probs[1] + san_probs[3]
+            total_study_windows += 1
+
+            if fault_p >= 0.70:
+                false_fault_windows += 1
+                print(f"   [FAŁSZYWY ALARM] {drive_name}/{wf.name} okno {w}: P(fault)={fault_p:.3f}")
+
+    study_fpr = (false_fault_windows / total_study_windows * 100.0) if total_study_windows > 0 else 0.0
+    print(f"   -> Przebadano dysków: {sorted(list(drives_tested))}")
+    print(f"   -> Zbadano okien pomiarowych: {total_study_windows}")
+    print(f"   -> Fałszywe alarmy 'USZKODZONY' (P(fault) >= 70%): {false_fault_windows}")
+    print(f"   -> Wskaźnik fałszywych alarmów (FPR): {study_fpr:.2f}%")
+    assert false_fault_windows == 0, f"Błąd: FPR dla zdrowych dysków wynosi {study_fpr:.2f}% > 0.0%!"
+    print("   [OK] TEST 1 ZDANY: 0.0% fałszywych alarmów na rzeczywistych dyskach HDD!")
+
+    # =========================================================================
+    # TEST 2: Odporność na szumy wentylatorów PC i dźwięki tła (OOD)
+    # =========================================================================
+    print("\n" + "-" * 75)
+    print("[TEST 2/3] Weryfikacja odporności na szumy wentylatorów PC i tła...")
+    ambient_files = []
+    ambient_files.extend(sorted(list((PROJECT_ROOT / "data" / "raw" / "outliers_oe").glob("oe_pc_fan*.wav"))))
+    ambient_files.extend(sorted(list((PROJECT_ROOT / "data" / "raw" / "computer_ambient").glob("*.wav"))))
+
+    total_ambient_windows = 0
+    false_ambient_faults = 0
+
+    for af in ambient_files:
+        try:
+            y, sr = sf.read(str(af))
+            if y.ndim > 1:
+                y = np.mean(y, axis=1)
+            if sr != TARGET_SR:
+                import librosa
+                y = librosa.resample(y, orig_sr=sr, target_sr=TARGET_SR)
+
+            num_w = max(1, len(y) // CHUNK_SAMPLES)
+            for w in range(num_w):
+                start = w * CHUNK_SAMPLES
+                end = start + CHUNK_SAMPLES
+                if len(y) < CHUNK_SAMPLES:
+                    chunk = np.pad(y, (0, CHUNK_SAMPLES - len(y)))
+                else:
+                    chunk = y[start:end]
+
+                tensor = encode_audio_chunk(chunk, sr=TARGET_SR, tensor_format="pytorch")
+                tensor_in = np.expand_dims(tensor, 0).astype(np.float32)
+
+                raw_probs = sess.run(None, {"input_audio_tensor": tensor_in})[0][0]
+                san_probs, guarded, reason = guard.protect_and_sanitize_predictions(
+                    raw_probs, tensor, waveform=chunk
+                )
+
+                fault_p = san_probs[0] + san_probs[1] + san_probs[3]
+                total_ambient_windows += 1
+
+                if fault_p >= 0.70:
+                    false_ambient_faults += 1
+                    print(f"   [FAŁSZYWY ALARM SZUMU] {af.name} okno {w}: P(fault)={fault_p:.3f}")
+        except Exception as e:
+            pass
+
+    ambient_fpr = (false_ambient_faults / total_ambient_windows * 100.0) if total_ambient_windows > 0 else 0.0
+    print(f"   -> Zbadano okien szumów wentylatorów i tła: {total_ambient_windows}")
+    print(f"   -> Fałszywe alarmy awarii: {false_ambient_faults} (FPR: {ambient_fpr:.2f}%)")
+    assert false_ambient_faults == 0, f"Błąd: Szum wentylatora wygenerował werdykt awarii! FPR={ambient_fpr:.2f}%"
+    print("   [OK] TEST 2 ZDANY: 0.0% fałszywych alarmów na szumach wentylatorów!")
+
+    # =========================================================================
+    # TEST 3: Czysty zbiór testowy dataset_encoded/test w logice binarnej
+    # =========================================================================
+    print("\n" + "-" * 75)
+    print("[TEST 3/3] Ewaluacja binarnego werdyktu na zbiorze testowym (dataset_encoded/test)...")
+    test_dir = PROJECT_ROOT / "dataset_encoded" / "test"
+
+    tp, fp, tn, fn = 0, 0, 0, 0
+    total_test_samples = 0
+
+    for cls in CLASSES:
+        cls_files = sorted(list((test_dir / cls).glob("*.npy")))
+        for f in cls_files:
+            total_test_samples += 1
+            tensor = np.load(f)
+            if tensor.shape == (128, 259, 3):
+                tensor_cf = np.transpose(tensor, (2, 0, 1))
+            else:
+                tensor_cf = tensor
+
+            tensor_in = np.expand_dims(tensor_cf, 0).astype(np.float32)
+            raw_probs = sess.run(None, {"input_audio_tensor": tensor_in})[0][0]
+            san_probs, guarded, reason = guard.protect_and_sanitize_predictions(raw_probs, tensor)
+
+            # P(fault) = beeping + clicking + scratching
+            fault_p = san_probs[0] + san_probs[1] + san_probs[3]
+            is_pred_fault = (fault_p >= 0.65)
+            is_true_fault = (cls != "normal")
+
+            if is_true_fault and is_pred_fault:
+                tp += 1
+            elif is_true_fault and not is_pred_fault:
+                fn += 1
+            elif not is_true_fault and is_pred_fault:
+                fp += 1
+            else:
+                tn += 1
+
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    test_fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
+
+    print(f"   -> Zbadano próbek testowych ogółem: {total_test_samples}")
+    print(f"   -> Prawdziwe awarie wykryte (TP): {tp} / {tp + fn}")
+    print(f"   -> Sprawne dyski bez alarmu (TN): {tn} / {tn + fp}")
+    print(f"   -> Fałszywe alarmy na sprawnych (FP): {fp}")
+    print(f"   -> Czułość (Recall dla uszkodzeń): {recall * 100.0:.2f}% (wymóg: >= 70%)")
+    print(f"   -> Precyzja (Precision):            {precision * 100.0:.2f}%")
+    print(f"   -> Wskaźnik FP (FPR):              {test_fpr * 100.0:.2f}%")
+
+    assert recall >= 0.70, f"Błąd: Zbyt niski recall: {recall:.2%} < 70%!"
+    print("   [OK] TEST 3 ZDANY: Czułość dla rzeczywistych uszkodzeń spełnia wymóg SLA (>= 70%)!")
+
+    print("\n" + "=" * 75)
+    print("WSZYSTKIE 3 ETAPY AUDYTU BINARNEGO ZDANE W 100% SUKCESEM!")
+    print("=" * 75)
+
+if __name__ == "__main__":
+    run_binary_verdict_verification()
+```
+
+
+### Analizator harmonicznych RPM i pisków stojana (Python) (`ml/rpm_harmonics_analyzer.py`)
+```python
+"""
+Moduł analizy pików częstotliwościowych i detekcji harmonicznych RPM dla dysków HDD.
+Single Source of Truth: ADR-001, fizyka akustyczna HDD & AGENTS.md
+
+Funkcjonalności:
+1. Detekcja fundamentalnej częstotliwości obrotowej silnika wrzeciona:
+   - 5400 RPM -> f0 = 90.0 Hz (+/- 1.5 Hz)
+   - 7200 RPM -> f0 = 120.0 Hz (+/- 1.8 Hz)
+   - 10000 RPM -> f0 = 166.7 Hz (+/- 2.5 Hz)
+2. Analiza grzebienia harmonicznego (Harmonic Comb Analysis):
+   - Weryfikacja obecności składowych k * f0 (2x, 3x, 4x, 6x, 12x)
+3. Test stacjonarności częstotliwości (odrzucanie głosu ludzkiego z wibrato i intonacją)
+4. Obliczenie współczynnika wyrazistości harmonicznej (Harmonic Prominence Ratio)
+5. Dyskryminacja: Zdrowy HDD (5400/7200) vs Wentylator PC vs Głos vs Awaria (Brak rotacji / Zablokowanie)
+"""
+
+from typing import Dict, Any, Optional, Tuple, List
+import numpy as np
+import scipy.signal as signal
+
+TARGET_SR = 22050
+
+# Profile prędkości obrotowych HDD z dynamicznym oknem śledzenia częstotliwości podstawowej
+RPM_PROFILES = {
+    "5400_rpm": {
+        "nominal_rpm": 5400,
+        "f0": 90.0,
+        "f_range": (85.5, 94.5),  # +/- 4.5 Hz (tolerancja degradacji łożysk)
+        "multipliers": [2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 9.0, 10.0, 12.0],
+    },
+    "7200_rpm": {
+        "nominal_rpm": 7200,
+        "f0": 120.0,
+        "f_range": (114.0, 126.0),  # +/- 6.0 Hz (tolerancja degradacji łożysk)
+        "multipliers": [2.0, 3.0, 4.0, 5.0, 6.0, 12.0],
+    },
+    "10000_rpm": {
+        "nominal_rpm": 10000,
+        "f0": 166.67,
+        "f_range": (160.0, 173.0),
+        "multipliers": [2.0, 3.0, 4.0, 6.0, 12.0],
+    }
+}
+
+
+def compute_high_res_spectrum(y: np.ndarray, sr: int = TARGET_SR, n_fft: int = 8192) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Oblicza widmo amplitudowe o wysokiej rozdzielczości (krok ~2.69 Hz przy 8192 i SR 22050).
+    Stosuje okno Flattop lub Hann z uśrednianiem segmentów (Welch).
+    """
+    if len(y) < n_fft:
+        pad_len = n_fft - len(y)
+        y = np.pad(y, (0, pad_len), mode="constant")
+    
+    freqs, psd = signal.welch(
+        y,
+        fs=sr,
+        window="hann",
+        nperseg=n_fft,
+        noverlap=n_fft // 2,
+        scaling="spectrum"
+    )
+    amplitude_spectrum = np.sqrt(psd)
+    return freqs, amplitude_spectrum
+
+
+def evaluate_harmonic_comb(
+    freqs: np.ndarray,
+    spec: np.ndarray,
+    f0_target: float,
+    f_range: Tuple[float, float],
+    multipliers: List[float],
+    bandwidth_hz: float = 3.5
+) -> Dict[str, Any]:
+    """
+    Dynamic Harmonic Tracking via Pitch Harmonizer:
+    Wyszukuje optymalny f0 w przedziale f_range (uwzględniając spadek prędkości obrotowej wywołany uszkodzeniem łożysk),
+    a następnie dynamicznie śledzi wyższe harmoniczne h_freq = m * f0_exact_freq.
+    """
+    total_energy = np.sum(spec**2) + 1e-12
+    
+    # 1. Sprawdzenie piku podstawowego f0 w dynamicznym oknie f_range
+    f_min, f_max = f_range
+    idx_f0 = np.where((freqs >= f_min) & (freqs <= f_max))[0]
+    if len(idx_f0) == 0:
+        return {"detected": False, "score": 0.0, "f0_found": 0.0, "prominence": 0.0}
+    
+    f0_max_idx = idx_f0[np.argmax(spec[idx_f0])]
+    f0_peak_val = spec[f0_max_idx]
+    f0_exact_freq = freqs[f0_max_idx]
+    
+    # Tło lokalne wokół f0 (poza pasmem piku)
+    local_bg_idx = np.where((freqs >= f0_target - 25.0) & (freqs <= f0_target + 25.0))[0]
+    local_bg_idx = [i for i in local_bg_idx if abs(freqs[i] - f0_exact_freq) > bandwidth_hz]
+    local_bg = np.median(spec[local_bg_idx]) if len(local_bg_idx) > 0 else 1e-6
+    
+    f0_prominence = f0_peak_val / (local_bg + 1e-9)
+    
+    # 2. Dynamiczne śledzenie wyższych harmonicznych proporcjonalnie do f0_exact_freq
+    harmonic_hits = 0
+    harmonic_energy = (f0_peak_val ** 2)
+    
+    for m in multipliers:
+        h_freq = f0_exact_freq * m
+        if h_freq >= (TARGET_SR / 2.0) - 60.0:
+            continue
+
+        h_tol = max(bandwidth_hz * 1.5, h_freq * 0.025)
+        idx_h = np.where((freqs >= h_freq - h_tol) & (freqs <= h_freq + h_tol))[0]
+        if len(idx_h) > 0:
+            h_peak = np.max(spec[idx_h])
+            # Tło lokalne dla danej harmonicznej
+            h_bg_idx = np.where((freqs >= h_freq - 30.0) & (freqs <= h_freq + 30.0))[0]
+            h_bg_idx = [i for i in h_bg_idx if abs(freqs[i] - h_freq) > h_tol]
+            h_bg = np.median(spec[h_bg_idx]) if len(h_bg_idx) > 0 else 1e-6
+            
+            if h_peak / (h_bg + 1e-9) > 1.6:
+                harmonic_hits += 1
+                harmonic_energy += (h_peak ** 2)
+                
+    comb_score = (f0_prominence * 0.4) + (harmonic_hits / len(multipliers) * 6.0)
+    comb_detected = ((f0_prominence >= 2.2 and harmonic_hits >= 2 and comb_score >= 3.0) or (f0_prominence >= 3.5 and harmonic_hits >= 1 and comb_score >= 3.0) or (f0_prominence >= 1.8 and harmonic_hits >= 3 and comb_score >= 3.8)) and (float(harmonic_energy / total_energy) >= 0.005 or harmonic_hits >= 4)
+    
+    return {
+        "detected": bool(comb_detected),
+        "score": float(comb_score),
+        "f0_found": float(f0_exact_freq),
+        "f0_prominence": float(f0_prominence),
+        "harmonics_matched": int(harmonic_hits),
+        "harmonics_total": len(multipliers),
+        "harmonic_energy_ratio": float(harmonic_energy / total_energy)
+    }
+
+
+def analyze_frequency_peaks(y: np.ndarray, sr: int = TARGET_SR) -> Dict[str, Any]:
+    """
+    Główna funkcja analizy częstotliwościowej nagrania audio.
+    Zwraca:
+    - Wykryty profil RPM ('5400_rpm', '7200_rpm', '10000_rpm' lub None)
+    - Obecność ostrych pików częstotliwościowych (Piszczenie silnika, pisk głowic)
+    - Czy sygnał jest stacjonarny mechanicznie (HDD) czy jest szumem wentylatora / mową
+    """
+    rms = float(np.sqrt(np.mean(y ** 2)))
+    if rms < 0.002:
+        return {
+            "status": "SILENCE",
+            "detected_rpm": None,
+            "rpm_confidence": 0.0,
+            "has_rotation": False,
+            "rms": rms,
+            "dominant_peaks": []
+        }
+
+    freqs, spec = compute_high_res_spectrum(y, sr=sr, n_fft=8192)
+    
+    # 1. Weryfikacja profili RPM z dynamicznym śledzeniem harmonicznych
+    best_rpm = None
+    best_rpm_data = None
+    best_score = 0.0
+    
+    for rpm_key, profile in RPM_PROFILES.items():
+        res = evaluate_harmonic_comb(freqs, spec, profile["f0"], profile["f_range"], profile["multipliers"])
         if res["detected"] and res["score"] > best_score:
             best_score = res["score"]
             best_rpm = rpm_key
@@ -8352,16 +8888,25 @@ import java.util.Arrays;
  * Zgodny z fizyką akustyczną HDD oraz niezmiennikami ADR-001.
  *
  * Wykrywa:
- * 1. Częstotliwości podstawowe i harmoniczne obrotu silnika wrzeciona:
- *    - 5400 RPM: f0 = 90.0 Hz (harmoniczne 180, 270, 360, 450, 540, 1080 Hz)
- *    - 7200 RPM: f0 = 120.0 Hz (harmoniczne 240, 360, 480, 600, 720, 1440 Hz)
- * 2. Brak rotacji i pisk stojana zablokowanego silnika (Stall Beep w paśmie 800 - 3500 Hz)
- * 3. Odrzucanie szumu wentylatorów PC i mowy ludzkiej
+ * 1. Dynamiczne śledzenie częstotliwości podstawowej i harmonicznych obrotu silnika (Dynamic Harmonic Tracking):
+ *    - 5400 RPM: nominalne f0 = 90.0 Hz z dynamicznym oknem śledzenia +/- 4.5 Hz (85.5 - 94.5 Hz)
+ *      Harmoniczne stojana i biegunów: 2x, 3x, 4x, 5x, 6x, 8x, 9x, 10x, 12x
+ *    - 7200 RPM: nominalne f0 = 120.0 Hz z dynamicznym oknem śledzenia +/- 6.0 Hz (114.0 - 126.0 Hz)
+ *      Harmoniczne: 2x, 3x, 4x, 5x, 6x, 12x
+ *    Obsługuje spadek prędkości obrotowej w agonalnych dyskach 2.5" z uszkodzonymi łożyskami.
+ * 2. Brak rotacji i pisk stojana zablokowanego silnika (Stall Beep w paśmie 1050 - 3500 Hz).
+ * 3. Odrzucanie szumu wentylatorów PC i basowego szumu otoczenia.
  */
 public class RpmHarmonicsAnalyzer {
 
     private static final int FFT_SIZE = 4096;
-    private static final float FREQ_BIN_WIDTH = (float) DspConstants.SAMPLE_RATE / FFT_SIZE; // ~5.38 Hz
+    private static final float FREQ_BIN_WIDTH = (float) DspConstants.SAMPLE_RATE / FFT_SIZE; // ~5.383 Hz
+
+    // Mnożniki harmonicznych obrotu dla 5400 RPM (w tym harmoniczne biegunów stojana 8x, 9x, 10x)
+    private static final float[] MULTIPLIERS_5400 = {2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 8.0f, 9.0f, 10.0f, 12.0f};
+
+    // Mnożniki harmonicznych obrotu dla 7200 RPM
+    private static final float[] MULTIPLIERS_7200 = {2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 12.0f};
 
     public static class RpmResult {
         public final boolean hasRotation;
@@ -8388,6 +8933,13 @@ public class RpmHarmonicsAnalyzer {
 
         public String getSummaryDescription() {
             if (hasRotation) {
+                float expectedF0 = nominalRpm == 5400 ? 90.0f : 120.0f;
+                float drift = f0FoundHz - expectedF0;
+                if (Math.abs(drift) > 1.5f) {
+                    return String.format(java.util.Locale.US,
+                        "Wykryto niestabilną rotację wrzeciona HDD (%d RPM, f0=%.1f Hz, dryf=%.1f Hz - degradacja łożysk).",
+                        nominalRpm, f0FoundHz, drift);
+                }
                 return String.format(java.util.Locale.US,
                     "Wykryto prawidłową rotację silnika HDD (%d RPM, f0=%.1f Hz).", nominalRpm, f0FoundHz);
             }
@@ -8428,11 +8980,11 @@ public class RpmHarmonicsAnalyzer {
         }
         float meanEnergy = totalEnergy / Math.max(1, numBins);
 
-        // 3. Ocena profilu 5400 RPM (f0 = 90 Hz) - rozszerzona o harmoniczne biegunów stojana 8x, 9x, 10x
-        CombScore score5400 = evaluateComb(avgSpectrum, 90.0f, new float[]{180.0f, 270.0f, 360.0f, 450.0f, 540.0f, 720.0f, 810.0f, 900.0f, 1080.0f});
+        // 3. Dynamiczne śledzenie harmoniczne dla 5400 RPM (zakres f0: 90.0 +/- 4.5 Hz)
+        CombScore score5400 = evaluateCombDynamic(avgSpectrum, 90.0f, 4.5f, MULTIPLIERS_5400);
 
-        // 4. Ocena profilu 7200 RPM (f0 = 120 Hz)
-        CombScore score7200 = evaluateComb(avgSpectrum, 120.0f, new float[]{240.0f, 360.0f, 480.0f, 600.0f, 720.0f, 1440.0f});
+        // 4. Dynamiczne śledzenie harmoniczne dla 7200 RPM (zakres f0: 120.0 +/- 6.0 Hz)
+        CombScore score7200 = evaluateCombDynamic(avgSpectrum, 120.0f, 6.0f, MULTIPLIERS_7200);
 
         boolean hasRotation = false;
         String detectedRpm = null;
@@ -8520,29 +9072,48 @@ public class RpmHarmonicsAnalyzer {
         final boolean detected;
         final float score;
         final float exactF0Hz;
+        final int harmonicHits;
+        final float f0Prominence;
 
-        CombScore(boolean detected, float score, float exactF0Hz) {
+        CombScore(boolean detected, float score, float exactF0Hz, int harmonicHits, float f0Prominence) {
             this.detected = detected;
             this.score = score;
             this.exactF0Hz = exactF0Hz;
+            this.harmonicHits = harmonicHits;
+            this.f0Prominence = f0Prominence;
         }
     }
 
-    private CombScore evaluateComb(float[] spectrum, float targetF0, float[] harmonics) {
-        float f0Tolerance = 4.0f;
-        int binF0Min = Math.max(0, (int) ((targetF0 - f0Tolerance) / FREQ_BIN_WIDTH));
-        int binF0Max = Math.min(spectrum.length - 1, (int) ((targetF0 + f0Tolerance) / FREQ_BIN_WIDTH));
+    /**
+     * Dynamic Harmonic Tracking via Pitch Harmonizer.
+     * Znajduje optymalną częstotliwość f0 w tolerancji f0Tolerance, a następnie dynamicznie
+     * śledzi harmoniczne f_k = k * exactF0Hz, uwzględniając spadek prędkości obrotowej wywołany uszkodzeniem łożysk.
+     */
+    private CombScore evaluateCombDynamic(float[] spectrum, float targetF0, float f0Tolerance, float[] multipliers) {
+        int binF0Min = Math.max(1, (int) ((targetF0 - f0Tolerance) / FREQ_BIN_WIDTH));
+        int binF0Max = Math.min(spectrum.length - 2, (int) ((targetF0 + f0Tolerance) / FREQ_BIN_WIDTH));
 
         double totalEnergy = 1e-12;
         for (float v : spectrum) {
             totalEnergy += v * v;
         }
 
+        // 1. Wyszukanie optymalnego f0 w rozszerzonym oknie tolerancji (szczyt lokalny)
         int bestF0Bin = binF0Min;
         float maxF0Val = 0f;
+        boolean foundLocalPeak = false;
+
         for (int b = binF0Min; b <= binF0Max; b++) {
-            if (spectrum[b] > maxF0Val) {
-                maxF0Val = spectrum[b];
+            float val = spectrum[b];
+            boolean isPeak = (val >= spectrum[b - 1] && val >= spectrum[b + 1]);
+            if (isPeak) {
+                if (!foundLocalPeak || val > maxF0Val) {
+                    foundLocalPeak = true;
+                    maxF0Val = val;
+                    bestF0Bin = b;
+                }
+            } else if (!foundLocalPeak && val > maxF0Val) {
+                maxF0Val = val;
                 bestF0Bin = b;
             }
         }
@@ -8550,9 +9121,9 @@ public class RpmHarmonicsAnalyzer {
         float exactF0Hz = bestF0Bin * FREQ_BIN_WIDTH;
         double harmonicEnergy = (double) maxF0Val * maxF0Val;
 
-        // Szacowanie lokalnego tła wokół f0 (poza pasmem piku)
-        int bgBinMin = Math.max(0, (int) ((targetF0 - 20.0f) / FREQ_BIN_WIDTH));
-        int bgBinMax = Math.min(spectrum.length - 1, (int) ((targetF0 + 20.0f) / FREQ_BIN_WIDTH));
+        // 2. Szacowanie lokalnego tła wokół f0 (poza pasmem piku)
+        int bgBinMin = Math.max(0, (int) ((targetF0 - 25.0f) / FREQ_BIN_WIDTH));
+        int bgBinMax = Math.min(spectrum.length - 1, (int) ((targetF0 + 25.0f) / FREQ_BIN_WIDTH));
         float bgSum = 0f;
         int bgCount = 0;
         for (int b = bgBinMin; b <= bgBinMax; b++) {
@@ -8564,12 +9135,19 @@ public class RpmHarmonicsAnalyzer {
         float localBg = bgCount > 0 ? (bgSum / bgCount) : 1e-6f;
         float f0Prominence = maxF0Val / Math.max(1e-6f, localBg);
 
-        // Dopasowanie wyższych harmonicznych (tolerancja adaptacyjna proporcjonalna do częstotliwości)
+        // 3. Dynamiczne śledzenie wyższych harmonicznych proporcjonalnie do znalezionego exactF0Hz
         int harmonicHits = 0;
-        for (float hFreq : harmonics) {
-            float tol = Math.max(6.0f, hFreq * 0.02f);
+        for (float m : multipliers) {
+            float hFreq = exactF0Hz * m;
+            if (hFreq >= (DspConstants.SAMPLE_RATE / 2.0f) - 60.0f) {
+                continue;
+            }
+
+            // Adaptacyjna tolerancja zależna od rzędu harmonicznej
+            float tol = Math.max(6.0f, hFreq * 0.025f);
             int hBinMin = Math.max(0, (int) ((hFreq - tol) / FREQ_BIN_WIDTH));
             int hBinMax = Math.min(spectrum.length - 1, (int) ((hFreq + tol) / FREQ_BIN_WIDTH));
+
             float maxHVal = 0f;
             for (int b = hBinMin; b <= hBinMax; b++) {
                 if (spectrum[b] > maxHVal) {
@@ -8577,8 +9155,8 @@ public class RpmHarmonicsAnalyzer {
                 }
             }
 
-            int hBgMin = Math.max(0, (int) ((hFreq - 25.0f) / FREQ_BIN_WIDTH));
-            int hBgMax = Math.min(spectrum.length - 1, (int) ((hFreq + 25.0f) / FREQ_BIN_WIDTH));
+            int hBgMin = Math.max(0, (int) ((hFreq - 30.0f) / FREQ_BIN_WIDTH));
+            int hBgMax = Math.min(spectrum.length - 1, (int) ((hFreq + 30.0f) / FREQ_BIN_WIDTH));
             float hBgSum = 0f;
             int hBgCount = 0;
             for (int b = hBgMin; b <= hBgMax; b++) {
@@ -8594,7 +9172,7 @@ public class RpmHarmonicsAnalyzer {
             }
         }
 
-        float score = (f0Prominence * 0.4f) + ((float) harmonicHits / harmonics.length * 6.0f);
+        float score = (f0Prominence * 0.4f) + ((float) harmonicHits / multipliers.length * 6.0f);
         float energyRatio = (float) (harmonicEnergy / totalEnergy);
 
         // Wymóg rotacji HDD: wyraźny f0, harmoniczne oraz realny udział energii grzebienia
@@ -8603,7 +9181,7 @@ public class RpmHarmonicsAnalyzer {
                 || (f0Prominence >= 1.8f && harmonicHits >= 3 && score >= 3.8f))
                 && (energyRatio >= 0.005f || harmonicHits >= 4);
 
-        return new CombScore(detected, score, exactF0Hz);
+        return new CombScore(detected, score, exactF0Hz, harmonicHits, f0Prominence);
     }
 
     /**
@@ -8639,8 +9217,9 @@ public class RpmHarmonicsAnalyzer {
         }
 
         if (numSegments > 0) {
+            float invSeg = 1.0f / numSegments;
             for (int k = 0; k < halfFft; k++) {
-                avgSpec[k] /= numSegments;
+                avgSpec[k] *= invSeg;
             }
         }
         return avgSpec;
@@ -8708,9 +9287,12 @@ import java.util.Arrays;
  * 1. Oczyszczacze powietrza i wentylatory PC (gładkie widmo 1/f, niska dynamika, brak transjentów)
  *    -> Weto dla 'clicking' (indeks 1)
  * 2. Przesterowania mikrofonu / clipping szczytów (hard clipping, niska płaskość widma >4kHz)
- *    -> Weto dla 'scratching' (indeks 3)
+ *    -> Weto dla 'scratching' (indeks 3) i 'clicking' (indeks 1) z wyjątkiem Smart Clipping Bypass
  * 3. Brak wąskopasmowego piku powyżej 1050 Hz lub potwierdzona rotacja wrzeciona
  *    -> Weto dla 'beeping' (indeks 0)
+ * 4. Smart Clipping Bypass:
+ *    Jeśli sygnał wykazuje ekstremalną dynamikę impulsową (CF >= 4.5) oraz szerokopasmową energię tarcia >4 kHz (highFreqFraction > 0.18),
+ *    system traktuje przesterowanie jako dowód katastrofalnej siły uderzenia głowicy (Crash Stop) i dopuszcza klasyfikację awarii.
  */
 public class DspPhysicalGuard {
 
@@ -8723,6 +9305,7 @@ public class DspPhysicalGuard {
         public final int transientPeakCount;
         public final boolean isAerodynamicFanOrPurifier;
         public final boolean isMicrophoneClipped;
+        public final boolean smartClippingBypass;
         public final boolean vetoClicking;
         public final boolean vetoScratching;
         public final boolean vetoBeeping;
@@ -8730,6 +9313,7 @@ public class DspPhysicalGuard {
 
         public SanitizationResult(float[] sanitizedProbs, float crestFactor, int transientPeakCount,
                                   boolean isAerodynamicFanOrPurifier, boolean isMicrophoneClipped,
+                                  boolean smartClippingBypass,
                                   boolean vetoClicking, boolean vetoScratching, boolean vetoBeeping,
                                   String auditLog) {
             this.sanitizedProbs = sanitizedProbs;
@@ -8737,10 +9321,20 @@ public class DspPhysicalGuard {
             this.transientPeakCount = transientPeakCount;
             this.isAerodynamicFanOrPurifier = isAerodynamicFanOrPurifier;
             this.isMicrophoneClipped = isMicrophoneClipped;
+            this.smartClippingBypass = smartClippingBypass;
             this.vetoClicking = vetoClicking;
             this.vetoScratching = vetoScratching;
             this.vetoBeeping = vetoBeeping;
             this.auditLog = auditLog;
+        }
+
+        // Konstruktor wstecznie kompatybilny
+        public SanitizationResult(float[] sanitizedProbs, float crestFactor, int transientPeakCount,
+                                  boolean isAerodynamicFanOrPurifier, boolean isMicrophoneClipped,
+                                  boolean vetoClicking, boolean vetoScratching, boolean vetoBeeping,
+                                  String auditLog) {
+            this(sanitizedProbs, crestFactor, transientPeakCount, isAerodynamicFanOrPurifier,
+                 isMicrophoneClipped, false, vetoClicking, vetoScratching, vetoBeeping, auditLog);
         }
     }
 
@@ -8760,7 +9354,7 @@ public class DspPhysicalGuard {
             RpmHarmonicsAnalyzer.RpmResult rpmRes
     ) {
         if (rawProbs == null || rawProbs.length < 4) {
-            return new SanitizationResult(rawProbs, 0f, 0, false, false, false, false, false, "Brak danych");
+            return new SanitizationResult(rawProbs, 0f, 0, false, false, false, false, false, false, "Brak danych");
         }
 
         // 1. Usunięcie DC offsetu z sygnału fali
@@ -8784,6 +9378,13 @@ public class DspPhysicalGuard {
         // Szum miejski/otoczenia o silnej dominacji basu i braku wysokich częstotliwości
         boolean isCityTrafficNoise = (lowFreqRatio > 0.75f && highFreqFraction < 0.035f);
 
+        // Smart Clipping Bypass:
+        // Jeśli sygnał wykazuje ekstremalną dynamikę impulsową (CF >= 4.5) oraz szerokopasmową energię tarcia > 4 kHz (highFreqFraction > 0.18),
+        // przesterowanie przetwornika ADC jest dowodem potężnego uderzenia mechanicznego głowicy (Crash Stop / Head Slap).
+        // W takim przypadku weto clippingu zostaje ominięte dla awarii mechanicznych (clicking i scratching).
+        boolean smartClippingBypass = (crestFactor >= 4.5f && highFreqFraction > 0.18f);
+        boolean effectiveClippingVeto = isClipped && !smartClippingBypass;
+
         float[] probs = Arrays.copyOf(rawProbs, rawProbs.length);
         boolean vetoClicking = false;
         boolean vetoScratching = false;
@@ -8794,31 +9395,41 @@ public class DspPhysicalGuard {
 
         // WETO 1: CLICKING (indeks 1)
         // Autentyczny Click of Death wymaga wyrazistych uderzeń (transientCount >= 2) oraz wysokiego Crest Factor (>= 3.5).
-        // Jednostajny szum oczyszczacza/wentylatora, przesterowanie mikrofonu ani basowy szum miasta NIE mogą generować clicking!
-        if (crestFactor < 3.5f || transientCount < 2 || isFanOrPurifier || isClipped || isCityTrafficNoise) {
+        // Jednostajny szum wentylatora ani basowy szum miasta NIE mogą generować clicking!
+        // Przesterowanie mikrofonu wetuje klikanie, chyba że aktywny jest Smart Clipping Bypass (katastrofalny Crash Stop).
+        if (crestFactor < 3.5f || transientCount < 2 || isFanOrPurifier || effectiveClippingVeto || isCityTrafficNoise) {
             if (probs[1] > 0.05f) {
                 vetoClicking = true;
                 float confiscated = probs[1] - 0.01f;
                 probs[1] = 0.01f;
                 probs[2] += confiscated;
                 audit.append(String.format(java.util.Locale.US,
-                        "[Weto CLICKING: CF=%.2f, transients=%d, fan=%b, clipped=%b, cityNoise=%b] ",
-                        crestFactor, transientCount, isFanOrPurifier, isClipped, isCityTrafficNoise));
+                        "[Weto CLICKING: CF=%.2f, transients=%d, fan=%b, clipped=%b (bypass=%b), cityNoise=%b] ",
+                        crestFactor, transientCount, isFanOrPurifier, isClipped, smartClippingBypass, isCityTrafficNoise));
             }
+        } else if (isClipped && smartClippingBypass) {
+            audit.append(String.format(java.util.Locale.US,
+                    "[Smart Clipping Bypass dla CLICKING: CF=%.2f, highFreq=%.1f%% - potwierdzono uderzenie Crash Stop] ",
+                    crestFactor, highFreqFraction * 100.0f));
         }
 
         // WETO 2: SCRATCHING (indeks 3)
-        // Fałszywe tarcie głowic powstaje przy przesterowaniu mikrofonu (clipping), szumie miasta lub szumie powietrza o niskim udziale >4kHz.
-        if (isClipped || isCityTrafficNoise || (isFanOrPurifier && highFreqFraction < 0.15f)) {
+        // Fałszywe tarcie głowic powstaje przy nieuszkodzonym przesterowaniu mikrofonu, szumie miasta lub szumie powietrza.
+        // Jeśli sygnał posiada cechy katastrofalnego tarcia głowic o talerz (CF >= 4.5 i highFreq > 18%), omijamy weto clippingu.
+        if (effectiveClippingVeto || isCityTrafficNoise || (isFanOrPurifier && highFreqFraction < 0.15f)) {
             if (probs[3] > 0.05f) {
                 vetoScratching = true;
                 float confiscated = probs[3] - 0.01f;
                 probs[3] = 0.01f;
                 probs[2] += confiscated;
                 audit.append(String.format(java.util.Locale.US,
-                        "[Weto SCRATCHING: clipped=%b, cityNoise=%b, highFreq=%.1f%%] ",
-                        isClipped, isCityTrafficNoise, highFreqFraction * 100.0f));
+                        "[Weto SCRATCHING: clipped=%b (bypass=%b), cityNoise=%b, highFreq=%.1f%%] ",
+                        isClipped, smartClippingBypass, isCityTrafficNoise, highFreqFraction * 100.0f));
             }
+        } else if (isClipped && smartClippingBypass) {
+            audit.append(String.format(java.util.Locale.US,
+                    "[Smart Clipping Bypass dla SCRATCHING: CF=%.2f, highFreq=%.1f%% - potwierdzono ostre tarcie głowic] ",
+                    crestFactor, highFreqFraction * 100.0f));
         }
 
         // WETO 3: BEEPING (indeks 0)
@@ -8844,8 +9455,9 @@ public class DspPhysicalGuard {
             sum += Math.max(p, 0f);
         }
         if (sum > EPSILON) {
+            float invSum = 1.0f / sum;
             for (int i = 0; i < probs.length; i++) {
-                probs[i] = Math.max(probs[i], 0f) / sum;
+                probs[i] = Math.max(probs[i], 0f) * invSum;
             }
         }
 
@@ -8855,6 +9467,7 @@ public class DspPhysicalGuard {
                 transientCount,
                 isFanOrPurifier,
                 isClipped,
+                smartClippingBypass,
                 vetoClicking,
                 vetoScratching,
                 vetoBeeping,
@@ -9011,7 +9624,7 @@ public class DspPhysicalGuard {
     /**
      * Zwraca udział energii w paśmie powyżej danej częstotliwości granicznej.
      */
-    private static float computeHighFrequencyEnergyFraction(float[] samples, int sr, float cutoffHz) {
+    public static float computeHighFrequencyEnergyFraction(float[] samples, int sr, float cutoffHz) {
         float highEnergy = computeBandEnergy(samples, sr, cutoffHz, 10000.0f);
         float totalEnergy = computeBandEnergy(samples, sr, 50.0f, 10000.0f);
         if (totalEnergy < EPSILON) return 0f;
@@ -9021,7 +9634,7 @@ public class DspPhysicalGuard {
     /**
      * Oblicza przybliżoną energię w określonym paśmie częstotliwości za pomocą transformaty DFT.
      */
-    private static float computeBandEnergy(float[] samples, int sr, float fLow, float fHigh) {
+    public static float computeBandEnergy(float[] samples, int sr, float fLow, float fHigh) {
         int nFft = 2048;
         int step = nFft / 2;
         int nSteps = (samples.length - nFft) / step + 1;

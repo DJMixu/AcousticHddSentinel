@@ -10,9 +10,12 @@ import java.util.Arrays;
  * 1. Oczyszczacze powietrza i wentylatory PC (gładkie widmo 1/f, niska dynamika, brak transjentów)
  *    -> Weto dla 'clicking' (indeks 1)
  * 2. Przesterowania mikrofonu / clipping szczytów (hard clipping, niska płaskość widma >4kHz)
- *    -> Weto dla 'scratching' (indeks 3)
+ *    -> Weto dla 'scratching' (indeks 3) i 'clicking' (indeks 1) z wyjątkiem Smart Clipping Bypass
  * 3. Brak wąskopasmowego piku powyżej 1050 Hz lub potwierdzona rotacja wrzeciona
  *    -> Weto dla 'beeping' (indeks 0)
+ * 4. Smart Clipping Bypass:
+ *    Jeśli sygnał wykazuje ekstremalną dynamikę impulsową (CF >= 4.5) oraz szerokopasmową energię tarcia >4 kHz (highFreqFraction > 0.18),
+ *    system traktuje przesterowanie jako dowód katastrofalnej siły uderzenia głowicy (Crash Stop) i dopuszcza klasyfikację awarii.
  */
 public class DspPhysicalGuard {
 
@@ -25,6 +28,7 @@ public class DspPhysicalGuard {
         public final int transientPeakCount;
         public final boolean isAerodynamicFanOrPurifier;
         public final boolean isMicrophoneClipped;
+        public final boolean smartClippingBypass;
         public final boolean vetoClicking;
         public final boolean vetoScratching;
         public final boolean vetoBeeping;
@@ -32,6 +36,7 @@ public class DspPhysicalGuard {
 
         public SanitizationResult(float[] sanitizedProbs, float crestFactor, int transientPeakCount,
                                   boolean isAerodynamicFanOrPurifier, boolean isMicrophoneClipped,
+                                  boolean smartClippingBypass,
                                   boolean vetoClicking, boolean vetoScratching, boolean vetoBeeping,
                                   String auditLog) {
             this.sanitizedProbs = sanitizedProbs;
@@ -39,10 +44,20 @@ public class DspPhysicalGuard {
             this.transientPeakCount = transientPeakCount;
             this.isAerodynamicFanOrPurifier = isAerodynamicFanOrPurifier;
             this.isMicrophoneClipped = isMicrophoneClipped;
+            this.smartClippingBypass = smartClippingBypass;
             this.vetoClicking = vetoClicking;
             this.vetoScratching = vetoScratching;
             this.vetoBeeping = vetoBeeping;
             this.auditLog = auditLog;
+        }
+
+        // Konstruktor wstecznie kompatybilny
+        public SanitizationResult(float[] sanitizedProbs, float crestFactor, int transientPeakCount,
+                                  boolean isAerodynamicFanOrPurifier, boolean isMicrophoneClipped,
+                                  boolean vetoClicking, boolean vetoScratching, boolean vetoBeeping,
+                                  String auditLog) {
+            this(sanitizedProbs, crestFactor, transientPeakCount, isAerodynamicFanOrPurifier,
+                 isMicrophoneClipped, false, vetoClicking, vetoScratching, vetoBeeping, auditLog);
         }
     }
 
@@ -62,7 +77,7 @@ public class DspPhysicalGuard {
             RpmHarmonicsAnalyzer.RpmResult rpmRes
     ) {
         if (rawProbs == null || rawProbs.length < 4) {
-            return new SanitizationResult(rawProbs, 0f, 0, false, false, false, false, false, "Brak danych");
+            return new SanitizationResult(rawProbs, 0f, 0, false, false, false, false, false, false, "Brak danych");
         }
 
         // 1. Usunięcie DC offsetu z sygnału fali
@@ -86,6 +101,13 @@ public class DspPhysicalGuard {
         // Szum miejski/otoczenia o silnej dominacji basu i braku wysokich częstotliwości
         boolean isCityTrafficNoise = (lowFreqRatio > 0.75f && highFreqFraction < 0.035f);
 
+        // Smart Clipping Bypass:
+        // Jeśli sygnał wykazuje ekstremalną dynamikę impulsową (CF >= 4.5) oraz szerokopasmową energię tarcia > 4 kHz (highFreqFraction > 0.18),
+        // przesterowanie przetwornika ADC jest dowodem potężnego uderzenia mechanicznego głowicy (Crash Stop / Head Slap).
+        // W takim przypadku weto clippingu zostaje ominięte dla awarii mechanicznych (clicking i scratching).
+        boolean smartClippingBypass = (crestFactor >= 4.5f && highFreqFraction > 0.18f);
+        boolean effectiveClippingVeto = isClipped && !smartClippingBypass;
+
         float[] probs = Arrays.copyOf(rawProbs, rawProbs.length);
         boolean vetoClicking = false;
         boolean vetoScratching = false;
@@ -96,31 +118,41 @@ public class DspPhysicalGuard {
 
         // WETO 1: CLICKING (indeks 1)
         // Autentyczny Click of Death wymaga wyrazistych uderzeń (transientCount >= 2) oraz wysokiego Crest Factor (>= 3.5).
-        // Jednostajny szum oczyszczacza/wentylatora, przesterowanie mikrofonu ani basowy szum miasta NIE mogą generować clicking!
-        if (crestFactor < 3.5f || transientCount < 2 || isFanOrPurifier || isClipped || isCityTrafficNoise) {
+        // Jednostajny szum wentylatora ani basowy szum miasta NIE mogą generować clicking!
+        // Przesterowanie mikrofonu wetuje klikanie, chyba że aktywny jest Smart Clipping Bypass (katastrofalny Crash Stop).
+        if (crestFactor < 3.5f || transientCount < 2 || isFanOrPurifier || effectiveClippingVeto || isCityTrafficNoise) {
             if (probs[1] > 0.05f) {
                 vetoClicking = true;
                 float confiscated = probs[1] - 0.01f;
                 probs[1] = 0.01f;
                 probs[2] += confiscated;
                 audit.append(String.format(java.util.Locale.US,
-                        "[Weto CLICKING: CF=%.2f, transients=%d, fan=%b, clipped=%b, cityNoise=%b] ",
-                        crestFactor, transientCount, isFanOrPurifier, isClipped, isCityTrafficNoise));
+                        "[Weto CLICKING: CF=%.2f, transients=%d, fan=%b, clipped=%b (bypass=%b), cityNoise=%b] ",
+                        crestFactor, transientCount, isFanOrPurifier, isClipped, smartClippingBypass, isCityTrafficNoise));
             }
+        } else if (isClipped && smartClippingBypass) {
+            audit.append(String.format(java.util.Locale.US,
+                    "[Smart Clipping Bypass dla CLICKING: CF=%.2f, highFreq=%.1f%% - potwierdzono uderzenie Crash Stop] ",
+                    crestFactor, highFreqFraction * 100.0f));
         }
 
         // WETO 2: SCRATCHING (indeks 3)
-        // Fałszywe tarcie głowic powstaje przy przesterowaniu mikrofonu (clipping), szumie miasta lub szumie powietrza o niskim udziale >4kHz.
-        if (isClipped || isCityTrafficNoise || (isFanOrPurifier && highFreqFraction < 0.15f)) {
+        // Fałszywe tarcie głowic powstaje przy nieuszkodzonym przesterowaniu mikrofonu, szumie miasta lub szumie powietrza.
+        // Jeśli sygnał posiada cechy katastrofalnego tarcia głowic o talerz (CF >= 4.5 i highFreq > 18%), omijamy weto clippingu.
+        if (effectiveClippingVeto || isCityTrafficNoise || (isFanOrPurifier && highFreqFraction < 0.15f)) {
             if (probs[3] > 0.05f) {
                 vetoScratching = true;
                 float confiscated = probs[3] - 0.01f;
                 probs[3] = 0.01f;
                 probs[2] += confiscated;
                 audit.append(String.format(java.util.Locale.US,
-                        "[Weto SCRATCHING: clipped=%b, cityNoise=%b, highFreq=%.1f%%] ",
-                        isClipped, isCityTrafficNoise, highFreqFraction * 100.0f));
+                        "[Weto SCRATCHING: clipped=%b (bypass=%b), cityNoise=%b, highFreq=%.1f%%] ",
+                        isClipped, smartClippingBypass, isCityTrafficNoise, highFreqFraction * 100.0f));
             }
+        } else if (isClipped && smartClippingBypass) {
+            audit.append(String.format(java.util.Locale.US,
+                    "[Smart Clipping Bypass dla SCRATCHING: CF=%.2f, highFreq=%.1f%% - potwierdzono ostre tarcie głowic] ",
+                    crestFactor, highFreqFraction * 100.0f));
         }
 
         // WETO 3: BEEPING (indeks 0)
@@ -146,8 +178,9 @@ public class DspPhysicalGuard {
             sum += Math.max(p, 0f);
         }
         if (sum > EPSILON) {
+            float invSum = 1.0f / sum;
             for (int i = 0; i < probs.length; i++) {
-                probs[i] = Math.max(probs[i], 0f) / sum;
+                probs[i] = Math.max(probs[i], 0f) * invSum;
             }
         }
 
@@ -157,6 +190,7 @@ public class DspPhysicalGuard {
                 transientCount,
                 isFanOrPurifier,
                 isClipped,
+                smartClippingBypass,
                 vetoClicking,
                 vetoScratching,
                 vetoBeeping,
@@ -313,7 +347,7 @@ public class DspPhysicalGuard {
     /**
      * Zwraca udział energii w paśmie powyżej danej częstotliwości granicznej.
      */
-    private static float computeHighFrequencyEnergyFraction(float[] samples, int sr, float cutoffHz) {
+    public static float computeHighFrequencyEnergyFraction(float[] samples, int sr, float cutoffHz) {
         float highEnergy = computeBandEnergy(samples, sr, cutoffHz, 10000.0f);
         float totalEnergy = computeBandEnergy(samples, sr, 50.0f, 10000.0f);
         if (totalEnergy < EPSILON) return 0f;
@@ -323,7 +357,7 @@ public class DspPhysicalGuard {
     /**
      * Oblicza przybliżoną energię w określonym paśmie częstotliwości za pomocą transformaty DFT.
      */
-    private static float computeBandEnergy(float[] samples, int sr, float fLow, float fHigh) {
+    public static float computeBandEnergy(float[] samples, int sr, float fLow, float fHigh) {
         int nFft = 2048;
         int step = nFft / 2;
         int nSteps = (samples.length - nFft) / step + 1;

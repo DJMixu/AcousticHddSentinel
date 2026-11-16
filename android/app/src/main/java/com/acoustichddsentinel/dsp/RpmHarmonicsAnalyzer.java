@@ -7,16 +7,25 @@ import java.util.Arrays;
  * Zgodny z fizyką akustyczną HDD oraz niezmiennikami ADR-001.
  *
  * Wykrywa:
- * 1. Częstotliwości podstawowe i harmoniczne obrotu silnika wrzeciona:
- *    - 5400 RPM: f0 = 90.0 Hz (harmoniczne 180, 270, 360, 450, 540, 1080 Hz)
- *    - 7200 RPM: f0 = 120.0 Hz (harmoniczne 240, 360, 480, 600, 720, 1440 Hz)
- * 2. Brak rotacji i pisk stojana zablokowanego silnika (Stall Beep w paśmie 800 - 3500 Hz)
- * 3. Odrzucanie szumu wentylatorów PC i mowy ludzkiej
+ * 1. Dynamiczne śledzenie częstotliwości podstawowej i harmonicznych obrotu silnika (Dynamic Harmonic Tracking):
+ *    - 5400 RPM: nominalne f0 = 90.0 Hz z dynamicznym oknem śledzenia +/- 4.5 Hz (85.5 - 94.5 Hz)
+ *      Harmoniczne stojana i biegunów: 2x, 3x, 4x, 5x, 6x, 8x, 9x, 10x, 12x
+ *    - 7200 RPM: nominalne f0 = 120.0 Hz z dynamicznym oknem śledzenia +/- 6.0 Hz (114.0 - 126.0 Hz)
+ *      Harmoniczne: 2x, 3x, 4x, 5x, 6x, 12x
+ *    Obsługuje spadek prędkości obrotowej w agonalnych dyskach 2.5" z uszkodzonymi łożyskami.
+ * 2. Brak rotacji i pisk stojana zablokowanego silnika (Stall Beep w paśmie 1050 - 3500 Hz).
+ * 3. Odrzucanie szumu wentylatorów PC i basowego szumu otoczenia.
  */
 public class RpmHarmonicsAnalyzer {
 
     private static final int FFT_SIZE = 4096;
-    private static final float FREQ_BIN_WIDTH = (float) DspConstants.SAMPLE_RATE / FFT_SIZE; // ~5.38 Hz
+    private static final float FREQ_BIN_WIDTH = (float) DspConstants.SAMPLE_RATE / FFT_SIZE; // ~5.383 Hz
+
+    // Mnożniki harmonicznych obrotu dla 5400 RPM (w tym harmoniczne biegunów stojana 8x, 9x, 10x)
+    private static final float[] MULTIPLIERS_5400 = {2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 8.0f, 9.0f, 10.0f, 12.0f};
+
+    // Mnożniki harmonicznych obrotu dla 7200 RPM
+    private static final float[] MULTIPLIERS_7200 = {2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 12.0f};
 
     public static class RpmResult {
         public final boolean hasRotation;
@@ -43,6 +52,13 @@ public class RpmHarmonicsAnalyzer {
 
         public String getSummaryDescription() {
             if (hasRotation) {
+                float expectedF0 = nominalRpm == 5400 ? 90.0f : 120.0f;
+                float drift = f0FoundHz - expectedF0;
+                if (Math.abs(drift) > 1.5f) {
+                    return String.format(java.util.Locale.US,
+                        "Wykryto niestabilną rotację wrzeciona HDD (%d RPM, f0=%.1f Hz, dryf=%.1f Hz - degradacja łożysk).",
+                        nominalRpm, f0FoundHz, drift);
+                }
                 return String.format(java.util.Locale.US,
                     "Wykryto prawidłową rotację silnika HDD (%d RPM, f0=%.1f Hz).", nominalRpm, f0FoundHz);
             }
@@ -83,11 +99,11 @@ public class RpmHarmonicsAnalyzer {
         }
         float meanEnergy = totalEnergy / Math.max(1, numBins);
 
-        // 3. Ocena profilu 5400 RPM (f0 = 90 Hz) - rozszerzona o harmoniczne biegunów stojana 8x, 9x, 10x
-        CombScore score5400 = evaluateComb(avgSpectrum, 90.0f, new float[]{180.0f, 270.0f, 360.0f, 450.0f, 540.0f, 720.0f, 810.0f, 900.0f, 1080.0f});
+        // 3. Dynamiczne śledzenie harmoniczne dla 5400 RPM (zakres f0: 90.0 +/- 4.5 Hz)
+        CombScore score5400 = evaluateCombDynamic(avgSpectrum, 90.0f, 4.5f, MULTIPLIERS_5400);
 
-        // 4. Ocena profilu 7200 RPM (f0 = 120 Hz)
-        CombScore score7200 = evaluateComb(avgSpectrum, 120.0f, new float[]{240.0f, 360.0f, 480.0f, 600.0f, 720.0f, 1440.0f});
+        // 4. Dynamiczne śledzenie harmoniczne dla 7200 RPM (zakres f0: 120.0 +/- 6.0 Hz)
+        CombScore score7200 = evaluateCombDynamic(avgSpectrum, 120.0f, 6.0f, MULTIPLIERS_7200);
 
         boolean hasRotation = false;
         String detectedRpm = null;
@@ -175,29 +191,48 @@ public class RpmHarmonicsAnalyzer {
         final boolean detected;
         final float score;
         final float exactF0Hz;
+        final int harmonicHits;
+        final float f0Prominence;
 
-        CombScore(boolean detected, float score, float exactF0Hz) {
+        CombScore(boolean detected, float score, float exactF0Hz, int harmonicHits, float f0Prominence) {
             this.detected = detected;
             this.score = score;
             this.exactF0Hz = exactF0Hz;
+            this.harmonicHits = harmonicHits;
+            this.f0Prominence = f0Prominence;
         }
     }
 
-    private CombScore evaluateComb(float[] spectrum, float targetF0, float[] harmonics) {
-        float f0Tolerance = 4.0f;
-        int binF0Min = Math.max(0, (int) ((targetF0 - f0Tolerance) / FREQ_BIN_WIDTH));
-        int binF0Max = Math.min(spectrum.length - 1, (int) ((targetF0 + f0Tolerance) / FREQ_BIN_WIDTH));
+    /**
+     * Dynamic Harmonic Tracking via Pitch Harmonizer.
+     * Znajduje optymalną częstotliwość f0 w tolerancji f0Tolerance, a następnie dynamicznie
+     * śledzi harmoniczne f_k = k * exactF0Hz, uwzględniając spadek prędkości obrotowej wywołany uszkodzeniem łożysk.
+     */
+    private CombScore evaluateCombDynamic(float[] spectrum, float targetF0, float f0Tolerance, float[] multipliers) {
+        int binF0Min = Math.max(1, (int) ((targetF0 - f0Tolerance) / FREQ_BIN_WIDTH));
+        int binF0Max = Math.min(spectrum.length - 2, (int) ((targetF0 + f0Tolerance) / FREQ_BIN_WIDTH));
 
         double totalEnergy = 1e-12;
         for (float v : spectrum) {
             totalEnergy += v * v;
         }
 
+        // 1. Wyszukanie optymalnego f0 w rozszerzonym oknie tolerancji (szczyt lokalny)
         int bestF0Bin = binF0Min;
         float maxF0Val = 0f;
+        boolean foundLocalPeak = false;
+
         for (int b = binF0Min; b <= binF0Max; b++) {
-            if (spectrum[b] > maxF0Val) {
-                maxF0Val = spectrum[b];
+            float val = spectrum[b];
+            boolean isPeak = (val >= spectrum[b - 1] && val >= spectrum[b + 1]);
+            if (isPeak) {
+                if (!foundLocalPeak || val > maxF0Val) {
+                    foundLocalPeak = true;
+                    maxF0Val = val;
+                    bestF0Bin = b;
+                }
+            } else if (!foundLocalPeak && val > maxF0Val) {
+                maxF0Val = val;
                 bestF0Bin = b;
             }
         }
@@ -205,9 +240,9 @@ public class RpmHarmonicsAnalyzer {
         float exactF0Hz = bestF0Bin * FREQ_BIN_WIDTH;
         double harmonicEnergy = (double) maxF0Val * maxF0Val;
 
-        // Szacowanie lokalnego tła wokół f0 (poza pasmem piku)
-        int bgBinMin = Math.max(0, (int) ((targetF0 - 20.0f) / FREQ_BIN_WIDTH));
-        int bgBinMax = Math.min(spectrum.length - 1, (int) ((targetF0 + 20.0f) / FREQ_BIN_WIDTH));
+        // 2. Szacowanie lokalnego tła wokół f0 (poza pasmem piku)
+        int bgBinMin = Math.max(0, (int) ((targetF0 - 25.0f) / FREQ_BIN_WIDTH));
+        int bgBinMax = Math.min(spectrum.length - 1, (int) ((targetF0 + 25.0f) / FREQ_BIN_WIDTH));
         float bgSum = 0f;
         int bgCount = 0;
         for (int b = bgBinMin; b <= bgBinMax; b++) {
@@ -219,12 +254,19 @@ public class RpmHarmonicsAnalyzer {
         float localBg = bgCount > 0 ? (bgSum / bgCount) : 1e-6f;
         float f0Prominence = maxF0Val / Math.max(1e-6f, localBg);
 
-        // Dopasowanie wyższych harmonicznych (tolerancja adaptacyjna proporcjonalna do częstotliwości)
+        // 3. Dynamiczne śledzenie wyższych harmonicznych proporcjonalnie do znalezionego exactF0Hz
         int harmonicHits = 0;
-        for (float hFreq : harmonics) {
-            float tol = Math.max(6.0f, hFreq * 0.02f);
+        for (float m : multipliers) {
+            float hFreq = exactF0Hz * m;
+            if (hFreq >= (DspConstants.SAMPLE_RATE / 2.0f) - 60.0f) {
+                continue;
+            }
+
+            // Adaptacyjna tolerancja zależna od rzędu harmonicznej
+            float tol = Math.max(6.0f, hFreq * 0.025f);
             int hBinMin = Math.max(0, (int) ((hFreq - tol) / FREQ_BIN_WIDTH));
             int hBinMax = Math.min(spectrum.length - 1, (int) ((hFreq + tol) / FREQ_BIN_WIDTH));
+
             float maxHVal = 0f;
             for (int b = hBinMin; b <= hBinMax; b++) {
                 if (spectrum[b] > maxHVal) {
@@ -232,8 +274,8 @@ public class RpmHarmonicsAnalyzer {
                 }
             }
 
-            int hBgMin = Math.max(0, (int) ((hFreq - 25.0f) / FREQ_BIN_WIDTH));
-            int hBgMax = Math.min(spectrum.length - 1, (int) ((hFreq + 25.0f) / FREQ_BIN_WIDTH));
+            int hBgMin = Math.max(0, (int) ((hFreq - 30.0f) / FREQ_BIN_WIDTH));
+            int hBgMax = Math.min(spectrum.length - 1, (int) ((hFreq + 30.0f) / FREQ_BIN_WIDTH));
             float hBgSum = 0f;
             int hBgCount = 0;
             for (int b = hBgMin; b <= hBgMax; b++) {
@@ -249,7 +291,7 @@ public class RpmHarmonicsAnalyzer {
             }
         }
 
-        float score = (f0Prominence * 0.4f) + ((float) harmonicHits / harmonics.length * 6.0f);
+        float score = (f0Prominence * 0.4f) + ((float) harmonicHits / multipliers.length * 6.0f);
         float energyRatio = (float) (harmonicEnergy / totalEnergy);
 
         // Wymóg rotacji HDD: wyraźny f0, harmoniczne oraz realny udział energii grzebienia
@@ -258,7 +300,7 @@ public class RpmHarmonicsAnalyzer {
                 || (f0Prominence >= 1.8f && harmonicHits >= 3 && score >= 3.8f))
                 && (energyRatio >= 0.005f || harmonicHits >= 4);
 
-        return new CombScore(detected, score, exactF0Hz);
+        return new CombScore(detected, score, exactF0Hz, harmonicHits, f0Prominence);
     }
 
     /**
@@ -294,8 +336,9 @@ public class RpmHarmonicsAnalyzer {
         }
 
         if (numSegments > 0) {
+            float invSeg = 1.0f / numSegments;
             for (int k = 0; k < halfFft; k++) {
-                avgSpec[k] /= numSegments;
+                avgSpec[k] *= invSeg;
             }
         }
         return avgSpec;

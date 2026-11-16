@@ -1,20 +1,28 @@
 package com.acoustichddsentinel.dsp;
 
 /**
- * Bank filtrów Mel z normalizacją pola powierzchni Slaneya.
+ * Bank filtrów Mel z normalizacją pola powierzchni Slaneya i optymalizacją Sparse Bounds.
  * Matematycznie tożsamy z implementacją librosa.filters.mel(sr=22050, n_fft=1024, n_mels=128, fmin=50, fmax=10000).
  * Błąd numeryczny względem librosa wynosi < 4e-9.
+ *
+ * Optymalizacja:
+ * Każdy trójkątny filtr Mel posiada niezerowe wagi wyłącznie w zwartym przedziale częstotliwości [startBin, endBin].
+ * Ograniczenie iteracji do aktywnych binów redukuje narzut obliczeniowy mnożenia macierzowego o ponad 90%.
  */
 public final class MelFilterBank {
 
     private final int numMels;
     private final int numFftBins; // 1 + n_fft / 2 = 513
     private final float[][] weights; // [numMels][numFftBins]
+    private final int[] startBins;   // [numMels] - pierwszy niezerowy bin filtru
+    private final int[] endBins;     // [numMels] - ostatni niezerowy bin filtru
 
     public MelFilterBank(int sr, int nFft, int nMels, float fmin, float fmax) {
         this.numMels = nMels;
         this.numFftBins = 1 + nFft / 2;
         this.weights = new float[nMels][numFftBins];
+        this.startBins = new int[nMels];
+        this.endBins = new int[nMels];
 
         computeFilterBank(sr, nFft, fmin, fmax);
     }
@@ -53,12 +61,15 @@ public final class MelFilterBank {
             fftFreqs[k] = k * freqStep;
         }
 
-        // Konstrukcja trójkątnych wag pasmowych z normalizacją Slaney (enorm)
+        // Konstrukcja trójkątnych wag pasmowych z normalizacją Slaney (enorm) oraz indeksowanie zakresów
         for (int i = 0; i < numMels; i++) {
             float lower = hzPoints[i];
             float center = hzPoints[i + 1];
             float upper = hzPoints[i + 2];
             float enorm = 2.0f / (upper - lower);
+
+            int firstNonZero = -1;
+            int lastNonZero = -1;
 
             for (int k = 0; k < numFftBins; k++) {
                 float f = fftFreqs[k];
@@ -69,7 +80,17 @@ public final class MelFilterBank {
                 } else {
                     weights[i][k] = 0.0f;
                 }
+
+                if (weights[i][k] > 0.0f) {
+                    if (firstNonZero == -1) {
+                        firstNonZero = k;
+                    }
+                    lastNonZero = k;
+                }
             }
+
+            startBins[i] = (firstNonZero != -1) ? firstNonZero : 0;
+            endBins[i] = (lastNonZero != -1) ? lastNonZero : (numFftBins - 1);
         }
     }
 
@@ -96,27 +117,42 @@ public final class MelFilterBank {
     }
 
     /**
+     * Szybka transformacja liniowego spektrogramu mocy do spektrogramu Mel
+     * z zapisem do prealokowanego bufora out (zero alokacji GC).
+     *
+     * @param powerSpectrogram macierz mocy [513][timeSteps]
+     * @param outMel           prealokowana macierz docelowa [128][timeSteps]
+     */
+    public void apply(float[][] powerSpectrogram, float[][] outMel) {
+        int timeSteps = powerSpectrogram[0].length;
+
+        for (int m = 0; m < numMels; m++) {
+            float[] w = weights[m];
+            float[] outRow = outMel[m];
+            int sBin = startBins[m];
+            int eBin = endBins[m];
+
+            for (int t = 0; t < timeSteps; t++) {
+                float sum = 0.0f;
+                for (int k = sBin; k <= eBin; k++) {
+                    sum += w[k] * powerSpectrogram[k][t];
+                }
+                outRow[t] = sum;
+            }
+        }
+    }
+
+    /**
      * Mnożenie macierzowe: transformacja liniowego spektrogramu mocy [513][timeSteps]
      * w spektrogram Mel [128][timeSteps].
      *
      * @param powerSpectrogram macierz mocy o wymiarach [513][timeSteps]
-     * @return macierz energii Mel o wymiarach [128][timeSteps]
+     * @return nowo zaalokowana macierz energii Mel o wymiarach [128][timeSteps]
      */
     public float[][] apply(float[][] powerSpectrogram) {
         int timeSteps = powerSpectrogram[0].length;
         float[][] melSpectrogram = new float[numMels][timeSteps];
-
-        for (int m = 0; m < numMels; m++) {
-            float[] w = weights[m];
-            for (int t = 0; t < timeSteps; t++) {
-                float sum = 0.0f;
-                for (int k = 0; k < numFftBins; k++) {
-                    sum += w[k] * powerSpectrogram[k][t];
-                }
-                melSpectrogram[m][t] = sum;
-            }
-        }
-
+        apply(powerSpectrogram, melSpectrogram);
         return melSpectrogram;
     }
 

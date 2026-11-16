@@ -118,13 +118,15 @@ public class MainViewModel extends AndroidViewModel {
         final ClassificationResult[] bestAnomalyContainer = new ClassificationResult[1];
         final AudioChunk[] repChunkContainer = new AudioChunk[1];
         final int[] faultWindowCountContainer = new int[1];
+        final String[] activeStatusMessage = new String[]{"Rejestracja wycinka bazowego (min. 3.0s)..."};
 
         audioRecorder.startAdaptiveListening(maxSeconds, new AudioRecorder.AdaptiveStreamCallback() {
             @Override
             public void onProgress(int elapsedMs, int maxMs, float currentRms) {
-                DiagnosticUiState current = uiState.getValue();
-                String msg = current != null ? current.getStatusMessage() : null;
-                uiState.postValue(DiagnosticUiState.recording(elapsedMs, maxMs, currentRms, msg));
+                if (elapsedMs < 3000) {
+                    activeStatusMessage[0] = "Rejestracja wycinka bazowego (min. 3.0s)...";
+                }
+                uiState.postValue(DiagnosticUiState.recording(elapsedMs, maxMs, currentRms, activeStatusMessage[0]));
             }
 
             @Override
@@ -229,10 +231,11 @@ public class MainViewModel extends AndroidViewModel {
                     // Jeśli wynik wciąż niejednoznaczny (np. szum tła) i są kolejne okna:
                     if (windowIndex < 4) {
                         int nextWindow = windowIndex + 2;
+                        activeStatusMessage[0] = "Słucham dalej dla potwierdzenia... (okno " + nextWindow + "/5)";
                         int elapsedMs = (windowIndex + 1) * 1500 + 1500;
                         uiState.postValue(DiagnosticUiState.recording(
                             elapsedMs, maxSeconds * 1000, chunk.getRms(),
-                            "Słucham dalej dla potwierdzenia... (okno " + nextWindow + "/5)"
+                            activeStatusMessage[0]
                         ));
                     }
 
@@ -259,7 +262,10 @@ public class MainViewModel extends AndroidViewModel {
                     return;
                 }
 
-                uiState.postValue(DiagnosticUiState.processing("Finalizowanie diagnozy i generowanie raportu..."));
+                String procMsg = stoppedEarly
+                    ? "Potwierdzono stan dysku (Early Stopping) • Finalizowanie raportu..."
+                    : "Zakończono pełny nasłuch 9.0s • Generowanie raportu...";
+                uiState.postValue(DiagnosticUiState.processing(procMsg));
                 finalizeDiagnostic(effectiveHddName, windowResults, windowChunks, repChunkContainer[0],
                     hasAnomalyContainer[0], bestAnomalyContainer[0], detectedRpmContainer[0]);
             }

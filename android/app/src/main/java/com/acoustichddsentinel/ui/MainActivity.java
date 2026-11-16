@@ -169,8 +169,10 @@ public class MainActivity extends AppCompatActivity {
                 stopPulseAnimation();
                 binding.btnHeroShazam.setEnabled(true);
                 binding.tvHeroHint.setText("Stuknij, aby zbadać stan HDD");
-                binding.progressBarAudio.setVisibility(View.GONE);
+                binding.layoutProgressSection.setVisibility(View.GONE);
                 binding.progressBarAudio.setIndeterminate(false);
+                binding.progressBarAudio.setProgress(0);
+                binding.progressBarMicLevel.setProgress(0);
                 binding.tvRecordingStatus.setText("Gotowy do badania (Shazam Mode)");
                 break;
 
@@ -178,14 +180,59 @@ public class MainActivity extends AppCompatActivity {
                 binding.cardResult.setVisibility(View.GONE);
                 startPulseAnimation();
                 binding.btnHeroShazam.setEnabled(true);
-                binding.tvHeroHint.setText("Słucham dźwięków dysku... Zbliż telefon do HDD");
-                binding.progressBarAudio.setVisibility(View.VISIBLE);
+                binding.tvHeroHint.setText("Trwa badanie akustyczne HDD...");
+                binding.layoutProgressSection.setVisibility(View.VISIBLE);
                 binding.progressBarAudio.setIndeterminate(false);
-                int progress = state.getRecordingTotalMs() > 0
-                    ? (state.getRecordingElapsedMs() * 100) / state.getRecordingTotalMs()
-                    : 0;
-                binding.progressBarAudio.setProgress(progress);
-                binding.tvRecordingStatus.setText(state.getStatusMessage());
+
+                int elapsedMs = state.getRecordingElapsedMs();
+                int totalMs = state.getRecordingTotalMs();
+                int progress = totalMs > 0 ? Math.min(100, (elapsedMs * 100) / totalMs) : 0;
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                    binding.progressBarAudio.setProgress(progress, true);
+                } else {
+                    binding.progressBarAudio.setProgress(progress);
+                }
+
+                // Czas badania
+                binding.tvProgressTime.setText(String.format(Locale.US, "Czas: %.1f s / %.1f s", elapsedMs / 1000.0f, totalMs / 1000.0f));
+
+                // Faza okna analitycznego
+                if (elapsedMs < 3000) {
+                    int pct3s = (elapsedMs * 100) / 3000;
+                    binding.tvProgressWindow.setText(String.format(Locale.US, "Okno 1/5 • Wymagane min. 3.0s (%d%%)", pct3s));
+                } else if (elapsedMs < 4500) {
+                    binding.tvProgressWindow.setText("Okno 2/5 • Weryfikacja spójności");
+                } else if (elapsedMs < 6000) {
+                    binding.tvProgressWindow.setText("Okno 3/5 • Potwierdzenie profilu");
+                } else if (elapsedMs < 7500) {
+                    binding.tvProgressWindow.setText("Okno 4/5 • Konsensus wielookienkowy");
+                } else {
+                    binding.tvProgressWindow.setText("Okno 5/5 • Maksymalny czas");
+                }
+
+                // Poziom sygnału mikrofonu na żywo (VU Meter)
+                float rms = state.getRecordingRms();
+                int micPercent = (int) Math.min(100f, Math.max(0f, (float) (Math.sqrt(Math.max(0f, rms)) * 260.0f)));
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                    binding.progressBarMicLevel.setProgress(micPercent, true);
+                } else {
+                    binding.progressBarMicLevel.setProgress(micPercent);
+                }
+
+                if (rms < 0.0004f) {
+                    binding.tvMicLevelLabel.setText("Zbyt cicho • zbliż telefon do HDD");
+                    binding.tvMicLevelLabel.setTextColor(ContextCompat.getColor(this, R.color.status_warning_text));
+                } else if (rms < 0.25f) {
+                    binding.tvMicLevelLabel.setText(String.format(Locale.US, "Optymalny (RMS: %.4f)", rms));
+                    binding.tvMicLevelLabel.setTextColor(ContextCompat.getColor(this, R.color.status_normal_text));
+                } else {
+                    binding.tvMicLevelLabel.setText(String.format(Locale.US, "Bardzo głośny (RMS: %.3f)", rms));
+                    binding.tvMicLevelLabel.setTextColor(ContextCompat.getColor(this, R.color.status_danger_text));
+                }
+
+                if (state.getStatusMessage() != null) {
+                    binding.tvRecordingStatus.setText(state.getStatusMessage());
+                }
                 break;
 
             case PROCESSING:
@@ -193,8 +240,13 @@ public class MainActivity extends AppCompatActivity {
                 stopPulseAnimation();
                 binding.btnHeroShazam.setEnabled(false);
                 binding.tvHeroHint.setText("Analizowanie sygnatury akustycznej...");
-                binding.progressBarAudio.setVisibility(View.VISIBLE);
+                binding.layoutProgressSection.setVisibility(View.VISIBLE);
+                binding.tvProgressTime.setText("Przetwarzanie AI...");
+                binding.tvProgressWindow.setText("Klasyfikacja 2D CNN");
                 binding.progressBarAudio.setIndeterminate(true);
+                binding.progressBarMicLevel.setProgress(100);
+                binding.tvMicLevelLabel.setText("DSP & ONNX");
+                binding.tvMicLevelLabel.setTextColor(ContextCompat.getColor(this, R.color.accent));
                 binding.tvRecordingStatus.setText(state.getStatusMessage());
                 break;
 
@@ -202,7 +254,7 @@ public class MainActivity extends AppCompatActivity {
                 stopPulseAnimation();
                 binding.btnHeroShazam.setEnabled(true);
                 binding.tvHeroHint.setText("Stuknij, aby zbadać ponownie");
-                binding.progressBarAudio.setVisibility(View.GONE);
+                binding.layoutProgressSection.setVisibility(View.GONE);
                 binding.progressBarAudio.setIndeterminate(false);
                 binding.tvRecordingStatus.setText("Diagnoza zakończona pomyślnie.");
 
@@ -213,7 +265,7 @@ public class MainActivity extends AppCompatActivity {
                 stopPulseAnimation();
                 binding.btnHeroShazam.setEnabled(true);
                 binding.tvHeroHint.setText("Stuknij, aby spróbować ponownie");
-                binding.progressBarAudio.setVisibility(View.GONE);
+                binding.layoutProgressSection.setVisibility(View.GONE);
                 binding.progressBarAudio.setIndeterminate(false);
                 binding.tvRecordingStatus.setText("Błąd: " + state.getErrorMessage());
 

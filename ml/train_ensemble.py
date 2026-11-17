@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, f1_score
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -135,9 +136,54 @@ def train_single_ensemble_member(
             torch.save(model.state_dict(), output_model_path)
 
     # Załaduj najlepsze wagi
-    model.load_state_dict(torch.load(output_model_path, weights_only=True))
+    saved_obj = torch.load(output_model_path, weights_only=False)
+    state_to_load = saved_obj["state_dict"] if isinstance(saved_obj, dict) and "state_dict" in saved_obj else saved_obj
+    model.load_state_dict(state_to_load)
     model.eval()
-    print(f"  -> Zapisano model: {output_model_path} (min val_loss: {best_val_loss:.4f})")
+
+    # Kalibracja prototypów Open-Set OOD dla członka komitetu
+    print("  -> Kalibracja prototypów Open-Set OOD...")
+    all_features = []
+    all_targets = []
+    with torch.no_grad():
+        for x_b, y_b in train_loader:
+            x_b = x_b.to(device)
+            f_b = model.extract_features(x_b)
+            all_features.append(f_b.cpu())
+            all_targets.append(y_b.cpu())
+
+    all_f = torch.cat(all_features, dim=0)
+    all_t = torch.cat(all_targets, dim=0)
+
+    # Indeksy klas uszkodzeń: beeping (0), clicking (1), scratching (3)
+    fault_indices = [0, 1, 3]
+    prototypes = torch.zeros((3, 128), dtype=torch.float32)
+    thresholds = torch.zeros(3, dtype=torch.float32)
+
+    for i, f_idx in enumerate(fault_indices):
+        mask = (all_t == f_idx)
+        class_f = all_f[mask]
+        class_f_norm = F.normalize(class_f, p=2, dim=1)
+        centroid = class_f_norm.mean(dim=0)
+        centroid = F.normalize(centroid.unsqueeze(0), p=2, dim=1).squeeze(0)
+        prototypes[i] = centroid
+
+        sims = torch.matmul(class_f_norm, centroid)
+        thresh = torch.quantile(sims, 0.05).item()
+        thresh = max(0.35, min(0.65, thresh - 0.05))
+        thresholds[i] = thresh
+
+    model.set_fault_prototypes(prototypes.to(device), thresholds.to(device), gamma=12.0)
+    checkpoint_data = {
+        "seed": seed,
+        "state_dict": model.state_dict(),
+        "classes": class_names,
+        "num_classes": len(class_names),
+        "open_set_calibrated": True,
+        "min_val_loss": best_val_loss
+    }
+    torch.save(checkpoint_data, output_model_path)
+    print(f"  -> Zapisano model ze skalibrowanymi prototypami OOD: {output_model_path} (min val_loss: {best_val_loss:.4f})")
     return model
 
 

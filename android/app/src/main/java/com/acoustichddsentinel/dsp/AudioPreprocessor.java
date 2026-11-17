@@ -26,6 +26,7 @@ public final class AudioPreprocessor {
     // Prealokowane bufory robocze - Zero GC Allocation podczas inferencji
     private final float[] preallocatedChunk;
     private final float[] preallocatedFlatTensor;
+    private final float[][] powerBuffer;
     private final float[][] melBuffer;
     private final float[][] logMelBuffer;
     private final float[][] delta1Buffer;
@@ -41,6 +42,7 @@ public final class AudioPreprocessor {
         this.preallocatedChunk = new float[DspConstants.CHUNK_SAMPLES];
         this.preallocatedFlatTensor = new float[DspConstants.TENSOR_FLAT_SIZE];
 
+        this.powerBuffer = new float[stftTransformer.getNumFftBins()][DspConstants.TIME_STEPS];
         this.melBuffer = new float[DspConstants.N_MELS][DspConstants.TIME_STEPS];
         this.logMelBuffer = new float[DspConstants.N_MELS][DspConstants.TIME_STEPS];
         this.delta1Buffer = new float[DspConstants.N_MELS][DspConstants.TIME_STEPS];
@@ -54,17 +56,17 @@ public final class AudioPreprocessor {
      * @return spłaszczony bufor float[] o długości 99456 (format [1, 3, 128, 259])
      */
     public synchronized float[] processAudioChunkToFlatTensor(float[] rawSamples) {
-        // 1. Dopasowanie długości do dokładnie CHUNK_SAMPLES (66150)
+        // 1. Dopasowanie długości do dokładnie CHUNK_SAMPLES (66150) in-place
         float[] chunk;
         if (rawSamples != null && rawSamples.length == DspConstants.CHUNK_SAMPLES) {
             System.arraycopy(rawSamples, 0, preallocatedChunk, 0, DspConstants.CHUNK_SAMPLES);
             chunk = preallocatedChunk;
         } else {
-            chunk = prepareFixedChunk(rawSamples, DspConstants.CHUNK_SAMPLES);
+            chunk = prepareFixedChunk(rawSamples, DspConstants.CHUNK_SAMPLES, preallocatedChunk);
         }
 
-        // 1b. Soft Pre-Amp: łagodne wzmocnienie programowe dla cichych nagrań
-        chunk = checkAndBoostAudio(chunk, DspConstants.TARGET_BOOST_RMS);
+        // 1b. Soft Pre-Amp in-place (bez alokacji bufora na stercie)
+        checkAndBoostAudioInPlace(chunk, DspConstants.TARGET_BOOST_RMS);
 
         // 2. Normalizacja szczytowa fali (Peak Normalization) do [-1.0, 1.0] z usunięciem DC offsetu
         normalizeWaveformPeak(chunk);
@@ -124,19 +126,30 @@ public final class AudioPreprocessor {
     }
 
     /**
+     * Dopasowanie długości próbek do prealokowanego bufora (Zero GC Churn).
+     */
+    private static float[] prepareFixedChunk(float[] samples, int targetSamples, float[] targetBuffer) {
+        if (targetBuffer == null || targetBuffer.length < targetSamples) {
+            targetBuffer = new float[targetSamples];
+        }
+        if (samples == null) {
+            Arrays.fill(targetBuffer, 0, targetSamples, 0.0f);
+            return targetBuffer;
+        }
+        int copyLen = Math.min(samples.length, targetSamples);
+        System.arraycopy(samples, 0, targetBuffer, 0, copyLen);
+        if (copyLen < targetSamples) {
+            Arrays.fill(targetBuffer, copyLen, targetSamples, 0.0f);
+        }
+        return targetBuffer;
+    }
+
+    /**
      * Dopasowanie długości próbek: dopełnienie zerami (zero-padding) lub przycięcie.
      */
     private static float[] prepareFixedChunk(float[] samples, int targetSamples) {
-        if (samples == null) {
-            return new float[targetSamples];
-        }
-        if (samples.length == targetSamples) {
-            return Arrays.copyOf(samples, targetSamples);
-        }
         float[] chunk = new float[targetSamples];
-        int copyLen = Math.min(samples.length, targetSamples);
-        System.arraycopy(samples, 0, chunk, 0, copyLen);
-        return chunk;
+        return prepareFixedChunk(samples, targetSamples, chunk);
     }
 
     /**
@@ -196,8 +209,8 @@ public final class AudioPreprocessor {
      * Dokładnie odpowiada wywołaniu librosa.power_to_db(mel, ref=np.max, top_db=80.0).
      */
     private void computeLogMelSpectrogramInternal(float[] chunk) {
-        float[][] power = stftTransformer.computePowerSpectrogram(chunk);
-        melFilterBank.apply(power, melBuffer);
+        stftTransformer.computePowerSpectrogram(chunk, powerBuffer);
+        melFilterBank.apply(powerBuffer, melBuffer);
 
         int numMels = DspConstants.N_MELS;
         int timeSteps = DspConstants.TIME_STEPS;
@@ -354,21 +367,26 @@ public final class AudioPreprocessor {
     }
 
     /**
-     * Wzmacnia ciche nagrania (RMS < 0.002), aby uniknąć odrzucenia przez bramkę DSP,
-     * analogicznie do potoku trenowania w prepare_audio_dataset.py.
+     * Wzmacnia ciche nagrania (RMS >= 0.002 i < 0.005) in-place,
+     * zabezpieczając przed wzmacnianiem szumu własnego przetwornika ADC poniżej bramki 0.002.
      */
-    public static float[] checkAndBoostAudio(float[] waveform, float targetRms) {
-        if (waveform == null || waveform.length == 0) return waveform;
+    public static void checkAndBoostAudioInPlace(float[] waveform, float targetRms) {
+        if (waveform == null || waveform.length == 0) return;
         float rms = computeRms(waveform);
         if (rms >= DspConstants.RMS_SILENCE_THRESHOLD && rms < DspConstants.RMS_QUIET_BOOST_THRESHOLD) {
             float gain = targetRms / rms;
             gain = Math.min(gain, 40.0f); // Ograniczenie maksymalnego wzmocnienia do +32 dB
-            float[] boosted = new float[waveform.length];
             for (int i = 0; i < waveform.length; i++) {
-                boosted[i] = waveform[i] * gain;
+                waveform[i] *= gain;
             }
-            return boosted;
         }
+    }
+
+    /**
+     * Wzmacnia ciche nagrania (RMS >= 0.002 i < 0.005) bez zbędnej alokacji pamięci.
+     */
+    public static float[] checkAndBoostAudio(float[] waveform, float targetRms) {
+        checkAndBoostAudioInPlace(waveform, targetRms);
         return waveform;
     }
 

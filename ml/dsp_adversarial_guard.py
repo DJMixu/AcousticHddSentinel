@@ -10,7 +10,7 @@ Wykrywa i neutralizuje specyficzne wzorce Out-Of-Distribution:
 import numpy as np
 import torch
 import scipy.stats
-from typing import Dict, Tuple, Union, Optional
+from typing import Dict, Tuple, Union, Optional, Any
 
 CLASSES = ["beeping", "clicking", "normal", "scratching"]
 TARGET_SR = 22050
@@ -245,6 +245,10 @@ class DSPAdversarialGuard:
                 return False, ""
 
             peak = float(np.max(np.abs(chunk)))
+            # Wymóg minimalnej amplitudy bezwzględnej nasycenia przetwornika ADC (peak >= 0.35)
+            if peak < 0.35:
+                return False, ""
+
             crest = peak / max(rms, 1e-12)
 
             is_rail = np.abs(chunk) >= (0.985 * peak)
@@ -362,15 +366,29 @@ class DSPAdversarialGuard:
         probs: Union[np.ndarray, torch.Tensor],
         tensor: Union[np.ndarray, torch.Tensor],
         waveform: Optional[np.ndarray] = None,
+        rpm_result: Optional[Dict[str, Any]] = None,
     ) -> Tuple[np.ndarray, bool, str]:
         """
         Weryfikuje predykcję modelu. Jeśli wykryto fałszywy alarm adwersarialny,
         bezpiecznie przekierowuje wynik do klasy 'normal' z wysokim zaufaniem.
+        Integruje analizę fizyczną RPM i harmonicznych stojana (ml/rpm_harmonics_analyzer.py).
         """
         if isinstance(probs, torch.Tensor):
             p = probs.detach().cpu().numpy().flatten()
         else:
             p = np.array(probs, dtype=np.float32).flatten()
+
+        # Opcjonalna automatyczna integracja z analizą RPM / pisków stojana
+        if rpm_result is None and waveform is not None and len(waveform) >= 1024:
+            try:
+                from rpm_harmonics_analyzer import analyze_frequency_peaks
+                rpm_result = analyze_frequency_peaks(waveform, sr=TARGET_SR)
+            except Exception:
+                rpm_result = None
+
+        has_normal_rotation = bool(rpm_result.get("has_rotation", False)) if rpm_result else False
+        has_stall_tone = bool(rpm_result.get("has_stall_beep", False) and rpm_result.get("stall_beep_freq_hz", 0.0) >= 1050.0) if rpm_result else False
+        is_strong_stall_tone = has_stall_tone and not has_normal_rotation
 
         is_cw, reason_cw = self.is_coil_whine(tensor)
         is_metro, reason_metro = self.is_periodic_metronome(tensor)
@@ -415,27 +433,59 @@ class DSPAdversarialGuard:
             new_p = new_p / np.sum(new_p)
             return new_p, True, f"Odrzucono fałszywy alarm wentylatora/turbiny: {reason_fan}"
 
-        # 4. Neutralizacja Przesterowania Toru Mikrofonu / THD klasyfikowanego jako SCRATCHING / CLICKING / BEEPING
-        if is_clip and (p[scratching_idx] > 0.15 or p[clicking_idx] > 0.15 or p[beeping_idx] > 0.15):
-            new_p = np.copy(p)
-            stolen = new_p[scratching_idx] + new_p[clicking_idx] + new_p[beeping_idx]
-            new_p[scratching_idx] = 0.02
-            new_p[clicking_idx] = 0.02
-            new_p[beeping_idx] = 0.02
-            new_p[normal_idx] += stolen * 0.98
-            new_p = new_p / np.sum(new_p)
-            return new_p, True, f"Odrzucono fałszywy alarm przesterowania mikrofonu: {reason_clip}"
+        # 4. Neutralizacja Przesterowania Toru Mikrofonu / THD
+        # Ochrona pisku stojana (beeping): silny, wąskopasmowy ton stojana (1050-3500 Hz) bez rotacji wrzeciona
+        # NIE jest wetowany samym przesterowaniem!
+        if is_clip:
+            veto_scratching = p[scratching_idx] > 0.15
+            veto_clicking = p[clicking_idx] > 0.15
+            veto_beeping = (not is_strong_stall_tone) and (p[beeping_idx] > 0.15)
+            if veto_scratching or veto_clicking or veto_beeping:
+                new_p = np.copy(p)
+                stolen = 0.0
+                if veto_scratching:
+                    stolen += new_p[scratching_idx] - 0.01
+                    new_p[scratching_idx] = 0.01
+                if veto_clicking:
+                    stolen += new_p[clicking_idx] - 0.01
+                    new_p[clicking_idx] = 0.01
+                if veto_beeping:
+                    stolen += new_p[beeping_idx] - 0.01
+                    new_p[beeping_idx] = 0.01
+                new_p[normal_idx] += stolen
+                new_p = new_p / np.sum(new_p)
+                return new_p, True, f"Odrzucono fałszywy alarm przesterowania mikrofonu: {reason_clip}"
 
         # 5. Neutralizacja Szumu Miasta / Ruchu Ulicznego (dominacja pasma < 300 Hz)
-        if is_city and (p[clicking_idx] > 0.15 or p[scratching_idx] > 0.15 or p[beeping_idx] > 0.15):
+        if is_city:
+            veto_scratching = p[scratching_idx] > 0.15
+            veto_clicking = p[clicking_idx] > 0.15
+            veto_beeping = (not has_stall_tone) and (p[beeping_idx] > 0.15)
+            if veto_scratching or veto_clicking or veto_beeping:
+                new_p = np.copy(p)
+                stolen = 0.0
+                if veto_scratching:
+                    stolen += new_p[scratching_idx] - 0.01
+                    new_p[scratching_idx] = 0.01
+                if veto_clicking:
+                    stolen += new_p[clicking_idx] - 0.01
+                    new_p[clicking_idx] = 0.01
+                if veto_beeping:
+                    stolen += new_p[beeping_idx] - 0.01
+                    new_p[beeping_idx] = 0.01
+                new_p[normal_idx] += stolen
+                new_p = new_p / np.sum(new_p)
+                return new_p, True, f"Odrzucono fałszywy alarm szumu miejskiego: {reason_city}"
+
+        # 5b. Weto BEEPING przy potwierdzonej prawidłowej rotacji silnika
+        # Wirujący dysk nie może mieć zablokowanego stojana (beeping)!
+        if has_normal_rotation and p[beeping_idx] > 0.15:
             new_p = np.copy(p)
-            fault_prob = new_p[clicking_idx] + new_p[scratching_idx] + new_p[beeping_idx]
-            new_p[clicking_idx] = 0.02
-            new_p[scratching_idx] = 0.02
-            new_p[beeping_idx] = 0.02
-            new_p[normal_idx] += fault_prob * 0.95
+            stolen = new_p[beeping_idx] - 0.01
+            new_p[beeping_idx] = 0.01
+            new_p[normal_idx] += stolen
             new_p = new_p / np.sum(new_p)
-            return new_p, True, f"Odrzucono fałszywy alarm szumu miejskiego: {reason_city}"
+            return new_p, True, "Odrzucono fałszywy pisk stojana (Potwierdzona prawidłowa rotacja wrzeciona HDD)"
 
         # 5. Neutralizacja fałszywego klikania bez transjentów (Zero-transient false clicking)
         # Fizyczny Click of Death wymaga uderzeń pozycjonera (num_events >= 2).

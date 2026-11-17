@@ -41,12 +41,13 @@ public final class StftTransformer {
     }
 
     /**
-     * Oblicza spektrogram mocy |STFT|^2 o wymiarach [513][timeSteps].
+     * Oblicza spektrogram mocy |STFT|^2 o wymiarach [513][timeSteps] z zapisem
+     * bezpośrednio do prealokowanego bufora wyjściowego outPowerSpectrogram (Zero GC Churn).
      *
-     * @param signal znormalizowana fala audio (dla wycinka 3.0s: 66150 próbek)
-     * @return dwuwymiarowa macierz mocy [numFftBins][numFrames] (513 x 259)
+     * @param signal              znormalizowana fala audio (dla wycinka 3.0s: 66150 próbek)
+     * @param outPowerSpectrogram macierz docelowa o wymiarach co najmniej [numFftBins][numFrames]
      */
-    public float[][] computePowerSpectrogram(float[] signal) {
+    public synchronized void computePowerSpectrogram(float[] signal, float[][] outPowerSpectrogram) {
         int pad = nFft / 2; // 512
         int signalLen = signal.length;
         int paddedLen = signalLen + 2 * pad;
@@ -74,10 +75,6 @@ public final class StftTransformer {
         }
 
         int numFrames = (paddedLen - nFft) / hopLength + 1; // 259 ramek dla 66150 próbek
-        float[][] powerSpectrogram = (usePrealloc && numFrames == DspConstants.TIME_STEPS)
-                ? preallocatedPower
-                : new float[numFftBins][numFrames];
-
         float[] real = usePrealloc ? preallocatedReal : new float[nFft];
         float[] imag = usePrealloc ? preallocatedImag : new float[nFft];
 
@@ -95,10 +92,26 @@ public final class StftTransformer {
 
             // Obliczenie mocy: |X(k)|^2 = real^2 + imag^2
             for (int k = 0; k < numFftBins; k++) {
-                powerSpectrogram[k][frameIdx] = real[k] * real[k] + imag[k] * imag[k];
+                outPowerSpectrogram[k][frameIdx] = real[k] * real[k] + imag[k] * imag[k];
             }
         }
+    }
 
+    /**
+     * Oblicza spektrogram mocy |STFT|^2 o wymiarach [513][timeSteps].
+     *
+     * @param signal znormalizowana fala audio (dla wycinka 3.0s: 66150 próbek)
+     * @return dwuwymiarowa macierz mocy [numFftBins][numFrames] (513 x 259)
+     */
+    public synchronized float[][] computePowerSpectrogram(float[] signal) {
+        int pad = nFft / 2;
+        int signalLen = signal.length;
+        int paddedLen = signalLen + 2 * pad;
+        int numFrames = (paddedLen - nFft) / hopLength + 1;
+        boolean usePrealloc = (signalLen == DspConstants.CHUNK_SAMPLES && numFrames == DspConstants.TIME_STEPS);
+
+        float[][] powerSpectrogram = usePrealloc ? preallocatedPower : new float[numFftBins][numFrames];
+        computePowerSpectrogram(signal, powerSpectrogram);
         return powerSpectrogram;
     }
 

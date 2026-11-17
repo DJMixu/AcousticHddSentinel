@@ -118,17 +118,17 @@ public final class MelFilterBank {
 
     /**
      * Szybka transformacja liniowego spektrogramu mocy do spektrogramu Mel
-     * z zapisem do prealokowanego bufora out (zero alokacji GC).
+     * z zapisem do prealokowanego bufora outputMel (zero alokacji GC).
      *
      * @param powerSpectrogram macierz mocy [513][timeSteps]
-     * @param outMel           prealokowana macierz docelowa [128][timeSteps]
+     * @param outputMel        prealokowana macierz docelowa [128][timeSteps]
      */
-    public void apply(float[][] powerSpectrogram, float[][] outMel) {
+    public void apply(float[][] powerSpectrogram, float[][] outputMel) {
         int timeSteps = powerSpectrogram[0].length;
 
         for (int m = 0; m < numMels; m++) {
             float[] w = weights[m];
-            float[] outRow = outMel[m];
+            float[] outRow = outputMel[m];
             int sBin = startBins[m];
             int eBin = endBins[m];
 

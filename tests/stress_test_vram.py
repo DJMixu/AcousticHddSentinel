@@ -176,7 +176,7 @@ def run_vram_stress_test(
     total_inf_count = 0
 
     # Rozgrzewka GPU (Warmup)
-    print("  -> Rozgrzewka GPU...")
+    print("  -> Rozgrzewka potoku CUDA/ROCm PyTorch...")
     warmup_batch = gpu_tensor_pool[:batch_size]
     for _ in range(10):
         _ = gpu_infer_step(warmup_batch)

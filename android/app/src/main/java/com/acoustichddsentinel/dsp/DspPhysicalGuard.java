@@ -16,11 +16,57 @@ import java.util.Arrays;
  * 4. Smart Clipping Bypass:
  *    Jeśli sygnał wykazuje ekstremalną dynamikę impulsową (CF >= 4.5) oraz szerokopasmową energię tarcia >4 kHz (highFreqFraction > 0.18),
  *    system traktuje przesterowanie jako dowód katastrofalnej siły uderzenia głowicy (Crash Stop) i dopuszcza klasyfikację awarii.
+ * 5. Ochrona pisku stojana (beeping):
+ *    Silny, wąskopasmowy ton zablokowanego stojana (1050-3500 Hz) przy braku rotacji wrzeciona
+ *    nie jest blokowany przesterowaniem toru mikrofonowego.
  */
 public class DspPhysicalGuard {
 
     private static final int SR = DspConstants.SAMPLE_RATE; // 22050 Hz
     private static final float EPSILON = 1e-12f;
+
+    private static final int FFT_BAND_SIZE = 2048;
+    private final float[] hannWindow2048;
+    private final float[] fftReal2048;
+    private final float[] fftImag2048;
+
+    public DspPhysicalGuard() {
+        this.hannWindow2048 = new float[FFT_BAND_SIZE];
+        for (int i = 0; i < FFT_BAND_SIZE; i++) {
+            hannWindow2048[i] = 0.5f * (1.0f - (float) Math.cos(2.0 * Math.PI * i / FFT_BAND_SIZE));
+        }
+        this.fftReal2048 = new float[FFT_BAND_SIZE];
+        this.fftImag2048 = new float[FFT_BAND_SIZE];
+    }
+
+    /**
+     * Struktura przechowująca energie w kluczowych pasmach widmowych obliczona w pojedynczym przebiegu FFT.
+     */
+    public static class SpectralBands {
+        public final float totalEnergy;     // 50 - 10000 Hz
+        public final float lowFreqEnergy;   // 50 - 300 Hz
+        public final float lowMidEnergy;    // 100 - 1500 Hz
+        public final float highFreqEnergy;  // 4000 - 10000 Hz
+
+        public SpectralBands(float totalEnergy, float lowFreqEnergy, float lowMidEnergy, float highFreqEnergy) {
+            this.totalEnergy = totalEnergy;
+            this.lowFreqEnergy = lowFreqEnergy;
+            this.lowMidEnergy = lowMidEnergy;
+            this.highFreqEnergy = highFreqEnergy;
+        }
+
+        public float getHighFreqFraction() {
+            return (totalEnergy > EPSILON) ? (highFreqEnergy / totalEnergy) : 0f;
+        }
+
+        public float getLowFreqRatio() {
+            return (totalEnergy > EPSILON) ? (lowFreqEnergy / totalEnergy) : 0f;
+        }
+
+        public float getLowMidRatio() {
+            return (totalEnergy > EPSILON) ? (lowMidEnergy / totalEnergy) : 0f;
+        }
+    }
 
     public static class SanitizationResult {
         public final float[] sanitizedProbs;
@@ -89,14 +135,14 @@ public class DspPhysicalGuard {
         float crestFactor = peak / Math.max(rms, EPSILON);
 
         int transientCount = countTransientPeaks(samples, SR);
-        boolean isFanOrPurifier = isAerodynamicFanOrPurifier(samples, crestFactor, transientCount);
-        boolean isClipped = isMicrophoneClipped(samples, peak, crestFactor);
 
-        // Analiza pasmowa energii: bas <300 Hz oraz wysokie tony >4 kHz
-        float highFreqFraction = computeHighFrequencyEnergyFraction(samples, SR, 4000.0f);
-        float lowFreqEnergy = computeBandEnergy(samples, SR, 50.0f, 300.0f);
-        float totalEnergy = computeBandEnergy(samples, SR, 50.0f, 10000.0f);
-        float lowFreqRatio = (totalEnergy > EPSILON) ? (lowFreqEnergy / totalEnergy) : 0f;
+        // Zoptymalizowana pojedyncza transformata FFT Radix-2 dla wszystkich pasm widmowych
+        SpectralBands bands = computeSpectralBands(samples);
+        float highFreqFraction = bands.getHighFreqFraction();
+        float lowFreqRatio = bands.getLowFreqRatio();
+
+        boolean isFanOrPurifier = isAerodynamicFanOrPurifier(samples, crestFactor, transientCount, bands);
+        boolean isClipped = isMicrophoneClipped(samples, peak, crestFactor);
 
         // Szum miejski/otoczenia o silnej dominacji basu i braku wysokich częstotliwości
         boolean isCityTrafficNoise = (lowFreqRatio > 0.75f && highFreqFraction < 0.035f);
@@ -157,18 +203,30 @@ public class DspPhysicalGuard {
 
         // WETO 3: BEEPING (indeks 0)
         // Dysk piszczy zablokowanym silnikiem wyłącznie, gdy silnik NIE wiruje i występuje ostry pisk > 1050 Hz.
-        // Przesterowanie mikrofonu ani basowy szum miasta bez pisków stojana nie mogą wywołać beeping!
+        // Ochrona pisku stojana: nie blokujemy klasy beeping samym warunkiem isClipped,
+        // jeżeli RpmHarmonicsAnalyzer potwierdził brak rotacji oraz silny ton stojana (hasStallTone == true w paśmie 1050-3500 Hz).
         boolean hasNormalRotation = (rpmRes != null && rpmRes.hasRotation);
         boolean hasStallTone = (rpmRes != null && rpmRes.hasStallBeep && rpmRes.stallBeepFreqHz >= 1050.0f);
-        if (hasNormalRotation || !hasStallTone || isClipped || (isCityTrafficNoise && !hasStallTone)) {
+        boolean isStrongStallTone = hasStallTone && !hasNormalRotation;
+
+        boolean vetoBeepingCondition;
+        if (isStrongStallTone) {
+            // Silny, wąskopasmowy pisk zablokowanego stojana bez rotacji:
+            // IGNORUJEMY clipping toru mikrofonowego!
+            vetoBeepingCondition = (isCityTrafficNoise && !hasStallTone);
+        } else {
+            vetoBeepingCondition = hasNormalRotation || !hasStallTone || isClipped || (isCityTrafficNoise && !hasStallTone);
+        }
+
+        if (vetoBeepingCondition) {
             if (probs[0] > 0.05f) {
                 vetoBeeping = true;
                 float confiscated = probs[0] - 0.01f;
                 probs[0] = 0.01f;
                 probs[2] += confiscated;
                 audit.append(String.format(java.util.Locale.US,
-                        "[Weto BEEPING: rot=%b, stallTone=%b, clipped=%b, cityNoise=%b] ",
-                        hasNormalRotation, hasStallTone, isClipped, isCityTrafficNoise));
+                        "[Weto BEEPING: rot=%b, stallTone=%b (strong=%b), clipped=%b, cityNoise=%b] ",
+                        hasNormalRotation, hasStallTone, isStrongStallTone, isClipped, isCityTrafficNoise));
             }
         }
 
@@ -195,6 +253,73 @@ public class DspPhysicalGuard {
                 vetoScratching,
                 vetoBeeping,
                 audit.toString().trim()
+        );
+    }
+
+    /**
+     * Oblicza energie w 4 kluczowych pasmach częstotliwości w pojedynczym przebiegu FFT Radix-2:
+     * - totalEnergy (50 - 10000 Hz)
+     * - lowFreqEnergy (50 - 300 Hz)
+     * - lowMidEnergy (100 - 1500 Hz)
+     * - highFreqEnergy (4000 - 10000 Hz)
+     */
+    public synchronized SpectralBands computeSpectralBands(float[] zeroMeanSamples) {
+        if (zeroMeanSamples == null || zeroMeanSamples.length < FFT_BAND_SIZE) {
+            return new SpectralBands(0f, 0f, 0f, 0f);
+        }
+
+        int step = FFT_BAND_SIZE / 2; // 1024
+        int nSteps = (zeroMeanSamples.length - FFT_BAND_SIZE) / step + 1;
+        if (nSteps <= 0) {
+            return new SpectralBands(0f, 0f, 0f, 0f);
+        }
+
+        float binWidth = (float) SR / FFT_BAND_SIZE; // 22050 / 2048 ≈ 10.7666 Hz
+        int bin50 = Math.max(0, Math.round(50.0f / binWidth));
+        int bin300 = Math.min(FFT_BAND_SIZE / 2, Math.round(300.0f / binWidth));
+        int bin100 = Math.max(0, Math.round(100.0f / binWidth));
+        int bin1500 = Math.min(FFT_BAND_SIZE / 2, Math.round(1500.0f / binWidth));
+        int bin4000 = Math.max(0, Math.round(4000.0f / binWidth));
+        int bin10000 = Math.min(FFT_BAND_SIZE / 2, Math.round(10000.0f / binWidth));
+
+        double accTotal = 0.0;
+        double accLow = 0.0;
+        double accLowMid = 0.0;
+        double accHigh = 0.0;
+
+        for (int s = 0; s < nSteps; s++) {
+            int offset = s * step;
+            for (int i = 0; i < FFT_BAND_SIZE; i++) {
+                fftReal2048[i] = zeroMeanSamples[offset + i] * hannWindow2048[i];
+                fftImag2048[i] = 0f;
+            }
+
+            fftRadix2(fftReal2048, fftImag2048, FFT_BAND_SIZE);
+
+            int halfFft = FFT_BAND_SIZE / 2;
+            for (int k = 0; k <= halfFft; k++) {
+                double pwr = (double) fftReal2048[k] * fftReal2048[k] + (double) fftImag2048[k] * fftImag2048[k];
+                if (k >= bin50 && k <= bin10000) {
+                    accTotal += pwr;
+                }
+                if (k >= bin50 && k <= bin300) {
+                    accLow += pwr;
+                }
+                if (k >= bin100 && k <= bin1500) {
+                    accLowMid += pwr;
+                }
+                if (k >= bin4000 && k <= bin10000) {
+                    accHigh += pwr;
+                }
+            }
+        }
+
+        double norm = (double) nSteps * FFT_BAND_SIZE;
+        return new SpectralBands(
+                (float) (accTotal / norm),
+                (float) (accLow / norm),
+                (float) (accLowMid / norm),
+                (float) (accHigh / norm)
         );
     }
 
@@ -284,26 +409,19 @@ public class DspPhysicalGuard {
     }
 
     /**
-     * Sprawdza, czy sygnał to ciągły szum aerodynamiczny wentylatora, turbiny, klimatyzacji lub oczyszczacza powietrza:
-     * - Brak ostrych transjentów mechanicznych HDD (transientCount < 4)
-     * - Umiarkowany Crest Factor (< 6.2)
-     * - Znikomy udział energii wysokich częstotliwości tarcia > 4 kHz (< 12%)
-     * - Dominacja energii w paśmie niskim i średnim (100 - 1500 Hz).
+     * Sprawdza, czy sygnał to ciągły szum aerodynamiczny wentylatora, turbiny, klimatyzacji lub oczyszczacza powietrza
+     * z wykorzystaniem prealokowanych energii pasmowych SpectralBands.
      */
-    public static boolean isAerodynamicFanOrPurifier(float[] zeroMeanSamples, float crestFactor, int transientCount) {
+    public static boolean isAerodynamicFanOrPurifier(float[] zeroMeanSamples, float crestFactor, int transientCount, SpectralBands bands) {
         if (crestFactor >= 6.2f || transientCount >= 4) {
             return false;
         }
+        if (bands == null || bands.totalEnergy < EPSILON) {
+            return false;
+        }
 
-        // Analiza pasmowa energii: pasmo niskie/średnie (100 - 1500 Hz) vs wysokie (> 4000 Hz)
-        float lowMidEnergy = computeBandEnergy(zeroMeanSamples, SR, 100.0f, 1500.0f);
-        float highEnergy = computeBandEnergy(zeroMeanSamples, SR, 4000.0f, 10000.0f);
-        float totalEnergy = computeBandEnergy(zeroMeanSamples, SR, 50.0f, 10000.0f);
-
-        if (totalEnergy < EPSILON) return false;
-
-        float highRatio = highEnergy / totalEnergy;
-        float lowMidRatio = lowMidEnergy / totalEnergy;
+        float highRatio = bands.getHighFreqFraction();
+        float lowMidRatio = bands.getLowMidRatio();
 
         // Szum turbulentny powietrza / otoczenia: wysokie pasmo >4 kHz jest znikome (< 4%),
         // a energia skupiona jest w dolnym i średnim paśmie.
@@ -316,12 +434,38 @@ public class DspPhysicalGuard {
     }
 
     /**
+     * Przeciążenie zachowujące kompatybilność wsteczną.
+     */
+    public static boolean isAerodynamicFanOrPurifier(float[] zeroMeanSamples, float crestFactor, int transientCount) {
+        if (crestFactor >= 6.2f || transientCount >= 4) {
+            return false;
+        }
+        float lowMidEnergy = computeBandEnergy(zeroMeanSamples, SR, 100.0f, 1500.0f);
+        float highEnergy = computeBandEnergy(zeroMeanSamples, SR, 4000.0f, 10000.0f);
+        float totalEnergy = computeBandEnergy(zeroMeanSamples, SR, 50.0f, 10000.0f);
+
+        if (totalEnergy < EPSILON) return false;
+
+        float highRatio = highEnergy / totalEnergy;
+        float lowMidRatio = lowMidEnergy / totalEnergy;
+
+        if (highRatio < 0.04f && (lowMidRatio > 0.50f || crestFactor < 5.5f)) {
+            return true;
+        }
+
+        return (lowMidRatio > 0.60f && highRatio < 0.12f && crestFactor < 4.5f && transientCount < 2);
+    }
+
+    /**
      * Sprawdza, czy wystąpiło przesterowanie toru mikrofonu (Hard Clipping):
+     * - Wymaga minimalnej amplitudy bezwzględnej nasycenia przetwornika ADC (peak >= 0.35f)
      * - Ponad 2% próbek osiąga >= 0.985 wartości szczytowej
      * - Lub występują spłaszczenia fali (flat run >= 3) przy niskim Crest Factor (< 2.5).
      */
     public static boolean isMicrophoneClipped(float[] zeroMeanSamples, float peak, float crestFactor) {
-        if (peak < 0.01f || zeroMeanSamples.length == 0) return false;
+        if (zeroMeanSamples == null || zeroMeanSamples.length == 0 || peak < 0.35f) {
+            return false;
+        }
 
         float railThresh = 0.985f * peak;
         int clippedSamples = 0;
@@ -355,10 +499,11 @@ public class DspPhysicalGuard {
     }
 
     /**
-     * Oblicza przybliżoną energię w określonym paśmie częstotliwości za pomocą transformaty DFT.
+     * Oblicza przybliżoną energię w określonym paśmie częstotliwości za pomocą transformaty FFT Radix-2.
      */
     public static float computeBandEnergy(float[] samples, int sr, float fLow, float fHigh) {
-        int nFft = 2048;
+        if (samples == null || samples.length < FFT_BAND_SIZE) return 0f;
+        int nFft = FFT_BAND_SIZE;
         int step = nFft / 2;
         int nSteps = (samples.length - nFft) / step + 1;
         if (nSteps <= 0) return 0f;
@@ -367,29 +512,81 @@ public class DspPhysicalGuard {
         int binLow = Math.max(0, (int) (fLow / binWidth));
         int binHigh = Math.min(nFft / 2, (int) (fHigh / binWidth));
 
-        double totalBandPower = 0.0;
         float[] window = new float[nFft];
         for (int i = 0; i < nFft; i++) {
             window[i] = 0.5f * (1.0f - (float) Math.cos(2.0 * Math.PI * i / nFft));
         }
 
+        float[] real = new float[nFft];
+        float[] imag = new float[nFft];
+        double totalBandPower = 0.0;
+
         for (int s = 0; s < nSteps; s++) {
             int offset = s * step;
-            // DFT bezpośrednie tylko dla binów w wybranym paśmie
+            for (int i = 0; i < nFft; i++) {
+                real[i] = samples[offset + i] * window[i];
+                imag[i] = 0f;
+            }
+
+            fftRadix2(real, imag, nFft);
+
             for (int k = binLow; k <= binHigh; k++) {
-                double real = 0.0;
-                double imag = 0.0;
-                double angleStep = 2.0 * Math.PI * k / nFft;
-                for (int n = 0; n < nFft; n++) {
-                    float val = samples[offset + n] * window[n];
-                    double angle = angleStep * n;
-                    real += val * Math.cos(angle);
-                    imag -= val * Math.sin(angle);
-                }
-                totalBandPower += (real * real + imag * imag);
+                totalBandPower += (double) real[k] * real[k] + (double) imag[k] * imag[k];
             }
         }
 
-        return (float) (totalBandPower / (nSteps * nFft));
+        return (float) (totalBandPower / ((double) nSteps * nFft));
+    }
+
+    /**
+     * Szybka transformata Fouriera Radix-2 Cooley-Tukey (in-place).
+     */
+    private static void fftRadix2(float[] real, float[] imag, int n) {
+        int j = 0;
+        for (int i = 0; i < n - 1; i++) {
+            if (i < j) {
+                float tr = real[i]; real[i] = real[j]; real[j] = tr;
+                float ti = imag[i]; imag[i] = imag[j]; imag[j] = ti;
+            }
+            int k = n / 2;
+            while (k <= j) {
+                j -= k;
+                k /= 2;
+            }
+            j += k;
+        }
+
+        for (int len = 2; len <= n; len <<= 1) {
+            double angle = -2.0 * Math.PI / len;
+            float wlen_r = (float) Math.cos(angle);
+            float wlen_i = (float) Math.sin(angle);
+
+            for (int i = 0; i < n; i += len) {
+                float w_r = 1.0f;
+                float w_i = 0.0f;
+                int half = len / 2;
+
+                for (int k = 0; k < half; k++) {
+                    int pos = i + k;
+                    int pair = pos + half;
+
+                    float v_r = real[pair] * w_r - imag[pair] * w_i;
+                    float v_i = real[pair] * w_i + imag[pair] * w_r;
+
+                    float u_r = real[pos];
+                    float u_i = imag[pos];
+
+                    real[pos] = u_r + v_r;
+                    imag[pos] = u_i + v_i;
+                    real[pair] = u_r - v_r;
+                    imag[pair] = u_i - v_i;
+
+                    float next_w_r = w_r * wlen_r - w_i * wlen_i;
+                    float next_w_i = w_r * wlen_i + w_i * wlen_r;
+                    w_r = next_w_r;
+                    w_i = next_w_i;
+                }
+            }
+        }
     }
 }

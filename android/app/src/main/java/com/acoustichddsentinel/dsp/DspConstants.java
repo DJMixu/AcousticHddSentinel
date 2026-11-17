@@ -49,8 +49,11 @@ public final class DspConstants {
     /** Szerokość okna różniczkowego dla wyznaczania kanałów Delta i Delta-Delta. */
     public static final int DELTA_WIDTH = 9;
 
-    /** Próg bramki ciszy (RMS Gate) - wartości poniżej oznaczają brak kontaktu z dyskiem lub całkowitą ciszę. */
-    public static final float RMS_SILENCE_THRESHOLD = 0.0004f;
+    /**
+     * Próg bramki ciszy (RMS Gate) zgodny z ADR-001 i ml/hdd_audio_encoder.py (RMS >= 0.002).
+     * Wartości poniżej tego progu oznaczają brak kontaktu z dyskiem lub szum własny przetwornika ADC.
+     */
+    public static final float RMS_SILENCE_THRESHOLD = 0.002f;
 
     /** Próg energii, poniżej którego aktywowane jest programowe podbicie cichych nagrań. */
     public static final float RMS_QUIET_BOOST_THRESHOLD = 0.005f;

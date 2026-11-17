@@ -89,7 +89,7 @@ AcousticHddSentinel/
 │       └── PROCESSED_SOURCES_REGISTRY.json # Rejestr unikalnych próbek i sum kontrolnych MD5
 │
 ├── dataset_categorized/               # Nagrania źródłowe podzielone na 4 klasy
-├── dataset_encoded/                   # 2269 tensorów .npy (Zero Data Leakage: train, validate, test)
+├── dataset_encoded/                   # 5 716 tensorów .npy (Zero Data Leakage: train, validate, test)
 │
 ├── training_output/                   # Produkcyjny model, wagi i raporty ewaluacji (Accuracy 83.8%, Macro F1 84.6%)
 │   ├── best_hdd_cnn_model.pt          # Wagi najlepszego pojedynczego modelu PyTorch (seed 777)

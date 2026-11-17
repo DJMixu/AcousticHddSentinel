@@ -212,9 +212,9 @@ Zbiór danych nie zawiera syntetycznych zniekształceń zaburzających fizykę d
 
 ### 2. Niezmiennik Zero Data Leakage i podział tensorów:
 Podział na zbiory nastąpił **wyłącznie na poziomie całych nośników źródłowych** przed pocięciem na okna czasowe:
-* **`train` (68% nagrań):** 4 633 tensory (zastosowano 50% overlap okien co 1.5 s oraz zbalansowaną augmentację pitch-shift $\pm 1.5$ półtonu dla klas rzadkich).
-* **`validate` (14% nagrań):** 196 tensorów (czyste okna co 3.0 s, brak nakładania, brak pitch-shiftu).
-* **`test` (18% nagrań):** 358 tensorów (**100% czysty zbiór ewaluacyjny** z niewidzianych wcześniej dysków, krok co 3.0 s, 0% overlapu, surowe środowisko).
+* **`train` (68% nagrań):** 4 955 tensorów (zastosowano 50% overlap okien co 1.5 s oraz zbalansowaną augmentację pitch-shift $\pm 1.5$ półtonu dla klas rzadkich).
+* **`validate` (14% nagrań):** 233 tensory (czyste okna co 3.0 s, brak nakładania, brak pitch-shiftu).
+* **`test` (18% nagrań):** 528 tensorów (**100% czysty zbiór ewaluacyjny** z niewidzianych wcześniej dysków, krok co 3.0 s, 0% overlapu, surowe środowisko).
 
 ### 3. Procedura treningowa i regularyzacja:
 * **Optymalizator:** `AdamW` (początkowy $\text{lr} = 10^{-3}$, zanik wag `weight_decay = 1e-4` chroniący przed przetrenowaniem).
@@ -414,8 +414,8 @@ AcousticHddSentinel/
 │   ├── app/src/test/java/             # Zestaw 22 testów jednostkowych potoku DSP i logiki
 │   └── build.gradle.kts               # Konfiguracja projektu Gradle 8.4
 │
-├── data/raw/                          # Baza surowych nagrań audio (288 plików, rejestr MD5)
-├── dataset_encoded/                   # 5 187 tensorów .npy (Train, Validate, Test – Zero Data Leakage)
+├── data/raw/                          # Baza surowych nagrań audio (rejestr MD5)
+├── dataset_encoded/                   # 5 716 tensorów .npy (Train, Validate, Test – Zero Data Leakage)
 ├── training_output/                   # Produkcyjne wagi PyTorch, macierze pomyłek i raporty ewaluacji
 ├── exported_models/                   # Wyeksportowane modele ONNX FP32 / INT8 i TorchScript
 └── docx/                              # Specyfikacje i decyzje architektoniczne (ADR-001, ADR-002)

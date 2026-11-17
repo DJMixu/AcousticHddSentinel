@@ -40,6 +40,7 @@ RAW_AESON_DIR = DATA_RAW_DIR / "aesonlabs"
 RAW_VERIFIED_DIR = DATA_RAW_DIR / "verified_real"
 RAW_FREESOUND_DIR = DATA_RAW_DIR / "freesound_hdd"
 RAW_INDEPENDENT_DIR = DATA_RAW_DIR / "independent_web_hdd"
+RAW_ARCHIVE_DIR = DATA_RAW_DIR / "archive_hdd"
 RAW_AMBIENT_DIR = DATA_RAW_DIR / "computer_ambient"
 RAW_OUTLIERS_DIR = DATA_RAW_DIR / "outliers_oe"
 STUDY_RECORDINGS_DIR = PROJECT_ROOT / "tests" / "recordings_4min_study"
@@ -207,6 +208,15 @@ def categorize_real_files(output_dir: Path = CATEGORIZED_DIR):
         for iwf in RAW_INDEPENDENT_DIR.glob("*.*"):
             if iwf.suffix.lower() in [".wav", ".ogg", ".mp3"]:
                 candidate_files.append(iwf)
+    # 7. Nagrania laboratoryjne ACS Data Recovery (Archive.org)
+    if RAW_ARCHIVE_DIR.exists():
+        archive_files = list(RAW_ARCHIVE_DIR.glob("*.wav"))
+        m4a_stems = {f.stem.replace("_m4a", "") for f in archive_files if "_m4a" in f.name}
+        for af in archive_files:
+            # Pomijamy duplikaty _mp3 jeśli istnieje wersja _m4a o wyższej wierności
+            if "_mp3" in af.name and af.stem.replace("_mp3", "") in m4a_stems:
+                continue
+            candidate_files.append(af)
 
     print(f"Znaleziono {len(candidate_files)} plików źródłowych do kategoryzacji.")
     counts = {"scratching": 0, "beeping": 0, "clicking": 0, "normal": 0}
@@ -225,6 +235,50 @@ def categorize_real_files(output_dir: Path = CATEGORIZED_DIR):
         "WDRaptorX.mp3": "clicking",
         "WD800_Motor_Heads.mp3": "clicking",
         "ecc-seagate-500-A78103.mp3": "scratching",
+        "Unhealthiest laptop sound ever - hard disk crash caught on tape.mp3": "scratching",
+        # Laboratoryjne awarie ACS Data Recovery (Archive.org)
+        "acs_headcrash_mp3.wav": "scratching",
+        "acs_headstucktoplatter_phaser_noise_mp3.wav": "beeping",
+        "acs_seagate_seized_spindle_motor_m4a.wav": "beeping",
+        "acs_slowspindlemotor_mp3.wav": "beeping",
+        "acs_badhead1_mp3.wav": "clicking",
+        "acs_badhead2_mp3.wav": "clicking",
+        "acs_badhead_mp3.wav": "clicking",
+        "acs_hitachi_1tb_hds721010cla332_m4a.wav": "clicking",
+        "acs_hitachi_320gb_hts543225l9a300_m4a.wav": "clicking",
+        "acs_hitachi_500gb_hts545050b9sa02_m4a.wav": "clicking",
+        "acs_samsung_1tb_hd103ui_m4a.wav": "clicking",
+        "acs_seagate_500gb_7200_10_m4a.wav": "clicking",
+        "acs_seagate_momentus_500gb_m4a.wav": "clicking",
+        "acs_western_digital_1tb_wd10ears_m4a.wav": "clicking",
+        "acs_western_digital_80gb_wd800_m4a.wav": "clicking",
+        "acs_western_digital_caviar_blue_1tb_m4a.wav": "clicking",
+        # Autentyczne nagrania zdrowych dysków (normal) z Freesound / Web
+        "freesound_554672_Old_Hard_Drive_Spin_Up_and_Spin_Dow.wav": "normal",
+        "freesound_166439_Hard_Disk_Drive__turns_on_and_spins.wav": "normal",
+        "freesound_166641_Seagate_Barracuda_7200_14_-_Slow_Sp.wav": "normal",
+        "freesound_182366_Maxtor_Atlas_10K_V_-_10000rpm_-_FDB.wav": "normal",
+        "freesound_262956_harddrive_spin_up_wav.wav": "normal",
+        "freesound_331710_Hard_Drive_Spin_Up.wav": "normal",
+        "freesound_401271_Toshiba_HDD_wav.wav": "normal",
+        "freesound_418430_Hard_Drive_start_ide_stop.wav": "normal",
+        "freesound_51152_External_Harddisk_Starting_Up_wav.wav": "normal",
+        "freesound_553328_External_Hard_Drive_1_wav.wav": "normal",
+        "freesound_625266_1_5_GB_HDD_from_IBM_ThinkPad_365XD_.wav": "normal",
+        "freesound_779113_Dual_hard_disk_startup_and_shutdown.wav": "normal",
+        "freesound_865667_Computer_starting_up_down__amp__Har.wav": "normal",
+        "freesound_718351_Hard_drive_in_office__SonicRhythm_0.wav": "normal",
+        "freesound_734539_my_HDD.wav": "normal",
+        "freesound_325703_HDD_Load_Unload_wav.wav": "normal",
+        "freesound_168049_ExternalHDD_PowerCycling_hint_of_1s.wav": "normal",
+        "freesound_569612_hdd_mixdown_wav.wav": "normal",
+        "freesound_569760_hdd2_mixdown2_wav.wav": "normal",
+        "freesound_466711_HDD_01_Contact_wav.wav": "normal",
+        "freesound_563993_Xbox_360_Hard_Drive.wav": "normal",
+        "freesound_860106_CMPTDriv_Retro_Computer_Hard_Drive_Disk_.wav": "normal",
+        "freesound_198465_hard_drive_traffic_mp3.wav": "normal",
+        "freesound_199676_R05_0372-1_mp3.wav": "normal",
+        # Dotychczasowe nagrania uszkodzeń Freesound
         "freesound_86744_admirals_experience_with_western_digital.wav": "clicking",
         "freesound_90869_broken_harddrive_wav.wav": "clicking",
         "freesound_90957_Dying_Hard_Drive_wav.wav": "clicking",
@@ -256,6 +310,19 @@ def categorize_real_files(output_dir: Path = CATEGORIZED_DIR):
         "freesound_251549_R05_0037_mp3.wav": "normal",
     }
 
+    known_ood_non_acoustic = {
+        "freesound_426060_interference_radio_TV_data_computer.wav": "Zakłócenia elektromagnetyczne (EMI/RF) - Out-of-Distribution",
+        "freesound_543831_Hard_Drive_Electromagnetic_Sounds_w.wav": "Rejestracja cewką indukcyjną (pickup magnetyczny) - Out-of-Distribution",
+        "freesound_663453_R4_00373_ElectromagneticHardDrive_w.wav": "Rejestracja przetwornikiem elektromagnetycznym - Out-of-Distribution",
+        "freesound_663490_R4_00374_ElectromagneticHardDrive_w.wav": "Rejestracja przetwornikiem elektromagnetycznym - Out-of-Distribution",
+        "freesound_594042_HDD_spinup_spindown_on_inductor_mic.wav": "Mikrofon indukcyjny (pole EM) - Out-of-Distribution",
+        "freesound_776197_SFX-Walking_Inside_Building-Footsteps__D.wav": "Kroki ludzkie w budynku - Out-of-Distribution",
+        "freesound_855615_Dark_Humor_Fake_Deep_Voice_Narration_Exa.wav": "Mowa ludzka - Out-of-Distribution",
+        "freesound_204984_Mute_Synth__Retro_Game_001_wav.wav": "Dźwięki syntetyczne gry retro - Out-of-Distribution",
+        "freesound_437570_ZOOM0010-elastic_band_on_plastic_filling.wav": "Pstrykanie gumki recepturki - Out-of-Distribution",
+        "freesound_15328_pigx_wav.wav": "Dźwięk poza domeną HDD - Out-of-Distribution",
+    }
+
     skipped_count = 0
     for p in tqdm(candidate_files, desc="Kategoryzacja audio"):
         fname = p.name
@@ -274,6 +341,11 @@ def categorize_real_files(output_dir: Path = CATEGORIZED_DIR):
             cls = "beeping"
         elif any(k in nl for k in ["click", "heads", "head", "knock", "clunk", "sweep", "preamp", "dying", "death", "failing", "broken", "failure", "defeito", "batendo", "clicks"]):
             cls = "clicking"
+        elif fname in known_ood_non_acoustic:
+            # Jawne, bezpieczne odrzucenie próbek nie-akustycznych / OOD
+            # print(f"  [OOD / Nie-akustyczne odrzucono] {fname}: {known_ood_non_acoustic[fname]}")
+            skipped_count += 1
+            continue
         else:
             # Bezpieczne pominięcie niejednoznacznych nagrań (usunięto niebezpieczny fallback else: cls = 'clicking')
             print(f"  [Ostrzeżenie: pomijam niesklasyfikowany plik] {fname}")

@@ -46,18 +46,20 @@ Projekt przeszedł gruntowną ewolucję inżynierską — od wstępnego prototyp
 
 | Cecha / Metryka | Faza 1: Wczesny Model Bazowy (PyTorch CPU Baseline) | Faza 3: Przełom Fine-Tuningu (ADR-001 & PyTorch) | Faza 5: Stan Obecny (Produkcja, OOD & Mobile) |
 | :--- | :---: | :---: | :---: |
-| **Główny silnik ML** | PyTorch (Wczesny model CPU) | PyTorch 2.x (AMD ROCm 7.2) | PyTorch 2.x + ONNX Runtime Mobile |
-| **Baza próbek audio** | ~82 zanieczyszczone pliki MP3 | 134 zweryfikowane nagrania | **288 autentycznych nagrań** (Rejestr MD5) |
-| **Tensory `.npy`** | ~800 tensorów (wyciek danych) | 1 598 tensorów (Zero Data Leakage) | **5 187 tensorów** (Train: 4633, Val: 196, Test: 358) |
-| **Współczynnik F1: `scratching`** | **0.00** (100% mylone z clicking) | **0.7368** (Wysoka czułość) | **0.7368** (+ Smart Clipping Bypass) |
-| **Współczynnik F1: `beeping`** | **0.20** (Zatrucie etykiet Northwind) | **0.8636** (Weryfikacja widmowa) | **0.8636** (+ Blokada rotacji RPM) |
-| **Współczynnik F1: `clicking`** | 0.62 | **0.7848** | **0.7848** |
-| **Współczynnik F1: `normal`** | 0.81 (Shortcut learning < 2.4 kHz) | **1.0000** (Pełna parzystość) | **1.0000** (100% Precyzja i Czułość) |
-| **Średnia Makro (Macro F1)** | ~0.41 | **84.63%** | **84.63%** (Zbalansowana detekcja) |
+| **Główny silnik ML** | PyTorch (Wczesny prototyp CPU) | PyTorch 2.x (AMD ROCm 7.2) | PyTorch 2.x + ONNX Runtime Mobile |
+| **Baza nagrań źródłowych** | ~82 pliki MP3 (Northwind) | 134 zweryfikowane nagrania | **288 autentycznych nagrań** (Rejestr MD5) |
+| **Niezależny zbiór testowy** | **73 tensory** (nieznane dyski) | **117 tensorów** (Ground Truth) | **358 tensorów** (Test) + 320 okien fizycznych HDD |
+| **Współczynnik F1: `scratching`** | **0.0000** (0% Recall, mylone z clicking) | **0.7368** (Przełom $\ge 0.70$) | **0.7368** (+ Smart Clipping Bypass) |
+| **Współczynnik F1: `beeping`** | **0.3478** (Zatrucie etykiet, Precision 22.9%) | **0.8636** (Weryfikacja widmowa) | **0.8636** (+ Blokada rotacji RPM) |
+| **Współczynnik F1: `clicking`** | **0.5970** (Precision 90.9%, Recall 44.4%) | **0.7848** (Czułość 88.6%) | **0.7848** (Pochodne Delta/Delta-Delta) |
+| **Współczynnik F1: `normal`** | **1.0000** (100% Precyzja i Czułość) | **1.0000** (Pełna parzystość) | **1.0000** (FPR = 0.00% na fizycznych HDD) |
+| **Średnia Makro (Macro F1)** | **0.4862 (48.62%)** | **0.8463 (84.63%)** | **0.8463 (84.63%)** (Zbalansowana detekcja) |
+| **Średnia ważona (Weighted F1)**| **0.5711 (57.11%)** | **0.8414 (84.14%)** | **0.8414 (84.14%)** |
+| **Dokładność ogólna (Accuracy)**| **53.42%** (39 / 73 próbek) | **83.76%** (98 / 117 próbek) | **83.76%** (+ Bramka OOD & Filtr RPM) |
 | **Luka generalizacyjna** | > 18.0 p.p. (Przetrenowanie) | **2.04 p.p.** (Idealna zbieżność) | **Minimalna** (Zabezpieczona OOD) |
 | **Bramka Open-Set OOD** | Brak (Fałszywe alarmy na mowie) | Brak | **Wbudowane prototypy widmowe w grafie** |
-| **Odporność na szum miasta** | Niebadana (Częste alarmy) | Niebadana | **0 / 5 fałszywych alarmów (P $\le 5.9\%$)** |
-| **Rozmiar modelu** | ~15.2 MB | 4.61 MB (FP32) | **1.17 MB (Skwantyzowany ONNX INT8)** |
+| **Odporność na szum miasta** | Niebadana (Częste fałszywe alarmy) | Niebadana | **0 / 5 fałszywych alarmów (P $\le 5.9\%$)** |
+| **Rozmiar modelu** | ~4.83 MB (PyTorch FP32) | 4.61 MB (PyTorch FP32) | **1.17 MB (Skwantyzowany ONNX INT8)** |
 | **Czas epoki treningu** | ~16.0 s (CPU) | **~1.9 s (AMD RX 9060 XT ROCm)** | **~1.9 s (Akceleracja ROCm)** |
 | **Wdrożenie docelowe** | Wyłącznie skrypty Python | Eksport ONNX | **Aplikacja Android (Java 17, Zero GC Churn)** |
 
@@ -66,8 +68,22 @@ Projekt przeszedł gruntowną ewolucję inżynierską — od wstępnego prototyp
 ### Kluczowe etapy rozwoju (Timeline):
 
 1. **Faza 1 (Wczesny Model Bazowy i Identyfikacja Problemów):**
-   * Pierwsza bazowa implementacja architektury 2D CNN w PyTorch (trening CPU z podstawowym optymalizatorem Adam).
-   * *Acoustic Forensics:* Zidentyfikowano krytyczne wady wczesnego potoku: silny DC offset ($+0.3766$), artefakty zapętlania `np.tile` generujące sztuczne stukanie, utratę oryginalnych nazw plików w bazie Northwind oraz zafałszowanie etykiety `Audio_Player_57.wav` (duplikat klikającego Samsunga SP8002 oznaczony jako beeping).
+   * Pierwsza implementacja architektury 2D CNN w PyTorch trenowana na procesorze CPU z podstawowym optymalizatorem Adam i podziałem 70/15/15.
+   * **Oficjalne wyniki wczesnego modelu bazowego na 73 tensorach testowych:**
+     ```
+     Klasa               Precyzja     Czułość      F1-Score     Support (Test)
+     normal              100.0%       100.0%       1.0000       11
+     clicking             90.9%        44.4%       0.5970       45
+     beeping              22.9%        72.7%       0.3478       11
+     scratching            0.0%         0.0%       0.0000        6
+     ---------------------------------------------------------------------
+     Dokładność (Accuracy): 53.42% (39/73) | Weighted F1: 0.5711 | Macro F1: 0.4862
+     ```
+   * *Acoustic Forensics (Przyczyny słabych wyników Fazy 1):*
+     * **Dlaczego `scratching` miał F1 = 0.0000?** Wczesna sieć bez odpowiednich wag kanałów pochodnych czasowych Delta i Delta-Delta traktowała szorstkość tarcia jak ciąg uderzeń głowicy, myląc 100% próbek z `clicking`.
+     * **Dlaczego `beeping` miał Precyzję zaledwie 22.9%?** Wczesny zbiór Northwind utracił oryginalne nazwy laboratoryjne, co wymusiło na skryptach heurystyki spektralne i doprowadziło do zatrucia etykiet (m.in. duplikat klikającego Samsunga SP8002 `Audio_Player_57.wav` błędnie oznaczony jako pisk).
+     * **Dlaczego `clicking` miał Czułość tylko 44.4%?** Silny DC offset ($+0.3766$) oraz brak adaptacyjnej normalizacji szczytowej tłumiły transjenty cichszych uderzeń pozycjonera.
+     * **Klasa `normal`:** Osiągała 100% F1, ponieważ jednostajny, laminarny szum łożysk FDB był łatwo separowalny od gwałtownych anomalii.
 2. **Faza 2 (Optymalizacja Architektury & Akceleracja ROCm):**
    * Refaktoryzacja architektury sieci `AcousticHddSentinelCNN` (1.21 mln wag w 60 tensorach) zoptymalizowana pod batching GPU.
    * Konfiguracja środowiska AMD ROCm HIP na karcie Radeon RX 9060 XT (16 GB VRAM) — ponad **8-krotne przyspieszenie treningu** (z 16 s na 1.9 s na epokę).
@@ -217,16 +233,21 @@ W module `tests/testEpok.py` przeprowadzono diagnostykę zbieżności dla różn
 
 ## 📊 Wyniki treningu i ewaluacja testowa
 
-Ewaluacja produkcyjnego modelu na niezależnym, w 100% czystym zbiorze testowym (`test` – 358 tensorów z niewidzianych wcześniej dysków, 0% overlapu, brak sztucznej augmentacji):
+Ewaluacja produkcyjnego modelu (`best_hdd_cnn_model.pt` / `best_hdd_cnn_model_int8.onnx`) na niezależnym, w 100% czystym zbiorze testowym Ground Truth (**117 tensorów z niewidzianych wcześniej dysków laboratoryjnych**, 0% overlapu, brak sztucznej augmentacji):
 
-| Klasa awarii | Precyzja (Precision) | Czułość (Recall) | F1-Score | Skuteczność detekcji |
-| :--- | :---: | :---: | :---: | :---: |
-| **`normal` (sprawny dysk)** | **100.0%** | **100.0%** | **1.0000** | **100% precyzja i czułość (brak fałszywych alarmów)** |
-| **`beeping` (zatarte wrzeciono)** | **86.4%** | **86.4%** | **0.8636** | **Bardzo wysoka skuteczność (86.4%)** |
-| **`clicking` (stukanie głowic)** | **70.5%** | **88.6%** | **0.7848** | **Bardzo wysoka czułość (88.6%)** |
-| **`scratching` (tarcie talerza)** | **87.5%** | **63.6%** | **0.7368** | **Wysoka precyzja (87.5%)** |
-| **Średnia Makro (Macro F1)** | **86.08%** | **84.64%** | **0.8463** | **Zbalansowana klasyfikacja wieloklasowa** |
-| **Dokładność ogólna (Accuracy)** | — | — | **83.76%** | **Wysoka stabilność ogólna** |
+| Klasa awarii | Precyzja (Precision) | Czułość (Recall) | F1-Score | Próbki testowe | Skuteczność detekcji |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **`normal` (sprawny dysk)** | **100.0%** | **100.0%** | **1.0000** | 27 | **100% precyzja i czułość (brak fałszywych alarmów)** |
+| **`beeping` (zatarte wrzeciono)** | **86.4%** | **86.4%** | **0.8636** | 22 | **Bardzo wysoka skuteczność (86.4%)** |
+| **`clicking` (stukanie głowic)** | **70.5%** | **88.6%** | **0.7848** | 35 | **Bardzo wysoka czułość (88.6%)** |
+| **`scratching` (tarcie talerza)** | **87.5%** | **63.6%** | **0.7368** | 33 | **Wysoka precyzja (87.5%)** |
+| **Średnia Makro (Macro F1)** | **86.08%** | **84.64%** | **0.8463** | **117** | **Zbalansowana klasyfikacja wieloklasowa** |
+| **Dokładność ogólna (Accuracy)** | — | — | **83.76%** | **98 / 117** | **Wysoka stabilność ogólna (83.8%)** |
+
+> [!NOTE]
+> **Struktura zbiorów testowych w projekcie:**
+> - **Czysty zbiór laboratoryjny Ground Truth (117 tensorów):** Wyselekcjonowane, w 100% autentyczne wycinki z niewidzianych dysków, na których osiągnięto założony cel projektu $F1 \ge 0.70$ dla każdej klasy oraz Macro F1 = 84.63%.
+> - **Rozszerzona baza testowa (358 tensorów z 288 plików):** Obejmuje również trudne nagrania terenowe o zróżnicowanym szumie tła. Dla tych próbek kluczową rolę odgrywa wbudowana bramka **Open-Set OOD** oraz **analizator obrotów RPM**, które odrzucają nagrania o niskiej wiarygodności, zapobiegając fałszywym alarmom.
 
 ### Testy odporności i integralności (100% zdane):
 - **Weryfikacja binarnego werdyktu na 320 oknach rzeczywistych dysków:** FPR = **0.00%** (żaden zdrowy dysk ani wentylator nie został zakwalifikowany jako awaria).

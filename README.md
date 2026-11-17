@@ -1,29 +1,56 @@
 # Acoustic HDD Sentinel 🛡️💽
 > **System wibroakustycznej detekcji i wieloklasowej klasyfikacji uszkodzeń mechanicznych dysków twardych (HDD) przy użyciu głębokich sieci konwolucyjnych (2D CNN w PyTorch), fizycznych strażników DSP oraz aplikacji mobilnej Android (Edge AI).**
 
+[![Branch](https://img.shields.io/badge/Branch-feature%2Fprototype--bez--normal-blue.svg)](https://github.com/DJMixu/AcousticHddSentinel/tree/feature/prototype-bez-normal)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![PyTorch 2.x](https://img.shields.io/badge/PyTorch-2.x-red.svg)](https://pytorch.org/)
-[![Android 8.0+](https://img.shields.io/badge/Android-Java%2017%20%7C%20API%2026%2B-green.svg)](https://developer.android.com/)
-[![ONNX Runtime Mobile](https://img.shields.io/badge/ONNX%20Runtime-INT8%20(1.17%20MB)-orange.svg)](https://onnxruntime.ai/)
-[![Status](https://img.shields.io/badge/Status-Macro%20F1%2084.6%25%20(Production)-brightgreen.svg)]()
+[![Status](https://img.shields.io/badge/Status-Fault--Only_OOD_Learning_(Prototype_v2)-brightgreen.svg)]()
 [![Hardware Acceleration](https://img.shields.io/badge/Acceleration-AMD%20ROCm%20HIP%20(RX%209060%20XT)-purple.svg)]()
+
+> [!IMPORTANT]
+> **Gałąź Eksperymentalna: `feature/prototype-bez-normal`**
+> Niniejsza gałąź bada alternatywny paradygmat diagnostyki wibroakustycznej: **Fault-Only Learning (Uczenie wyłącznie na uszkodzeniach)**.
+> - Sieć 2D CNN uczona jest **wyłącznie na 3 klasach awarii** (`beeping`, `clicking`, `scratching` – 3 421 tensorów).
+> - Klasa `normal` (zdrowy dysk) została w 100% wykluczona z treningu i walidacji i rozpoznawana jest metodami **Out-Of-Distribution (OOD)** za pomocą estymatora gęstości **GMM w przestrzeni 128D**.
+> - Szczegółowa dokumentacja eksperymentu: 📂 **[PrototypBezNormal/README.md](file:///home/DJMixu/Pulpit/AcousticHddSentinel/PrototypBezNormal/README.md)**.
+> - Pełny raport bezpośredniego porównania z modelem bazowym: 📊 **[PrototypBezNormal/COMPARISON_WITH_NORMAL_MODEL.md](file:///home/DJMixu/Pulpit/AcousticHddSentinel/PrototypBezNormal/COMPARISON_WITH_NORMAL_MODEL.md)**.
 
 ---
 
 ## 📖 Spis treści
-1. [O projekcie](#-o-projekcie)
-2. [📈 Ewolucja Projektu i Kamienie Milowe (Progress & Evolution)](#-ewolucja-projektu-i-kamienie-milowe-progress--evolution)
-3. [Architektura przetwarzania audio (ADR-001)](#-architektura-przetwarzania-audio-adr-001)
-4. [🧠 Jak konkretnie działa model 2D CNN i mechanizmy obronne](#-jak-konkretnie-działa-model-2d-cnn-i-mechanizmy-obronne)
-5. [🔍 Jak model wyłapuje poszczególne awarie mechaniczne](#-jak-model-wyłapuje-poszczególne-awarie-mechaniczne)
-6. [📚 Na czym model był uczony i diagnostyka epok](#-na-czym-model-był-uczony-i-diagnostyka-epok)
-7. [📊 Wyniki treningu i ewaluacja testowa](#-wyniki-treningu-i-ewaluacja-testowa)
-8. [🔬 Rzeczywisty eksperyment na 4 fizycznych dyskach HDD](#-rzeczywisty-eksperyment-na-4-fizycznych-dyskach-hdd)
-9. [📱 Aplikacja Mobilna Android (Potok DSP, Mikrofon i Zero GC Churn)](#-aplikacja-mobilna-android-potok-dsp-mikrofon-i-zero-gc-churn)
-10. [📦 Eksport modeli produkcyjnych (ONNX / Mobile / Android)](#-eksport-modeli-produkcyjnych-onnx--mobile--android)
-11. [💻 Instalacja i szybki start](#-instalacja-i-szybki-start)
-12. [📁 Uporządkowana struktura repozytorium](#-uporządkowana-struktura-repozytorium)
-13. [🤖 Współpraca z Antigravity (AGY)](#-współpraca-z-antigravity-agy)
+1. [🔬 PrototypBezNormal: Eksperyment bez klasy 'normal' w treningu](#-prototypbeznormal-eksperyment-bez-klasy-normal-w-treningu)
+2. [O projekcie](#-o-projekcie)
+3. [📈 Ewolucja Projektu i Kamienie Milowe (Progress & Evolution)](#-ewolucja-projektu-i-kamienie-milowe-progress--evolution)
+4. [Architektura przetwarzania audio (ADR-001)](#-architektura-przetwarzania-audio-adr-001)
+5. [🧠 Jak konkretnie działa model 2D CNN i mechanizmy obronne](#-jak-konkretnie-działa-model-2d-cnn-i-mechanizmy-obronne)
+6. [🔍 Jak model wyłapuje poszczególne awarie mechaniczne](#-jak-model-wyłapuje-poszczególne-awarie-mechaniczne)
+7. [📚 Na czym model był uczony i diagnostyka epok](#-na-czym-model-był-uczony-i-diagnostyka-epok)
+8. [📊 Wyniki treningu i ewaluacja testowa](#-wyniki-treningu-i-ewaluacja-testowa)
+9. [🔬 Rzeczywisty eksperyment na 4 fizycznych dyskach HDD](#-rzeczywisty-eksperyment-na-4-fizycznych-dyskach-hdd)
+10. [📱 Aplikacja Mobilna Android (Potok DSP, Mikrofon i Zero GC Churn)](#-aplikacja-mobilna-android-potok-dsp-mikrofon-i-zero-gc-churn)
+11. [📦 Eksport modeli produkcyjnych (ONNX / Mobile / Android)](#-eksport-modeli-produkcyjnych-onnx--mobile--android)
+12. [💻 Instalacja i szybki start](#-instalacja-i-szybki-start)
+13. [📁 Uporządkowana struktura repozytorium](#-uporządkowana-struktura-repozytorium)
+14. [🤖 Współpraca z Antigravity (AGY)](#-współpraca-z-antigravity-agy)
+
+---
+
+## 🔬 PrototypBezNormal: Eksperyment bez klasy 'normal' w treningu
+
+W ramach gałęzi **`feature/prototype-bez-normal`** rozwijany jest eksperyment odrzucający konieczność posiadania bazy nagrań sprawnych dysków podczas uczenia sieci neuronowej:
+
+* **Zasada działania:** Sieć 2D CNN uczy się reprezentacji w przestrzeni cech 128D wyłącznie na autentycznych uszkodzeniach (`beeping`, `clicking`, `scratching`). Dysk sprawny (`normal`) traktowany jest jako stan **Out-Of-Distribution (OOD)**.
+* **Estymator Gęstości GMM:** Jeśli badany wycinek dźwięku nie pasuje statystycznie do żadnej elipsoidalnej obwiedni uszkodzenia (log-likelihood poniżej progu kalibracyjnego $T = 201.95$), zostaje uznany za stan **NORMAL / HEALTHY**.
+* **Wyniki na 516 tensorach testowych (Zero Data Leakage):**
+  - **76.90% czułości (Recall) dla klasy `normal`** oraz **73.04% precyzji** ($F1 = 74.92\%$) bez jakichkolwiek danych treningowych z tej klasy!
+  - **100% poprawnych werdyktów HEALTHY (39/39 okien 3.0s)** na ciągłym 60-sekundowym nagraniu fizycznego dysku WD Blue 5400 RPM.
+  - Wyższa precyzja wykrywania zatarcia wrzeciona (`beeping`): **54.29%** (vs 35.00% w modelu pełnym).
+* **Narzędzia diagnostyczne na tej gałęzi:**
+  - `python PrototypBezNormal/compare_full_vs_no_normal.py` – bezpośrednie porównanie z modelem pełnym.
+  - `python PrototypBezNormal/live_predict.py <plik.wav>` – szybka analiza plików audio.
+  - `python PrototypBezNormal/record_and_predict.py --duration 5.0` – diagnostyka na żywo z dedykowanego mikrofonu Realtek ALC1220.
+
+Szczegóły techniczne i raport porównawczy: [PrototypBezNormal/README.md](file:///home/DJMixu/Pulpit/AcousticHddSentinel/PrototypBezNormal/README.md) oraz [PrototypBezNormal/COMPARISON_WITH_NORMAL_MODEL.md](file:///home/DJMixu/Pulpit/AcousticHddSentinel/PrototypBezNormal/COMPARISON_WITH_NORMAL_MODEL.md).
 
 ---
 

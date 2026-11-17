@@ -1,0 +1,8 @@
+{
+  "threshold": 201.95330810546875,
+  "val_mean": 179.29022216796875,
+  "val_std": 94.64049530029297,
+  "percentile": 45.0,
+  "training_samples": 3421,
+  "validation_samples": 131
+}

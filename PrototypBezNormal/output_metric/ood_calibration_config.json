@@ -1,0 +1,11 @@
+{
+  "global_cosine_threshold": -0.849509596824646,
+  "class_cosine_thresholds": {
+    "beeping": -0.9562671184539795,
+    "clicking": -0.8566592335700989,
+    "scratching": 0.19236966967582703
+  },
+  "global_mahalanobis_threshold": 3.004349946975708,
+  "global_energy_threshold": 14.205090522766113,
+  "calibrated_samples": 3421
+}

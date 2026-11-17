@@ -41,6 +41,7 @@ RAW_VERIFIED_DIR = DATA_RAW_DIR / "verified_real"
 RAW_FREESOUND_DIR = DATA_RAW_DIR / "freesound_hdd"
 RAW_INDEPENDENT_DIR = DATA_RAW_DIR / "independent_web_hdd"
 RAW_ARCHIVE_DIR = DATA_RAW_DIR / "archive_hdd"
+RAW_HARVESTED_ARCHIVE_DIR = DATA_RAW_DIR / "harvested_archive"
 RAW_AMBIENT_DIR = DATA_RAW_DIR / "computer_ambient"
 RAW_OUTLIERS_DIR = DATA_RAW_DIR / "outliers_oe"
 STUDY_RECORDINGS_DIR = PROJECT_ROOT / "tests" / "recordings_4min_study"
@@ -217,6 +218,9 @@ def categorize_real_files(output_dir: Path = CATEGORIZED_DIR):
             if "_mp3" in af.name and af.stem.replace("_mp3", "") in m4a_stems:
                 continue
             candidate_files.append(af)
+    # 8. Nowe autentyczne nagrania archiwalne i laboratoryjne uszkodzeń
+    if RAW_HARVESTED_ARCHIVE_DIR.exists():
+        candidate_files.extend(list(RAW_HARVESTED_ARCHIVE_DIR.glob("*.wav")))
 
     print(f"Znaleziono {len(candidate_files)} plików źródłowych do kategoryzacji.")
     counts = {"scratching": 0, "beeping": 0, "clicking": 0, "normal": 0}
@@ -253,6 +257,42 @@ def categorize_real_files(output_dir: Path = CATEGORIZED_DIR):
         "acs_western_digital_1tb_wd10ears_m4a.wav": "clicking",
         "acs_western_digital_80gb_wd800_m4a.wav": "clicking",
         "acs_western_digital_caviar_blue_1tb_m4a.wav": "clicking",
+        # Nowe autentyczne nagrania uszkodzeń (harvested_archive)
+        "stellar_recovery_platter_scratch.wav": "scratching",
+        "hdd_grinding_noise_mechanical_friction.wav": "scratching",
+        "freesound_804471_disk_grinding_and_clicking.wav": "scratching",
+        "freesound_90957_dying_hard_drive_platter_drag.wav": "scratching",
+        "github_deervo_quantum_bigfoot_grinding_load.wav": "scratching",
+        "github_deervo_quantum_bigfoot_grinding_loop.wav": "scratching",
+        "github_deervo_seagate_st225_bad_condition.wav": "scratching",
+
+        "wd_green_stiction_motor_beep.wav": "beeping",
+        "freesound_840484_hgst_mechanical_beep.wav": "beeping",
+        "freesound_562411_storejet_read_failure_beep.wav": "beeping",
+        "freesound_443025_hard_drive_strain_beep.wav": "beeping",
+        "freesound_378913_failing_drive_siren_beep.wav": "beeping",
+        "freesound_90869_broken_hdd_meep_beep.wav": "beeping",
+
+        "archive_soundbible_hard_drive_clicking.wav": "clicking",
+        "freesound_860383_hard_drive_motor_skip_clicking.wav": "clicking",
+        "freesound_149220_wd_protege_click_of_death.wav": "clicking",
+        "freesound_569970_ipod_broken_hdd_spinup_click.wav": "clicking",
+        "freesound_840282_hdd_abrupt_shutdown_crash.wav": "clicking",
+        "freesound_205512_wd_unmountable_click.wav": "clicking",
+        "freesound_272341_hard_drives_failing_multiclick.wav": "clicking",
+        "freesound_114172_defrag_clanks_1.wav": "clicking",
+        "freesound_114173_defrag_clanks_2.wav": "clicking",
+        "freesound_114174_defrag_clanks_3.wav": "clicking",
+        "freesound_262872_1995_compaq_actuator_click.wav": "clicking",
+        "freesound_86744_dying_western_digital_fan_click.wav": "clicking",
+        "freesound_71929_ns_hard_drive_seek_knocks.wav": "clicking",
+        "github_deervo_ibm_deskstar_75gxp_deathstar_load1.wav": "clicking",
+        "github_deervo_ibm_deskstar_75gxp_deathstar_load2.wav": "clicking",
+        "github_deervo_fujitsu_mpg3204at_failure_load1.wav": "clicking",
+        "github_deervo_fujitsu_mpg3204at_failure_load2.wav": "clicking",
+        "github_clicker_loop_1.wav": "clicking",
+        "github_clicker_loop_2.wav": "clicking",
+        "github_clicker_loop_3.wav": "clicking",
         # Autentyczne nagrania zdrowych dysków (normal) z Freesound / Web
         "freesound_554672_Old_Hard_Drive_Spin_Up_and_Spin_Dow.wav": "normal",
         "freesound_166439_Hard_Disk_Drive__turns_on_and_spins.wav": "normal",

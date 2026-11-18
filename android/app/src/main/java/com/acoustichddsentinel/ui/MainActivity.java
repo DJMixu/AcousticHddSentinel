@@ -1,11 +1,15 @@
 package com.acoustichddsentinel.ui;
 
 import android.Manifest;
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.view.View;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.ImageView;
 import android.widget.Toast;
 
@@ -167,37 +171,44 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private android.animation.ObjectAnimator pulseAnimatorX;
-    private android.animation.ObjectAnimator pulseAnimatorY;
+    private AnimatorSet pulseAnimatorSet;
 
     private void startPulseAnimation() {
-        if (pulseAnimatorX == null || pulseAnimatorY == null) {
-            pulseAnimatorX = android.animation.ObjectAnimator.ofFloat(binding.viewPulseRing, "scaleX", 1.0f, 1.35f);
-            pulseAnimatorY = android.animation.ObjectAnimator.ofFloat(binding.viewPulseRing, "scaleY", 1.0f, 1.35f);
+        if (pulseAnimatorSet == null) {
+            ObjectAnimator scaleX = ObjectAnimator.ofFloat(binding.viewPulseRing, View.SCALE_X, 1.0f, 1.25f);
+            ObjectAnimator scaleY = ObjectAnimator.ofFloat(binding.viewPulseRing, View.SCALE_Y, 1.0f, 1.25f);
+            ObjectAnimator alpha = ObjectAnimator.ofFloat(binding.viewPulseRing, View.ALPHA, 0.75f, 0.0f);
 
-            pulseAnimatorX.setDuration(800);
-            pulseAnimatorY.setDuration(800);
+            scaleX.setRepeatCount(ValueAnimator.INFINITE);
+            scaleX.setRepeatMode(ValueAnimator.RESTART);
+            scaleY.setRepeatCount(ValueAnimator.INFINITE);
+            scaleY.setRepeatMode(ValueAnimator.RESTART);
+            alpha.setRepeatCount(ValueAnimator.INFINITE);
+            alpha.setRepeatMode(ValueAnimator.RESTART);
 
-            pulseAnimatorX.setRepeatCount(android.animation.ValueAnimator.INFINITE);
-            pulseAnimatorY.setRepeatCount(android.animation.ValueAnimator.INFINITE);
-
-            pulseAnimatorX.setRepeatMode(android.animation.ValueAnimator.REVERSE);
-            pulseAnimatorY.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+            pulseAnimatorSet = new AnimatorSet();
+            pulseAnimatorSet.playTogether(scaleX, scaleY, alpha);
+            pulseAnimatorSet.setDuration(1200);
+            pulseAnimatorSet.setInterpolator(new DecelerateInterpolator());
         }
+
+        binding.viewPulseRing.setScaleX(1.0f);
+        binding.viewPulseRing.setScaleY(1.0f);
+        binding.viewPulseRing.setAlpha(0.75f);
         binding.viewPulseRing.setVisibility(View.VISIBLE);
-        if (!pulseAnimatorX.isRunning()) {
-            pulseAnimatorX.start();
-            pulseAnimatorY.start();
+
+        if (!pulseAnimatorSet.isStarted() || !pulseAnimatorSet.isRunning()) {
+            pulseAnimatorSet.start();
         }
     }
 
     private void stopPulseAnimation() {
-        if (pulseAnimatorX != null && pulseAnimatorX.isRunning()) {
-            pulseAnimatorX.cancel();
-            pulseAnimatorY.cancel();
+        if (pulseAnimatorSet != null && (pulseAnimatorSet.isRunning() || pulseAnimatorSet.isStarted())) {
+            pulseAnimatorSet.cancel();
         }
         binding.viewPulseRing.setScaleX(1.0f);
         binding.viewPulseRing.setScaleY(1.0f);
+        binding.viewPulseRing.setAlpha(0.0f);
         binding.viewPulseRing.setVisibility(View.INVISIBLE);
     }
 
@@ -455,13 +466,9 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         stopPulseAnimation();
-        if (pulseAnimatorX != null) {
-            pulseAnimatorX.cancel();
-            pulseAnimatorX = null;
-        }
-        if (pulseAnimatorY != null) {
-            pulseAnimatorY.cancel();
-            pulseAnimatorY = null;
+        if (pulseAnimatorSet != null) {
+            pulseAnimatorSet.cancel();
+            pulseAnimatorSet = null;
         }
     }
 

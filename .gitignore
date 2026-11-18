@@ -1,44 +1,164 @@
-# Byte-compiled / cache files
+# ==============================================================================
+# AcousticHddSentinel - Comprehensive .gitignore
+# Zgodny ze standardem projektu, ADR-001 oraz ADR-002
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Python: Bytecode, Cache, Test & Linters
+# ------------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.egg
+*.egg-info/
+dist/
 
-# Wirtualne środowiska Pythona
+# Test runner, coverage & linting caches
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+
+# Środowiska wirtualne Pythona
 venv/
 .venv/
 .venv*/
 env/
 ENV/
+env.bak/
+venv.bak/
 
-# Generowane zbiory (odtwarzalne skryptami prepare_audio_dataset.py oraz hdd_audio_encoder.py)
+# ------------------------------------------------------------------------------
+# 2. PyTorch & Machine Learning: Checkpoints i modele tymczasowe
+# ------------------------------------------------------------------------------
+checkpoints/
+*.ckpt
+checkpoint_*.pt
+*checkpoint*.pt
+epoch_*.pt
+tmp_*.pt
+temp_*.pt
+
+# Kopie zapasowe modeli i pośrednie wersje treningowe
+models_backup/
+training_output/models/
+
+# Monitoring & telemetry
+runs/
+wandb/
+.neptune/
+
+# Jawne wyjątki dla produkcyjnych modeli i komitetów (ZAKAZ IGNOROWANIA)
+!training_output/best_hdd_cnn_model.pt
+!training_output/ensemble_model_*.pt
+!training_output/fused_ensemble_model.pt
+!exported_models/*.pt
+!PrototypBezNormal/output*/*.pt
+
+# ------------------------------------------------------------------------------
+# 3. Android & Gradle: Pliki kompilacji, pamięć podręczna i pakiety
+# ------------------------------------------------------------------------------
+.gradle/
+android/.gradle/
+local.properties
+android/local.properties
+
+# Artefakty budowania
+build/
+android/build/
+android/*/build/
+.cxx/
+android/.cxx/
+android/*/.cxx/
+.externalNativeBuild/
+android/.externalNativeBuild/
+android/*/.externalNativeBuild/
+
+# Pakiety aplikacji mobilnej (tymczasowe APK i AAB)
+*.apk
+*.aab
+android/*.apk
+android/*.aab
+android/app/*.apk
+android/app/build/outputs/apk/
+
+# Raporty i zrzuty Android SDK
+captures/
+android/app/lint-baseline.xml
+
+# Zabezpieczenie zasobów Android (ONNX INT8, classes.json, model_card.json)
+!android/app/src/main/assets/**
+
+# ------------------------------------------------------------------------------
+# 4. IDE, Edytory i narzędzia programistyczne
+# ------------------------------------------------------------------------------
+# JetBrains / Android Studio / IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Edytory tekstu i pliki wymiany (Vim, Emacs, Nano)
+*.swp
+*.swo
+*.tmp
+*.temp
+*.bak
+*~
+.#*
+#*#
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# ------------------------------------------------------------------------------
+# 5. Systemy operacyjne (Linux, macOS, Windows)
+# ------------------------------------------------------------------------------
+# Linux
+*~
+.directory
+.fuse_hidden*
+.Trash-*
+.nfs*
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ------------------------------------------------------------------------------
+# 6. Specyficzne dla AcousticHddSentinel: Zbiory generowane i testy
+# ------------------------------------------------------------------------------
+# Generowane zbiory tensorów (odtwarzalne skryptami z data/raw zgodnie z ADR-001)
 dataset_categorized/
 dataset_encoded/
 
-# Pliki tymczasowe edytorów i systemowe
-.DS_Store
-Thumbs.db
-*.swp
-*~
-*.log
-
-# Artefakty testów obciążeniowych i tymczasowe
+# Artefakty testów obciążeniowych i syntetycznych próbek adversarial
 stress_test_output/
-.idea/
-.vscode/
-models_backup/
-training_output/models/
 tests/adversarial_lab/samples/
 
-# Artefakty i pliki tymczasowe projektu mobilnego Android
-android/.gradle/
-android/build/
-android/*/build/
-android/local.properties
-android/.cxx/
-android/*.apk
-android/*.aab
-*.iml
-.gradle/
-build/
+# Tymczasowe wyjście testu parzystości DSP Java
+tests/tmp_parity/java_tensor_out.raw
+!tests/tmp_parity/test_signal_in.raw
 
+# Logi systemowe
+*.log

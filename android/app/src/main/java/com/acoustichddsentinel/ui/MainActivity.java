@@ -85,6 +85,7 @@ public class MainActivity extends AppCompatActivity {
         binding.rvHistory.setAdapter(adapter);
 
         setupModelSelectionToggle();
+        setupRawAudioToggle();
     }
 
     private void setupModelSelectionToggle() {
@@ -96,6 +97,16 @@ public class MainActivity extends AppCompatActivity {
             if (viewModel.getActiveModelType() != targetType) {
                 viewModel.setModelType(targetType);
                 Toast.makeText(this, getString(R.string.toast_model_switched, targetType.getTitle()), Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void setupRawAudioToggle() {
+        binding.switchRawAudio.setOnCheckedChangeListener((btn, isChecked) -> {
+            if (viewModel.isRawAudioMode() != isChecked) {
+                viewModel.setRawAudioMode(isChecked);
+                int msgRes = isChecked ? R.string.toast_raw_audio_enabled : R.string.toast_raw_audio_disabled;
+                Toast.makeText(this, msgRes, Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -135,6 +146,12 @@ public class MainActivity extends AppCompatActivity {
             int targetId = (modelType == ModelType.ALTERNATIVE) ? R.id.btnModelAlternative : R.id.btnModelLegacy;
             if (binding.toggleGroupModel.getCheckedButtonId() != targetId) {
                 binding.toggleGroupModel.check(targetId);
+            }
+        });
+
+        viewModel.getRawAudioMode().observe(this, isRaw -> {
+            if (binding.switchRawAudio.isChecked() != isRaw) {
+                binding.switchRawAudio.setChecked(isRaw);
             }
         });
 
@@ -191,6 +208,13 @@ public class MainActivity extends AppCompatActivity {
         binding.toggleGroupModel.setEnabled(!isBusy);
         binding.btnModelLegacy.setEnabled(!isBusy);
         binding.btnModelAlternative.setEnabled(!isBusy);
+        binding.switchRawAudio.setEnabled(!isBusy);
+
+        if (state.getStatus() == DiagnosticUiState.Status.RECORDING) {
+            getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
 
         switch (state.getStatus()) {
             case IDLE:
@@ -416,6 +440,15 @@ public class MainActivity extends AppCompatActivity {
         builder.setPositiveButton("Zamknij", null)
             .setNeutralButton("Usuń wpis", (dialog, which) -> viewModel.deleteHistoryItem(item))
             .show();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (viewModel != null) {
+            viewModel.stopRecording();
+        }
+        getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
 
     @Override

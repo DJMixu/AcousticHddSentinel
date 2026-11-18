@@ -110,6 +110,19 @@
                             android:textAllCaps="false" />
                     </com.google.android.material.button.MaterialButtonToggleGroup>
 
+                    <!-- Opcjonalny Tryb Czystego Toru Audio RAW -->
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switchRawAudio"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:layout_marginBottom="4dp"
+                        android:checked="true"
+                        android:text="@string/label_raw_audio_mode"
+                        android:textColor="@color/text_primary"
+                        android:textSize="12sp"
+                        app:useMaterialThemeColors="true" />
+
                     <!-- Sekcja Shazam Hero Listening Button (Czysty interfejs Shazam) -->
                     <FrameLayout
                         android:id="@+id/layoutHeroShazam"

@@ -51,10 +51,15 @@ public class MainViewModel extends AndroidViewModel {
 
     private final ModelStrategyManager modelStrategyManager;
     private final MutableLiveData<ModelType> selectedModelType;
+    private final MutableLiveData<Boolean> rawAudioMode;
 
     public MainViewModel(@NonNull Application application) {
         super(application);
         this.audioRecorder = new AudioRecorder();
+        boolean initialRawMode = com.acoustichddsentinel.audio.AudioPreferences.isRawAudioEnabled(application);
+        this.audioRecorder.setRawAudioMode(initialRawMode);
+        this.rawAudioMode = new MutableLiveData<>(initialRawMode);
+
         this.audioPreprocessor = new AudioPreprocessor();
         this.rpmHarmonicsAnalyzer = new RpmHarmonicsAnalyzer();
         this.dspPhysicalGuard = new DspPhysicalGuard();
@@ -104,6 +109,21 @@ public class MainViewModel extends AndroidViewModel {
 
     public ModelStrategyManager getModelStrategyManager() {
         return modelStrategyManager;
+    }
+
+    public LiveData<Boolean> getRawAudioMode() {
+        return rawAudioMode;
+    }
+
+    public boolean isRawAudioMode() {
+        return Boolean.TRUE.equals(rawAudioMode.getValue());
+    }
+
+    public void setRawAudioMode(boolean enabled) {
+        audioRecorder.setRawAudioMode(enabled);
+        com.acoustichddsentinel.audio.AudioPreferences.setRawAudioEnabled(getApplication(), enabled);
+        rawAudioMode.postValue(enabled);
+        Log.i(TAG, "Zmieniono tryb czystego toru RAW: " + enabled);
     }
 
     public LiveData<DiagnosticUiState> getUiState() {

@@ -22,4 +22,7 @@
     <string name="model_option_legacy">Model Klasyczny (CNN)</string>
     <string name="model_option_alternative">Model Alternatywny</string>
     <string name="toast_model_switched">Przełączono model na: %1$s</string>
+    <string name="label_raw_audio_mode">Czysty tor audio RAW (Omiń filtry systemowe)</string>
+    <string name="toast_raw_audio_enabled">Włączono czysty tor audio RAW (Unprocessed, filtry systemowe wyłączone).</string>
+    <string name="toast_raw_audio_disabled">Przełączono na standardowy tor audio.</string>
 </resources>

@@ -156,8 +156,17 @@ def run_verification():
             X_test = np.stack([np.load(f).astype(np.float32) for f in test_files], axis=0)
             y_test = np.array(test_labels)
 
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+            batch_size = 32
+            pt_preds_list = []
             with torch.no_grad():
-                pt_preds = pt_eval_model(torch.from_numpy(X_test).to(device)).cpu().numpy()
+                for i in range(0, len(X_test), batch_size):
+                    batch_x = torch.from_numpy(X_test[i : i + batch_size]).to(device)
+                    batch_preds = pt_eval_model(batch_x).cpu().numpy()
+                    pt_preds_list.append(batch_preds)
+            pt_preds = np.concatenate(pt_preds_list, axis=0)
             pt_labels = np.argmax(pt_preds, axis=1)
 
             pt_acc = accuracy_score(y_test, pt_labels)

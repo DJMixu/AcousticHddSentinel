@@ -18,4 +18,8 @@
     <string name="title_history">Historia Diagnoz</string>
     <string name="btn_clear_history">Wyczyść</string>
     <string name="empty_history">Brak zarejestrowanych diagnoz.</string>
+    <string name="label_model_selection">Architektura modelu AI:</string>
+    <string name="model_option_legacy">Model Klasyczny (CNN)</string>
+    <string name="model_option_alternative">Model Alternatywny</string>
+    <string name="toast_model_switched">Przełączono model na: %1$s</string>
 </resources>

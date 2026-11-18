@@ -92,6 +92,85 @@ public class RpmHarmonicsAnalyzerTest {
     }
 
     @Test
+    public void testHumanVoiceRejection() {
+        // Głos ludzki ze zmienną wysokością tonu (wibrato 130 Hz z modulacją 5 Hz +/- 15 Hz)
+        float[] samples = new float[numSamples];
+        double cumulativePhase = 0.0;
+        for (int i = 0; i < numSamples; i++) {
+            double t = (double) i / sampleRate;
+            double instFreq = 130.0 + 15.0 * Math.sin(2.0 * Math.PI * 5.0 * t);
+            cumulativePhase += 2.0 * Math.PI * instFreq / sampleRate;
+            double vocal = 0.3 * Math.sin(cumulativePhase)
+                         + 0.2 * Math.sin(2.0 * cumulativePhase)
+                         + 0.15 * Math.sin(3.0 * cumulativePhase);
+            samples[i] = (float) vocal;
+        }
+
+        RpmHarmonicsAnalyzer.RpmResult res = analyzer.analyzeChunk(samples);
+        assertFalse("Głos ludzki z modulacją wibrato nie może być uznany za wirujący dysk HDD", res.hasRotation);
+        assertNull(res.detectedRpm);
+    }
+
+    @Test
+    public void testHumanVoiceVibrato120HzRejection() {
+        // Głos ludzki z wibrato dokładnie w paśmie 7200 RPM (120 Hz +/- 15 Hz z modulacją 5 Hz)
+        float[] samples = new float[numSamples];
+        double cumulativePhase = 0.0;
+        for (int i = 0; i < numSamples; i++) {
+            double t = (double) i / sampleRate;
+            double instFreq = 120.0 + 15.0 * Math.sin(2.0 * Math.PI * 5.0 * t);
+            cumulativePhase += 2.0 * Math.PI * instFreq / sampleRate;
+            double vocal = 0.35 * Math.sin(cumulativePhase)
+                         + 0.25 * Math.sin(2.0 * cumulativePhase)
+                         + 0.18 * Math.sin(3.0 * cumulativePhase);
+            samples[i] = (float) vocal;
+        }
+
+        RpmHarmonicsAnalyzer.RpmResult res = analyzer.analyzeChunk(samples);
+        assertFalse("Wibrato mowy ludzkiej 120 Hz nie może być uznane za rotację 7200 RPM", res.hasRotation);
+        assertNull(res.detectedRpm);
+    }
+
+    @Test
+    public void testHumanVoiceVibrato90HzRejection() {
+        // Głos ludzki (baryton/bas) z wibrato w paśmie 5400 RPM (90 Hz +/- 10 Hz z modulacją 5 Hz)
+        float[] samples = new float[numSamples];
+        double cumulativePhase = 0.0;
+        for (int i = 0; i < numSamples; i++) {
+            double t = (double) i / sampleRate;
+            double instFreq = 90.0 + 10.0 * Math.sin(2.0 * Math.PI * 5.0 * t);
+            cumulativePhase += 2.0 * Math.PI * instFreq / sampleRate;
+            double vocal = 0.35 * Math.sin(cumulativePhase)
+                         + 0.22 * Math.sin(2.0 * cumulativePhase)
+                         + 0.15 * Math.sin(3.0 * cumulativePhase);
+            samples[i] = (float) vocal;
+        }
+
+        RpmHarmonicsAnalyzer.RpmResult res = analyzer.analyzeChunk(samples);
+        assertFalse("Wibrato mowy ludzkiej 90 Hz nie może być uznane za rotację 5400 RPM", res.hasRotation);
+        assertNull(res.detectedRpm);
+    }
+
+    @Test
+    public void testTwoTonePureMotor5400RpmDetection() {
+        // Autentyczny silnik HDD FDB o dominującej fundamentalnej f0 (90 Hz) i 2. harmonicznej 2f0 (180 Hz)
+        float[] samples = new float[numSamples];
+        float f0 = 90.0f;
+        for (int i = 0; i < numSamples; i++) {
+            double t = (double) i / sampleRate;
+            double signal = 0.30 * Math.sin(2.0 * Math.PI * f0 * t)
+                          + 0.18 * Math.sin(2.0 * Math.PI * 2.0 * f0 * t)
+                          + 0.01 * (Math.random() - 0.5);
+            samples[i] = (float) signal;
+        }
+
+        RpmHarmonicsAnalyzer.RpmResult res = analyzer.analyzeChunk(samples);
+        assertTrue("Musi rozpoznać 2-tonowy obrót silnika 5400 RPM (f0 + 2f0)", res.hasRotation);
+        assertEquals("5400_rpm", res.detectedRpm);
+        assertEquals(5400, res.nominalRpm);
+    }
+
+    @Test
     public void testSeizedSpindleStallBeep() {
         float[] samples = new float[numSamples];
         float beepFreq = 1500.0f; // pisk stojana zablokowanego silnika

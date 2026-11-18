@@ -92,6 +92,10 @@ public class DiagnosticAdapter extends RecyclerView.Adapter<DiagnosticAdapter.Vi
             holder.tvBadge.setText(item.getPredictedClass().toUpperCase(Locale.US));
             holder.tvBadge.setBackground(ContextCompat.getDrawable(context, R.drawable.bg_badge_anomaly));
             holder.tvBadge.setTextColor(ContextCompat.getColor(context, R.color.status_fault_text));
+        } else if ("ambient".equalsIgnoreCase(item.getPredictedClass())) {
+            holder.tvBadge.setText("SZUM TŁA / BRAK DYSKU");
+            holder.tvBadge.setBackground(ContextCompat.getDrawable(context, R.drawable.badge_ambient_background));
+            holder.tvBadge.setTextColor(ContextCompat.getColor(context, R.color.status_ambient_text));
         } else {
             holder.tvBadge.setText("SPRAWNY");
             holder.tvBadge.setBackground(ContextCompat.getDrawable(context, R.drawable.bg_badge_normal));

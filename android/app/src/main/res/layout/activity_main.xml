@@ -68,6 +68,48 @@
                             android:text="HDD WDC WD10EZEX" />
                     </com.google.android.material.textfield.TextInputLayout>
 
+                    <!-- Wybór Modelu AI (Wzorzec Strategii) -->
+                    <TextView
+                        android:id="@+id/tvModelSelectionLabel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:layout_marginBottom="4dp"
+                        android:text="@string/label_model_selection"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <com.google.android.material.button.MaterialButtonToggleGroup
+                        android:id="@+id/toggleGroupModel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="6dp"
+                        app:checkedButton="@id/btnModelLegacy"
+                        app:selectionRequired="true"
+                        app:singleSelection="true">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnModelLegacy"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/model_option_legacy"
+                            android:textSize="12sp"
+                            android:textAllCaps="false" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnModelAlternative"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/model_option_alternative"
+                            android:textSize="12sp"
+                            android:textAllCaps="false" />
+                    </com.google.android.material.button.MaterialButtonToggleGroup>
+
                     <!-- Sekcja Shazam Hero Listening Button (Czysty interfejs Shazam) -->
                     <FrameLayout
                         android:id="@+id/layoutHeroShazam"

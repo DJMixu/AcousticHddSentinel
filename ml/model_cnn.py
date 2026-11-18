@@ -125,6 +125,15 @@ class AcousticHddSentinelCNN(nn.Module):
         self.register_buffer("fault_thresholds", torch.full((3,), 0.40, dtype=torch.float32))
         self.register_buffer("gamma", torch.tensor(12.0, dtype=torch.float32))
 
+    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs):
+        """Dynamicznie dopasowuje kształt bufora fault_prototypes dla modeli SMPC (3, M, 128)."""
+        proto_key = prefix + "fault_prototypes"
+        if proto_key in state_dict:
+            proto_tensor = state_dict[proto_key]
+            if proto_tensor.shape != self.fault_prototypes.shape:
+                self.register_buffer("fault_prototypes", torch.zeros_like(proto_tensor))
+        super()._load_from_state_dict(state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs)
+
     def forward(self, x: torch.Tensor, return_logits: bool = False) -> torch.Tensor:
         """
         Forward pass sieci.
@@ -207,9 +216,19 @@ class AcousticHddSentinelCNN(nn.Module):
         if bool(self.use_open_set.item()) and not self.training:
             # 1. Normalizacja cech L2
             z_norm = F.normalize(dense_feat, p=2, dim=1)
-            p_norm = F.normalize(self.fault_prototypes, p=2, dim=1)
-            # 2. Podobieństwo cosinusowe do 3 prototypów wad [beeping(0), clicking(1), scratching(3)]
-            cos_sim = torch.matmul(z_norm, p_norm.t())  # (B, 3)
+            # Obsługa zarówno unimodalnych (3, 128) jak i wielomodalnych SMPC (3, M, 128)
+            # Option A: MatMul + view + ReduceMax bez einsum (100% kompatybilne z ONNX i INT8)
+            if self.fault_prototypes.ndim == 3:
+                K, M, D = self.fault_prototypes.shape
+                p_norm = F.normalize(self.fault_prototypes, p=2, dim=-1)
+                p_flat = p_norm.view(K * M, D)
+                sims_flat = torch.matmul(z_norm, p_flat.t())
+                sims = sims_flat.view(-1, K, M)
+                cos_sim, _ = torch.max(sims, dim=2)
+            else:
+                p_norm = F.normalize(self.fault_prototypes, p=2, dim=1)
+                cos_sim = torch.matmul(z_norm, p_norm.t())  # (B, 3)
+
             # 3. Bramka OOD Sigmoid: jeśli cos_sim < threshold, gating -> 0
             gating = torch.sigmoid(self.gamma * (cos_sim - self.fault_thresholds))  # (B, 3)
             # 4. Tłumienie logitów uszkodzeń (log(0.0001) = -9.21)
@@ -258,14 +277,36 @@ class AcousticHddSentinelCNN(nn.Module):
         x = self.relu_dense(x)
         return x
 
+    def compute_smpc_cosine_similarities(self, z: torch.Tensor) -> torch.Tensor:
+        """
+        Oblicza maksymalne podobieństwo cosinusowe dla każdej klasy uszkodzenia
+        względem jej M sub-centrów (Option A: MatMul + view + ReduceMax bez einsum):
+            cos theta_k = max_{m=1..M} (z · W_{k,m})
+        Zwraca:
+            (B, K) z wartościami w zakresie [-1, 1].
+        """
+        z_norm = F.normalize(z, p=2, dim=-1)
+        if self.fault_prototypes.ndim == 3:
+            K, M, D = self.fault_prototypes.shape
+            p_norm = F.normalize(self.fault_prototypes, p=2, dim=-1)
+            p_flat = p_norm.view(K * M, D)
+            sims_flat = torch.matmul(z_norm, p_flat.t())
+            sims = sims_flat.view(-1, K, M)
+            cos_sim, _ = torch.max(sims, dim=-1)
+            return cos_sim
+        else:
+            p_norm = F.normalize(self.fault_prototypes, p=2, dim=-1)
+            return torch.matmul(z_norm, p_norm.t())
+
     def set_fault_prototypes(self, prototypes: torch.Tensor, thresholds: torch.Tensor, gamma: float = 12.0):
         """
         Inicjalizuje prototypy cech dla znanych klas uszkodzeń (beeping, clicking, scratching)
         oraz progi podobieństwa cosinusowego do odrzucania próbek Out-Of-Distribution (OOD).
+        Transparentnie obsługuje zarówno prototypy unimodalne (3, 128), jak i wielomodalne SMPC (3, M, 128).
         """
-        self.fault_prototypes.copy_(prototypes)
-        self.fault_thresholds.copy_(thresholds)
-        self.gamma.copy_(torch.tensor(gamma, dtype=torch.float32))
+        self.register_buffer("fault_prototypes", prototypes.detach().clone().float())
+        self.register_buffer("fault_thresholds", thresholds.detach().clone().float())
+        self.register_buffer("gamma", torch.tensor(gamma, dtype=torch.float32, device=prototypes.device))
         self.use_open_set.fill_(True)
 
     @torch.no_grad()

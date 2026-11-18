@@ -214,76 +214,101 @@ def export_pipeline(
         json.dump({str(i): name for i, name in enumerate(class_names)}, f, indent=2)
     print(f"📄 Zapisano mapowanie klas: {classes_out_path}")
 
-    # 9. Generowanie szablonu integracji w Kotlin (Android)
-    android_snippet_path = os.path.join(output_dir, "AcousticClassifierAndroid.kt")
+    # 9. Generowanie szablonu integracji w czystej Javie 17 (Android ADR-002)
+    android_snippet_path = os.path.join(output_dir, "AcousticClassifierAndroid.java")
     with open(android_snippet_path, "w", encoding="utf-8") as f:
-        f.write('''package com.acoustichddsentinel.ml
+        f.write('''package com.acoustichddsentinel.ml;
 
-import android.content.Context
-import ai.onnxruntime.OrtEnvironment
-import ai.onnxruntime.OrtSession
-import ai.onnxruntime.OnnxTensor
-import java.nio.FloatBuffer
+import android.content.Context;
+import ai.onnxruntime.OrtEnvironment;
+import ai.onnxruntime.OrtSession;
+import ai.onnxruntime.OnnxTensor;
+import ai.onnxruntime.OrtException;
+import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.FloatBuffer;
+import java.util.Map;
+import java.util.Collections;
 
 /**
- * Obsługa klasyfikatora Acoustic HDD Sentinel na Androidzie przy użyciu ONNX Runtime Mobile.
- * Wymaga zależności: implementation("com.microsoft.onnxruntime:onnxruntime-android:latest.release")
+ * Szablon inferencji Acoustic HDD Sentinel w 100% czystej Javie 17 (ADR-002).
+ * Model ONNX INT8: best_hdd_cnn_model_int8.onnx (1.18 MB) w app/src/main/assets/.
  */
-class AcousticClassifierAndroid(context: Context) {
-    private val env: OrtEnvironment = OrtEnvironment.getEnvironment()
-    private val session: OrtSession
+public class AcousticClassifierAndroid implements AutoCloseable {
+    public static final String[] CLASSES = {"beeping", "clicking", "normal", "scratching"};
+    public static final int CHANNELS = 3;
+    public static final int N_MELS = 128;
+    public static final int FRAMES = 259;
+    public static final int TOTAL_ELEMENTS = CHANNELS * N_MELS * FRAMES;
 
-    companion object {
-        val CLASSES = arrayOf("beeping", "clicking", "normal", "scratching")
-        const val CHANNELS = 3
-        const val N_MELS = 128
-        const val FRAMES = 259
-        const val TOTAL_ELEMENTS = CHANNELS * N_MELS * FRAMES
+    private final OrtEnvironment env;
+    private OrtSession session;
+    private volatile boolean isClosed;
+
+    public AcousticClassifierAndroid(Context context) throws IOException, OrtException {
+        this.env = OrtEnvironment.getEnvironment();
+        byte[] modelBytes = readAssetBytes(context, "best_hdd_cnn_model_int8.onnx");
+        OrtSession.SessionOptions options = new OrtSession.SessionOptions();
+        options.setIntraOpNumThreads(Math.max(1, Runtime.getRuntime().availableProcessors() / 2));
+        this.session = env.createSession(modelBytes, options);
     }
 
-    init {
-        // Model best_hdd_cnn_model_int8.onnx umieszczony w app/src/main/assets/
-        val modelBytes = context.assets.open("best_hdd_cnn_model_int8.onnx").readBytes()
-        session = env.createSession(modelBytes, OrtSession.SessionOptions())
-    }
-
-    /**
-     * Wykonuje inferencję na spłaszczonym tensorze (3 * 128 * 259) floatów.
-     * Zwraca parę: (Nazwa najprawdopodobniejszej klasy, Pewność w przedziale 0.0 - 1.0)
-     */
-    fun classifyAudioChunk(flatTensorData: FloatArray): Pair<String, Float> {
-        require(flatTensorData.size == TOTAL_ELEMENTS) {
-            "Tensor musi zawierać dokładnie $TOTAL_ELEMENTS próbek (3 x 128 x 259)."
+    public synchronized ClassificationResult classifyAudioChunk(float[] flatTensorData) throws OrtException {
+        if (flatTensorData == null || flatTensorData.length != TOTAL_ELEMENTS) {
+            throw new IllegalArgumentException("Tensor musi zawierać dokładnie " + TOTAL_ELEMENTS + " elementów.");
         }
-
-        val shape = longArrayOf(1, CHANNELS.toLong(), N_MELS.toLong(), FRAMES.toLong())
-        val tensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(flatTensorData), shape)
-
-        val results = session.run(mapOf("input_audio_tensor" to tensor))
-        @Suppress("UNCHECKED_CAST")
-        val probabilities = (results[0].value as Array<FloatArray>)[0]
-
-        var maxIdx = 0
-        var maxProb = probabilities[0]
-        for (i in 1 until probabilities.size) {
-            if (probabilities[i] > maxProb) {
-                maxProb = probabilities[i]
-                maxIdx = i
+        long[] shape = new long[]{1, CHANNELS, N_MELS, FRAMES};
+        try (OnnxTensor tensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(flatTensorData), shape);
+             OrtSession.Result results = session.run(Collections.singletonMap("input_audio_tensor", tensor))) {
+            float[][] probs = (float[][]) results.get(0).getValue();
+            int maxIdx = 0;
+            float maxProb = probs[0][0];
+            for (int i = 1; i < probs[0].length; i++) {
+                if (probs[0][i] > maxProb) {
+                    maxProb = probs[0][i];
+                    maxIdx = i;
+                }
             }
+            return new ClassificationResult(CLASSES[maxIdx], maxProb);
         }
-
-        tensor.close()
-        results.close()
-        return Pair(CLASSES[maxIdx], maxProb)
     }
 
-    fun close() {
-        session.close()
-        env.close()
+    private static byte[] readAssetBytes(Context context, String assetName) throws IOException {
+        try (InputStream is = context.getAssets().open(assetName);
+             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            byte[] buf = new byte[8192];
+            int r;
+            while ((r = is.read(buf)) != -1) {
+                baos.write(buf, 0, r);
+            }
+            return baos.toByteArray();
+        }
+    }
+
+    @Override
+    public synchronized void close() {
+        if (isClosed) return;
+        isClosed = true;
+        try {
+            if (session != null) {
+                session.close();
+                session = null;
+            }
+        } catch (OrtException ignored) {}
+    }
+
+    public static class ClassificationResult {
+        public final String predictedClass;
+        public final float confidence;
+        public ClassificationResult(String predictedClass, float confidence) {
+            this.predictedClass = predictedClass;
+            this.confidence = confidence;
+        }
     }
 }
 ''')
-    print(f"📱 Wygenerowano szablon integracyjny Android (Kotlin): {android_snippet_path}")
+    print(f"📱 Wygenerowano szablon integracyjny Android (Pure Java 17): {android_snippet_path}")
 
     # 10. Automatyczna synchronizacja z modułem aplikacji mobilnej Android
     android_assets_dir = Path("android/app/src/main/assets")

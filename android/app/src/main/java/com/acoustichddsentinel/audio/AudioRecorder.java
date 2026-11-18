@@ -30,18 +30,97 @@ public class AudioRecorder {
 
     // Współczynniki 2-sekcyjnego kaskadowego filtru Butterwortha 4. rzędu (fc = 9500 Hz przy fs = 44100 Hz)
     // Sekcja 1
-    private static final float B0_1 = 0.058872744f;
-    private static final float B1_1 = 0.11774549f;
-    private static final float B2_1 = 0.058872744f;
-    private static final float A1_1 = -0.22665857f;
-    private static final float A2_1 = 0.051437586f;
+    public static final float B0_1 = 0.058872744f;
+    public static final float B1_1 = 0.11774549f;
+    public static final float B2_1 = 0.058872744f;
+    public static final float A1_1 = -0.22665857f;
+    public static final float A2_1 = 0.051437586f;
 
     // Sekcja 2
-    private static final float B0_2 = 1.0f;
-    private static final float B1_2 = 2.0f;
-    private static final float B2_2 = 1.0f;
-    private static final float A1_2 = -0.31385655f;
-    private static final float A2_2 = 0.4559369f;
+    public static final float B0_2 = 1.0f;
+    public static final float B1_2 = 2.0f;
+    public static final float B2_2 = 1.0f;
+    public static final float A1_2 = -0.31385655f;
+    public static final float A2_2 = 0.4559369f;
+
+    /**
+     * Kaskadowy filtr Butterwortha 4. rzędu (Direct Form II Transposed) z decymacją 2:1
+     * z 44100 Hz do 22050 Hz.
+     */
+    public static class ButterworthDecimator {
+        private float s1_1 = 0.0f, s2_1 = 0.0f;
+        private float s1_2 = 0.0f, s2_2 = 0.0f;
+        private boolean decimateToggle = false;
+
+        public void reset() {
+            s1_1 = 0.0f;
+            s2_1 = 0.0f;
+            s1_2 = 0.0f;
+            s2_2 = 0.0f;
+            decimateToggle = false;
+        }
+
+        public float[] process(float[] input44k) {
+            if (input44k == null || input44k.length == 0) {
+                return new float[0];
+            }
+            float[] output22k = new float[input44k.length / 2];
+            int outIdx = 0;
+            for (float s : input44k) {
+                // Kaskada Biquad Sekcja 1
+                float y1 = B0_1 * s + s1_1;
+                s1_1 = B1_1 * s - A1_1 * y1 + s2_1;
+                s2_1 = B2_1 * s - A2_1 * y1;
+
+                // Kaskada Biquad Sekcja 2
+                float y2 = B0_2 * y1 + s1_2;
+                s1_2 = B1_2 * y1 - A1_2 * y2 + s2_2;
+                s2_2 = B2_2 * y1 - A2_2 * y2;
+
+                decimateToggle = !decimateToggle;
+                if (decimateToggle && outIdx < output22k.length) {
+                    output22k[outIdx++] = y2;
+                }
+            }
+            return output22k;
+        }
+
+        public float[] process(short[] inputShorts44k, int offset, int length) {
+            if (inputShorts44k == null || length <= 0) {
+                return new float[0];
+            }
+            float[] output22k = new float[length / 2];
+            int outIdx = 0;
+            for (int i = 0; i < length; i++) {
+                float s = inputShorts44k[offset + i] / 32768.0f;
+
+                // Kaskada Biquad Sekcja 1
+                float y1 = B0_1 * s + s1_1;
+                s1_1 = B1_1 * s - A1_1 * y1 + s2_1;
+                s2_1 = B2_1 * s - A2_1 * y1;
+
+                // Kaskada Biquad Sekcja 2
+                float y2 = B0_2 * y1 + s1_2;
+                s1_2 = B1_2 * y1 - A1_2 * y2 + s2_2;
+                s2_2 = B2_2 * y1 - A2_2 * y2;
+
+                decimateToggle = !decimateToggle;
+                if (decimateToggle && outIdx < output22k.length) {
+                    output22k[outIdx++] = y2;
+                }
+            }
+            return output22k;
+        }
+    }
+
+    public static float[] filterAndDecimate(float[] input44k) {
+        return new ButterworthDecimator().process(input44k);
+    }
+
+    public static float[] filterAndDecimate(short[] inputShorts44k) {
+        if (inputShorts44k == null) return new float[0];
+        return new ButterworthDecimator().process(inputShorts44k, 0, inputShorts44k.length);
+    }
 
     public interface RecordCallback {
         void onProgress(int elapsedMs, int totalMs, float currentRms);

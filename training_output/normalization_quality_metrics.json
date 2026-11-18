@@ -1,47 +1,47 @@
 {
   "raw_audio_profile": {
-    "count": 288,
+    "count": 353,
     "rms_min": 0.0008801227086223662,
     "rms_max": 0.5262109637260437,
-    "rms_mean": 0.08464287966489792,
+    "rms_mean": 0.07621481269598007,
     "rms_ratio_max_min": 597.8829345703125,
     "peak_min": 0.018377769738435745,
     "peak_max": 1.270963191986084,
     "crest_min": 1.3138675689697266,
-    "crest_max": 130.94195556640625,
-    "crest_mean": 23.13954734802246,
-    "crest_p95": 65.81863403320312,
+    "crest_max": 143.42041015625,
+    "crest_mean": 22.86788558959961,
+    "crest_p95": 65.19937896728516,
     "dc_offset_max_abs": 0.37665557861328125,
-    "dc_offset_mean_abs": 0.011616083793342113
+    "dc_offset_mean_abs": 0.009515011683106422
   },
   "encoded_tensors_profile": {
-    "total_tensors": 5187,
+    "total_tensors": 6840,
     "nan_tensors": 0,
     "inf_tensors": 0,
     "channel_0_log_mel": {
-      "mean_of_means": 3.10942352325901e-09,
-      "std_of_means": 1.8384813320025675e-07,
-      "mean_of_stds": 0.9999999868885869,
-      "std_of_stds": 3.8923833057772784e-08,
+      "mean_of_means": -5.163599027877533e-09,
+      "std_of_means": 1.6544700764419567e-07,
+      "mean_of_stds": 0.9999999864843854,
+      "std_of_stds": 3.541913484129647e-08,
       "min_global": -7.433152675628662,
       "max_global": 8.370783805847168
     },
     "channel_1_delta": {
-      "mean_of_means": 1.4619807327213197e-10,
-      "std_of_means": 6.600624762160081e-09,
-      "mean_of_stds": 0.9999999861876262,
-      "std_of_stds": 3.7117381110621735e-08,
+      "mean_of_means": 7.230943341107932e-11,
+      "std_of_means": 6.534331467283843e-09,
+      "mean_of_stds": 0.9999999858046833,
+      "std_of_stds": 3.368851189281981e-08,
       "min_global": -14.173884391784668,
       "max_global": 14.083597183227539
     },
     "channel_2_delta_delta": {
-      "mean_of_means": -3.185112133167547e-11,
-      "std_of_means": 6.8364193195067325e-09,
-      "mean_of_stds": 0.99999998681964,
-      "std_of_stds": 3.64273528844194e-08,
-      "min_global": -12.545340538024902,
-      "max_global": 13.43791675567627
+      "mean_of_means": 1.9639825114984808e-10,
+      "std_of_means": 6.75219229163406e-09,
+      "mean_of_stds": 0.9999999865802408,
+      "std_of_stds": 3.330266172452777e-08,
+      "min_global": -11.286825180053711,
+      "max_global": 13.437917709350586
     },
-    "mean_3sigma_outlier_pct": 1.0085311365856477
+    "mean_3sigma_outlier_pct": 1.0011979789940317
   }
 }

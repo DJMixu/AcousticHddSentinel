@@ -131,6 +131,25 @@ public class DspPhysicalGuard {
 
         // 2. Obliczenie cech fizycznych
         float rms = computeRms(samples);
+
+        // Odrzucenie ciszy / braku sygnału (ADR-001 Invariant: RMS < 0.002f)
+        if (rms < DspConstants.RMS_SILENCE_THRESHOLD) {
+            float[] silentProbs = new float[]{0.0f, 0.0f, 1.0f, 0.0f};
+            return new SanitizationResult(
+                    silentProbs,
+                    0f,
+                    0,
+                    false,
+                    false,
+                    false,
+                    rawProbs[1] > 0.05f,
+                    rawProbs[3] > 0.05f,
+                    rawProbs[0] > 0.05f,
+                    String.format(java.util.Locale.US,
+                            "[Cisza / brak sygnału: RMS=%.5f < %.4f - wymuszono zero prawdopodobieństwa awarii]",
+                            rms, DspConstants.RMS_SILENCE_THRESHOLD)
+            );
+        }
         float peak = computePeak(samples);
         float crestFactor = peak / Math.max(rms, EPSILON);
 

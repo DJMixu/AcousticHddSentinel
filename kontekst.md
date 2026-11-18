@@ -107,9 +107,9 @@ Projekt **Acoustic HDD Sentinel** to system wibroakustycznej detekcji i wielokla
   - **`audio/AudioRecorder.java`:** Pętla rejestracji dźwięku z buforem kołowym, wsparciem dla 22050 Hz oraz awaryjnego 44100 Hz.
   - **`dsp/AudioPreprocessor.java`:** Wierna implementacja Radix-2 FFT, okna Hanna, trójkątnego banku filtrów Mel i wag Savitzky'ego-Golaya w Javie dająca tensory tożsame z Librosa.
   - **`ml/AcousticClassifier.java`:** Inferencja `OrtSession` z optymalizacją pamięciową i mapowaniem etykiet.
-  - **`data/AppDatabase.java`:** Czysty `SQLiteOpenHelper` z pełną historią diagnoz i eksportem.
+  - **`data/DiagnosticDbHelper.java`:** Czysty `SQLiteOpenHelper` z pełną historią diagnoz i eksportem (wraz z `DiagnosticModel.java` i `DiagnosticRepository.java`).
   - **`ui/MainActivity.java` & `MainViewModel.java`:** Wzorzec MVVM z `LiveData`, interfejs w stylu Shazam z pulsującym radarem, animowanymi falami oraz mechanizmem **Early Stopping** (natychmiastowe zatrzymanie przy pewności $\ge 75-80\%$ lub konsensusie okien).
-- Utworzono 6 kompleksowych testów jednostkowych w Javie (`AudioChunkTest`, `AudioPreprocessorTest`, `RpmHarmonicsAnalyzerTest`, `DspEndToEndStressTest`, `DiagnosticModelTest`, `ClassificationResultTest`) – 100% zdanych.
+- Utworzono 8 kompleksowych klas testowych obejmujących 37 testów jednostkowych w czystej Javie (`AudioChunkTest`, `AudioRecorderDecimationTest`, `AudioPreprocessorTest`, `RpmHarmonicsAnalyzerTest`, `DspEndToEndStressTest`, `DspPhysicalGuardTest`, `DiagnosticModelTest`, `ClassificationResultTest`) – 37/37 (100%) zdanych w 2 s.
 
 ---
 
@@ -134,7 +134,7 @@ Projekt **Acoustic HDD Sentinel** to system wibroakustycznej detekcji i wielokla
 
 ---
 
-### Faza 10: Skalowanie Bazy Audio (Ground Truth) do 288 Nagrań i 2269 Tensorów
+### Faza 10: Skalowanie Bazy Audio (Ground Truth) do 353 Nagrań i 6840 Tensorów
 *(Identyfikator sesji: `e7b374f`)*
 - Baza surowych plików laboratoryjnych w `data/raw/` została rozszerzona o nowe katalogi:
   - `archive_hdd/` (Internet Archive, laboratoryjne zbiory uszkodzeń),
@@ -143,7 +143,7 @@ Projekt **Acoustic HDD Sentinel** to system wibroakustycznej detekcji i wielokla
   - `verified_real/` (nagrania z rzeczywistych weryfikacji sprzętowych),
   - `computer_ambient/` i `outliers_oe/` (próbki dźwięków otoczenia do treningu odporności).
 - Utworzono rejestr [data/raw/PROCESSED_SOURCES_REGISTRY.json](data/raw/PROCESSED_SOURCES_REGISTRY.json) śledzący unikalne hashe MD5 i metadane próbek.
-- Liczba surowych nagrań wzrosła ze 134 do **288 plików**, a łączna liczba poprawnych tensorów `.npy` w `dataset_encoded/` osiągnęła **2269 tensorów** (276 plików w train, 28 w validate, 44 w test — z zachowaniem 100% Zero Data Leakage).
+- Liczba surowych nagrań osiągnęła **353 pliki audio** w `data/raw/`, a łączna liczba poprawnych tensorów `.npy` w `dataset_encoded/` wynosi **6 840 tensorów** (6 045 w train z 496 nagrań źródłowych, 279 w validate z 52 nagrań, 516 w test z 74 nagrań — 100% Zero Data Leakage).
 
 ---
 
@@ -170,6 +170,48 @@ Projekt **Acoustic HDD Sentinel** to system wibroakustycznej detekcji i wielokla
   W `MainViewModel.java` wprowadzono zasadę: jeśli sieć nie wykrywa ewidentnej awarii i jednocześnie analizator RPM nie potwierdza rotacji 5400/7200 RPM, aplikacja zamiast `normal` wyświetla neutralny stan **„Dźwięk otoczenia / brak dysku”**, instruując użytkownika o konieczności przyłożenia mikrofonu do metalowej obudowy dysku.
 - **Kompendium inżynierskie dla prowadzącego ([PROMPT_DOKUMENTACJA_DLA_PROWADZACEGO.md](PROMPT_DOKUMENTACJA_DLA_PROWADZACEGO.md)):**
   Opracowano skompresowany, 9000-liniowy dokument łączący kompendium fizyczne i sygnałowe, historię ewolucji modeli od wczesnego Kerasa do ONNX INT8 oraz kompletny audyt bezpieczeństwa numerycznego.
+
+---
+
+### Faza 13: Audyt Algorytmiczny DSP, Eliminacja Kotlina i Poprawki Parzystości (Milestone 1 Retry & Przygotowanie SMPC)
+- **Rygorystyczny audyt ADR-002 (Czysta Java 17):**
+  Wyeliminowano wszelkie pozostałości Kotlina z repozytorium (szablon `AcousticClassifierAndroid.kt` zastąpiony przez `AcousticClassifierAndroid.java`). Moduł Android kompiluje się w 100% bez bibliotek uruchomieniowych Kotlina (0 plików `.kt`, 0 runtime overhead).
+- **Dynamiczne skalowanie okna tła harmonicznych (`RpmHarmonicsAnalyzer`):**
+  Zdiagnozowano i usunięto błąd sztywnego okna $\pm 30$ Hz wokół harmonicznych: dla częstotliwości $> 1000$ Hz (np. 1440 Hz przy 7200 RPM) tolerancja $h\_tol = h \times f0 \times 0.025$ przekraczała 30 Hz, powodując wyzerowanie liczby binów tła i fałszywą detekcję szumu numerycznego FFT ($9.74 \times 10^{-6}$) jako 3. harmonicznej. Wprowadzono adaptacyjne okno $\pm \max(40.0, h\_tol \times 2.0)$ Hz w Pythonie i Javie.
+- **Bramka bezwzględnej energii harmonicznych:**
+  Dodano warunek, że pik harmoniczny musi przewyższać lokalne tło ($> 1.6\times$) ORAZ posiadać bezwzględną energię $\ge 5\%$ średniej widma (`h_peak > np.mean(spec) * 0.05` / `maxHVal > meanEnergy * 0.05f`), co definitywnie eliminuje artefakty numeryczne na zerowym poziomie tła.
+- **Symetryczne wykluczenie tła lokalnego fundamentalnej w Javie:**
+  Zawężono wykluczenie wokół $f_0$ do $\pm 1$ bin (`Math.abs(b - bestF0Bin) > 1`) symetrycznie w promieniu 5 binów, eliminując sztuczne zaniżenie mediany tła i redukując $f_0$ prominence głosu z 3.65 do $< 2.0$.
+- **Kryteria detekcji grzebienia dla autentycznych silników 2-tonowych (FDB):**
+  Umożliwiono detekcję rotacji przy $harmonic\_hits \ge 1$, $f0\_prominence \ge 3.0$, $comb\_score \ge 3.0$ pod warunkiem, że pojedyncze trafienie przypada ściśle na 2. harmoniczną ($2f_0$, mnożnik 2.0), przywracając 100% czułość dla cichych silników 5400/7200 RPM o dominującej 2. harmonicznej przy dowolnym SNR (od Clean do 0 dB).
+- **Jednostkowe testy odrzucania głosu i 2-tonowego rotora w module Android:**
+  Dodano `testHumanVoiceRejection` do `RpmHarmonicsAnalyzerTest.java` (sygnał $130 \pm 15$ Hz z wibrato 5 Hz) oraz `testTwoTonePureMotor5400RpmDetection`.
+- **Mobilność urządzeń w `HybridAcousticSentinel`:**
+  Dodano wsparcie dla parametru `device: Optional[Union[torch.device, str]] = None` oraz dynamiczne dopasowanie tensora wejściowego do urządzenia parametrów modelu (`t_input.to(model_device)`), zapobiegając błędom typu `RuntimeError: Input type (torch.FloatTensor) and weight type (torch.cuda.FloatTensor)`.
+- **Wprowadzenie do Milestone 2 (Architektura SMPC — Sub-Center Multi-Prototype Cosine):**
+  W ramach badań nad paradygmatem Fault-Only Learning (OOD) przygotowano specyfikację modułów SMPC pod kątem orkiestracji modeli lokalnych (Qwen 3.8 Architekt i Qwen 2.5 Coder przez most `scripts/local_llm_bridge.py`).
+
+---
+
+### Faza 14: Wdrożenie Milestone 2 — Architektura Wielomodalnych Podcentrów (SMPC) i OOD Hardening
+- **Front-Loaded orkiestracja lokalnych modeli LLM na AMD Radeon RX 9060 XT:**
+  Jako pierwszy krok etapu uruchomiono most `scripts/local_llm_bridge.py`:
+  1. *Architekt Qwen 3.8 27B* (`--preset smpc-arch`): przygotowanie rygorystycznej specyfikacji Option A w ONNX (`MatMul` + `view` + `ReduceMax` bez `einsum`) oraz walidacji prototypów scratching w Gałęzi D.
+  2. *Programista Qwen 2.5 Coder 14B* (`--coder-only`): implementacja kodów integracji dla PyTorcha, funkcji straty ArcMargin i ortogonalności.
+  3. Pełne zwolnienie pamięci VRAM (`--free-vram`) przed wykonaniem obliczeń GPU w PyTorch.
+- **Implementacja SMPC w `ml/model_cnn.py`:**
+  - Wzbogacono klasę `AcousticHddSentinelCNN` o transparentne bufory prototypów `fault_prototypes` wspierające zarówno układ unimodalny `(3, 128)`, jak i wielomodalny SMPC `(3, M, 128)`.
+  - Wdrożono Option A dla ONNX: rzutowanie cech L2, iloczyn macierzowy `torch.matmul(z_norm, p_flat.t())`, `view(-1, K, M)` i `torch.max(dim=-1)` eliminujące `einsum` i gwarantujące 100% kompatybilność z ONNX Runtime Mobile INT8 na Androidzie.
+  - Zastosowano mechanizm `_load_from_state_dict` pre-hook automatycznie dopasowujący bufor do checkpointu.
+  - Bezwzględnie zachowano niezmiennik liczby trenowalnych parametrów bazowych: **dokładnie 1,206,756 parametrów**.
+- **Wzmocnienie Gałęzi D w `ml/hybrid_acoustic_sentinel.py`:**
+  - Zastąpiono ślepy fallback `cnn_top_class in ["scratching"] -> ambient_pc` weryfikacją podobieństwa cosinusowego do wielomodalnych prototypów tarcia talerza.
+  - Sygnały o $\cos(\theta) \ge \tau_{scratching}$ są klasyfikowane jako autentyczne uszkodzenie `scratching` (`is_anomaly=True`), podczas gdy szumy wentylatorów PC o niskim podobieństwie są bezpiecznie odrzucane do `ambient_pc` (`is_anomaly=False`).
+- **Integracja w potoku treningowym `ml/train_cnn.py`:**
+  - Dodano flagi CLI: `--use-smpc`, `--smpc-subcenters 3`, `--smpc-margin 0.25`, `--smpc-scale 16.0`, `--smpc-ortho-lambda 0.10`, `--smpc-ortho-threshold 0.30`.
+  - Wdrożono funkcje `SubCenterArcMarginLoss`, `compute_orthogonality_loss` oraz `spherical_kmeans` z separacją grup wag w optymalizatorze (`weight_decay=0.0` dla wektorów jednostkowych prototypów).
+- **Zestaw testów `tests/test_smpc_architecture.py`:**
+  - Opracowano 7 testów jednostkowych weryfikujących: Channel-First/Last, Option A numeryczną ekwiwalencję ($<10^{-6}$), niezmiennik 1,206,756 parametrów, ArcMargin loss i przepływ gradientów, ortogonalność podcentrów i hybrydową fuzję decyzyjną (100% sukcesu).
 
 ---
 
@@ -245,14 +287,17 @@ AcousticHddSentinel/
 │
 ├── tests/                             # 🧪 Testy jednostkowe, integracyjne, weryfikacyjne i stress-testy
 │   ├── test_project_logic.py          # Automatyczny test integralności projektu i niezmienników ADR-001 (6/6)
+│   ├── test_smpc_architecture.py      # Testy jednostkowe architektury Sub-Center Multi-Prototype Cosine (SMPC Option A, 7/7)
+│   ├── test_rpm_harmonics_analyzer.py # Test jednostkowy detektora prążków obrotowych 90/120 Hz i wibrato mowy (9/9)
+│   ├── test_computer_sound_rejection.py # Weryfikacja odrzucania szumów wentylatorów PC i cichego sygnału 45 dB (6/6)
 │   ├── verify_cnn_model.py            # 6-etapowy test weryfikacyjny poprawności modelu PyTorch
+│   ├── verify_binary_verdict_and_real_drives.py # Test 320 okien rzeczywistych dysków i wentylatorów
+│   ├── verify_dsp_parity_python_java.py # Weryfikacja parzystości numerycznej DSP (Java vs Python)
 │   ├── profile_normalization_quality.py # Profiler jakości dwuetapowej normalizacji DSP
 │   ├── stress_test.py                 # Ciągły test inferencji potoku DSP + CNN (latencja, pamięć, stabilność)
-│   ├── stress_test_vram.py            # Test obciążeniowy pamięci VRAM karty GPU AMD
+│   ├── stress_test_vram.py            # Test obciążeniowy pamięci VRAM karty GPU AMD (2149 chunków/s)
 │   ├── testEpok.py                    # Diagnostyka stabilności wag w zależności od liczby epok
 │   ├── test_onnx_ood_rejection.py     # Test weryfikacyjny tłumienia dźwięków spoza rozkładu (OOD)
-│   ├── test_computer_sound_rejection.py # Weryfikacja odrzucania szumów pracy komputera i klawiatury
-│   ├── test_rpm_harmonics_analyzer.py # Test jednostkowy detektora prążków obrotowych 90/120 Hz
 │   ├── run_toshiba_4min_study.py      # Skrypt ewaluacyjny 4-fazowego testu Toshiba P300 (6TB)
 │   ├── run_wd_4min_study.py           # Skrypt ewaluacyjny 4-fazowego testu WD Blue (500GB)
 │   ├── run_seagate_4min_study.py      # Skrypt ewaluacyjny 4-fazowego testu Seagate Momentus (500GB)
@@ -261,7 +306,7 @@ AcousticHddSentinel/
 │   └── recordings_4min_study/         # Zapis 16 minut rzeczywistych nagrań audio 4 dysków w 4 fazach
 │
 ├── scripts/                           # 🛠️ Narzędzia i most orkiestracji lokalnych modeli LLM
-│   ├── local_llm_bridge.py            # Tandem LLM: Qwen 3.8 27B (Architekt) + Qwen 2.5 Coder 14B (Coder)
+│   ├── local_llm_bridge.py            # Tandem LLM: Qwen 3.8 27B (Architekt) + Qwen 2.5 Coder 14B (Coder) z 7 presetami
 │   ├── start_services.sh              # Uruchamianie usług Ollama i Open WebUI
 │   └── stop_services.sh               # Zatrzymywanie usług Ollama i Open WebUI
 │
@@ -269,11 +314,11 @@ AcousticHddSentinel/
 │   ├── app/src/main/assets/           # Skwantyzowany model ONNX INT8 (1.17 MB), classes.json, model_card.json
 │   ├── app/src/main/java/             # Pakiety: audio (AudioRecord), data (SQLiteOpenHelper), dsp (ADR-001 DSP), ml (ONNX), ui (MVVM)
 │   ├── app/src/main/res/              # Layouty UI w stylu Shazam z pulsującym radarem, ikony, motywy M3
-│   ├── app/src/test/java/             # Zestaw 6 testów jednostkowych Java (DSP, ML, Audio, Data, Stress)
-│   ├── build.gradle.kts               # Konfiguracja Gradle (Java 17, ONNX Runtime Mobile, AndroidX)
+│   ├── app/src/test/java/             # Zestaw 8 klas testowych (37 testów jednostkowych: DSP, Decymacja, RPM, Strażnik fizyczny, Audio, Baza SQLite, Klasyfikacja)
+│   ├── build.gradle.kts               # Konfiguracja Gradle (Java 17, ONNX Runtime Mobile, AndroidX, 0 Kotlina)
 │   └── README.md                      # Instrukcja uruchomienia i testowania w Android Studio
 │
-├── data/raw/                          # Baza 288 surowych nagrań laboratoryjnych (Ground Truth)
+├── data/raw/                          # Baza 353 surowych nagrań laboratoryjnych (Ground Truth)
 │   ├── northwind/                     # 82 pliki laboratoryjne Northwind Data Recovery
 │   ├── additional/                    # 13 nagrań uszkodzeń HDD
 │   ├── aesonlabs/                     # 9 nagrań Aesonlabs Data Recovery
@@ -285,7 +330,7 @@ AcousticHddSentinel/
 │   └── PROCESSED_SOURCES_REGISTRY.json# Rejestr unikalnych próbek i sum kontrolnych MD5
 │
 ├── dataset_categorized/               # Nagrania źródłowe podzielone na 4 klasy
-├── dataset_encoded/                   # 2269 tensorów .npy o kształcie (128, 259, 3) float32
+├── dataset_encoded/                   # 6 840 tensorów .npy o kształcie (128, 259, 3) float32 (Train: 6045, Val: 279, Test: 516)
 │
 ├── training_output/                   # Wagi referencyjne, metryki, raporty i macierz pomyłek
 │   ├── best_hdd_cnn_model.pt          # Wagi najlepszego modelu PyTorch (seed 777)
@@ -311,40 +356,69 @@ AcousticHddSentinel/
 ## 7. Status Integralności i Testów Automatycznych
 
 1. **Test logiczny projektu (`python tests/test_project_logic.py`):**
-   - [TEST 1/6] Składnia AST skryptów Python: **ZDANY**
-   - [TEST 2/6] Brak Data Leakage (Train: 276, Val: 28, Test: 44 nagrania): **ZDANY (Zero przecieków)**
-   - [TEST 3/6] Wymiary tensorów: **ZDANY (2269 tensorów o idealnym kształcie (128, 259, 3) float32)**
-   - [TEST 4/6] Weryfikacja bazy audio: **ZDANY (288 prawidłowych plików)**
+   - [TEST 1/6] Składnia AST skryptów Python: **ZDANY (8 kluczowych modułów)**
+   - [TEST 2/6] Brak Data Leakage (Train: 496 nagrań, Val: 52 nagrań, Test: 74 nagrań — łącznie 622 unikalne stems): **ZDANY (Zero przecieków)**
+   - [TEST 3/6] Wymiary tensorów: **ZDANY (6 840 tensorów o idealnym kształcie (128, 259, 3) float32)**
+   - [TEST 4/6] Weryfikacja bazy audio: **ZDANY (353 prawidłowe pliki w data/raw/)**
    - [TEST 5/6] Artefakty treningowe: **ZDANY (Model 4.63 MB, 4 klasy, classes.json)**
-   - [TEST 6/6] Moduł mobilny Android: **ZDANY (25/25 kluczowych plików, model INT8 1.18 MB)**
+   - [TEST 6/6] Moduł mobilny Android: **ZDANY (27/27 kluczowych plików, model INT8 1.18 MB)**
    - **Wynik ogólny: 6/6 ZDANYCH (100% sukcesu)**
 
 2. **Testy jednostkowe modułu Android (`cd android && ./gradlew test`):**
-   - `AudioChunkTest`: walidacja bufora PCM i konwersji próbek — **ZDANY**
-   - `AudioPreprocessorTest`: walidacja FFT, okna Hanna, banku Mel i Z-Score — **ZDANY**
-   - `RpmHarmonicsAnalyzerTest`: weryfikacja prążków 90 Hz i 120 Hz — **ZDANY**
-   - `DspEndToEndStressTest`: 100 powtórzeń potoku bez wycieków pamięci i NaN — **ZDANY**
-   - `DiagnosticModelTest`: operacje CRUD bazy SQLiteOpenHelper — **ZDANY**
-   - `ClassificationResultTest`: generowanie zaleceń inżynierskich — **ZDANY**
-   - **Wynik ogólny: BUILD SUCCESSFUL (100% testów zdanych w 5 s)**
+   - `AudioChunkTest`: walidacja bufora PCM i konwersji próbek — **ZDANY (1 test)**
+   - `AudioRecorderDecimationTest`: kaskadowy filtr Butterwortha 4. rzędu i decymacja 2:1 (passband/stopband) — **ZDANY (5 testów)**
+   - `AudioPreprocessorTest`: walidacja FFT, okna Hanna, banku Mel, Savitzky-Golay i Z-Score — **ZDANY (8 testów)**
+   - `RpmHarmonicsAnalyzerTest`: weryfikacja prążków 90 Hz, 120 Hz, odrzucanie wibrato mowy 90/120/130 Hz, pisku stojana i 2-tone motor — **ZDANY (9 testów)**
+   - `DspEndToEndStressTest`: 100 powtórzeń potoku bez wycieków pamięci i NaN — **ZDANY (3 testy)**
+   - `DspPhysicalGuardTest`: strażnik fizyczny, stall beep, veto clippingu, fan noise vs scratching — **ZDANY (6 testów)**
+   - `DiagnosticModelTest`: operacje CRUD bazy SQLiteOpenHelper i model diagnostyczny — **ZDANY (1 test)**
+   - `ClassificationResultTest`: generowanie zaleceń inżynierskich i klasyfikacji — **ZDANY (4 testy)**
+   - **Wynik ogólny: BUILD SUCCESSFUL (37/37 testów jednostkowych w 8 klasach zdanych w 2 s)**
+
+3. **Testy architektury wielomodalnej SMPC (`python tests/test_smpc_architecture.py`):**
+   - Weryfikacja układów Channel-First (B, 3, 128, 259) i Channel-Last (B, 128, 259, 3) — **ZDANY**
+   - Option A ekwiwalencja numeryczna ONNX (MatMul + view + ReduceMax) vs definicja referencyjna ($< 10^{-6}$) — **ZDANY**
+   - Niezmiennik liczby parametrów bazowych (dokładnie 1,206,756 parametrów przed i po SMPC) — **ZDANY**
+   - SubCenterArcMarginLoss i przepływ gradientów w PyTorch — **ZDANY**
+   - compute_orthogonality_loss (kara 0.0 dla wektorów ortogonalnych, 2.10 dla skolapsowanych) — **ZDANY**
+   - spherical_kmeans klastrowanie M podcentrów na hipersferze S^127 — **ZDANY**
+   - Weryfikacja hybrydowej Gałęzi D (walidacja cech scratching vs ambient noise) — **ZDANY**
+   - **Wynik ogólny: 7/7 ZDANYCH (100% sukcesu)**
+
+4. **Remediacja Milestone 1 Iteracja 3 (Temporal Pitch Stationarity & Zero FPR):**
+   - **Weryfikacja stacjonarności czasowej pitch (Python & Java 17):** Implementacja testu niespójnych przesunięć czasowych (incommensurate offsets: 0.0s, 0.37s, 0.83s, 1.41s, 2.11s) z interpolacją paraboliczną częstotliwości piku w pasmie +/- 5.0 Hz. Sztywny silnik HDD zachowuje $\Delta f_0 \le 0.1$ Hz, podczas gdy wibrato głosu ludzkiego (3-8 Hz FM) wykazuje $\Delta f_0 \ge 3.0$ Hz, co eliminuje fałszywe alarmy rotacji w 100%.
+   - **Bariera ostrości prążka (`f0_sharpness`):** Obliczanie stosunku energii piku do ramion (+/- 2 biny widma). Silniki mechaniczne wykazują ostrość $> 10.0$, podczas gdy szerokie wybrzuszenia modulacji głosu mają ostrość $< 6.0$. Wymóg `f0_sharpness >= 6.0` dla 2-tonowych rotorów FDB całkowicie odcina podszywanie się pod rotację.
+   - **Zaokrąglenia binów i symetria tła w Javie:** Poprawiono zaokrąglanie granic pasma `(int) Math.ceil` / `(int) Math.floor` w `RpmHarmonicsAnalyzer.java` oraz wyrównano okno szacowania tła lokalnego do `targetF0 \pm 25.0` Hz.
+   - **Adversarial Audit:** 0% fałszywych alarmów (0/96 w Pythonie, 0/54 w Javie) na pełnej siatce sweepów wokalnych, syren i tonów czystych.
 
 ---
 
 ## 8. Kluczowe Polecenia Szybkiego Startu
 
-```bash
-# 1. Sprawdzenie integralności projektu i niezmienników ADR-001:
-python tests/test_project_logic.py
+> **Uwaga dotyczące środowiska:** Do uruchamiania skryptów PyTorch/DSP projekt posiada gotowy wirtualny interpreter w `.venv` (automatycznie wykrywany lub poprzez `source .venv/bin/activate`).
 
-# 2. Uruchomienie testów jednostkowych Androida:
+```bash
+# 1. Kompletny zestaw 5 oficjalnych testów systemu:
+python tests/test_project_logic.py
+python tests/test_smpc_architecture.py
+python tests/test_rpm_harmonics_analyzer.py
+python tests/test_computer_sound_rejection.py
+cd android && ./gradlew test && cd ..
+python tests/verify_cnn_model.py
+python tests/test_rpm_harmonics_analyzer.py
+python tests/test_computer_sound_rejection.py
+python tests/test_smpc_architecture.py
+
+# 2. Uruchomienie testów jednostkowych Androida (czysta Java 17):
 cd android && ./gradlew test && cd ..
 
 # 3. Kategoryzacja i enkodowanie tensorów audio:
 python ml/prepare_audio_dataset.py
 python ml/hdd_audio_encoder.py
 
-# 4. Trening modelu bazowego PyTorch na GPU (AMD ROCm):
+# 4. Trening modelu bazowego PyTorch na GPU (AMD ROCm) z opcjonalnym SMPC:
 python ml/train_cnn.py --epochs 35 --batch-size 32 --output-dir ./training_output
+python ml/train_cnn.py --use-smpc --smpc-subcenters 3 --epochs 35 --batch-size 32 --output-dir ./training_output_smpc
 
 # 5. Eksport modeli ONNX FP32, ONNX INT8 i synchronizacja do Androida:
 python ml/export_model.py --weights training_output/best_hdd_cnn_model.pt --output-dir exported_models

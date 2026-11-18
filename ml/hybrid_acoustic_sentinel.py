@@ -8,7 +8,7 @@ Hybrydowy system diagnostyki akustycznej Acoustic HDD Sentinel.
 Zgodność: ADR-001, fizyka akustyczna HDD, wymagania testowe w tests/.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 import numpy as np
 import torch
 import librosa
@@ -18,8 +18,14 @@ from ml.hdd_audio_encoder import encode_audio_chunk
 from ml.model_cnn import AcousticHddSentinelCNN
 
 class HybridAcousticSentinel:
-    def __init__(self, model_weights_path: Optional[str] = None, num_classes: int = 4):
+    def __init__(
+        self,
+        model_weights_path: Optional[str] = None,
+        num_classes: int = 4,
+        device: Optional[Union[torch.device, str]] = None
+    ):
         self.sr = TARGET_SR
+        self.device = torch.device(device) if device is not None else torch.device("cpu")
         self.cnn_model = AcousticHddSentinelCNN(num_classes=num_classes)
         self.classes = ["beeping", "clicking", "normal", "scratching"]
         
@@ -32,7 +38,8 @@ class HybridAcousticSentinel:
             if "classes" in cp:
                 self.classes = cp["classes"]
             if "fault_prototypes" in cp.get("state_dict", cp):
-                self.cnn_model.use_open_set = True
+                self.cnn_model.use_open_set.fill_(True)
+        self.cnn_model.to(self.device)
         self.cnn_model.eval()
 
     def diagnose_chunk(self, y_chunk: np.ndarray) -> Dict[str, Any]:
@@ -59,9 +66,10 @@ class HybridAcousticSentinel:
         
         # 2. Inferencja CNN
         tensor = encode_audio_chunk(y_chunk, sr=self.sr, tensor_format="pytorch")
-        t_input = torch.from_numpy(tensor).unsqueeze(0)
+        model_device = next(self.cnn_model.parameters()).device if list(self.cnn_model.parameters()) else self.device
+        t_input = torch.from_numpy(tensor).unsqueeze(0).to(model_device)
         with torch.no_grad():
-            cnn_probs = self.cnn_model(t_input)[0].numpy()
+            cnn_probs = self.cnn_model(t_input)[0].detach().cpu().numpy()
             
         cnn_top_idx = int(np.argmax(cnn_probs))
         cnn_top_class = self.classes[cnn_top_idx]
@@ -122,16 +130,43 @@ class HybridAcousticSentinel:
 
         # D. Weryfikacja dźwięków otoczenia komputera (Wentylatory PC, Szum tła ~45 dB SPL):
         # Jeśli brak rotacji HDD, brak Stall Beep, brak klikania, a spektrum to szerokopasmowy szum:
-        # -> Odrzucenie jako AMBIENT / PC_FAN / OOD!
+        # -> Weryfikacja wielomodalnych prototypów SMPC dla 'scratching' zamiast ślepego fallbacku!
         if not peak_analysis["has_rotation"] and not has_mechanical_clicks and not peak_analysis["has_stall_beep"]:
-            # Sprawdź, czy CNN nie zgaduje z niską pewnością (< 0.70)
+            # Sprawdź dopasowanie do prototypów uszkodzeń SMPC
+            is_validated_scratching = False
+            scratching_sim = 0.0
+            thresh_scratching = 0.40
+
+            if cnn_top_class == "scratching" and cnn_top_prob >= 0.70:
+                with torch.no_grad():
+                    dense_feat = self.cnn_model.extract_features(t_input)
+                    if hasattr(self.cnn_model, "compute_smpc_cosine_similarities"):
+                        cos_sims = self.cnn_model.compute_smpc_cosine_similarities(dense_feat)
+                        scratching_sim = float(cos_sims[0, 2])
+                        if hasattr(self.cnn_model, "fault_thresholds") and len(self.cnn_model.fault_thresholds) > 2:
+                            thresh_scratching = float(self.cnn_model.fault_thresholds[2])
+                        if scratching_sim >= thresh_scratching:
+                            is_validated_scratching = True
+
+            if is_validated_scratching:
+                return {
+                    "decision": "scratching",
+                    "is_anomaly": True,
+                    "confidence": float(cnn_top_prob),
+                    "rpm_detected": None,
+                    "mechanism": f"Potwierdzone wielomodalne tarcie głowic o talerz (SMPC cos_sim={scratching_sim:.3f} >= {thresh_scratching:.3f}). Brak rotacji z powodu oporu mechanicznego.",
+                    "cnn_probabilities": {self.classes[i]: float(cnn_probs[i]) for i in range(len(self.classes))},
+                    "crest_factor": round(crest_factor, 2),
+                    "rms": round(rms, 5)
+                }
+
             if cnn_top_prob < 0.70 or cnn_top_class in ["scratching", "beeping"]:
                 return {
                     "decision": "ambient_pc",
                     "is_anomaly": False,
                     "confidence": 0.90,
                     "rpm_detected": None,
-                    "mechanism": "Dźwięk tła komputera / wentylator chłodzenia. Brak charakterystycznych sygnatur fizycznych dysku HDD.",
+                    "mechanism": "Dźwięk tła komputera / wentylator chłodzenia. Brak charakterystycznych sygnatur fizycznych dysku HDD (odrzucono przez SMPC OOD).",
                     "cnn_probabilities": {self.classes[i]: float(cnn_probs[i]) for i in range(len(self.classes))},
                     "crest_factor": round(crest_factor, 2),
                     "rms": round(rms, 5)

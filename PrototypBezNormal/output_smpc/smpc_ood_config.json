@@ -1,0 +1,65 @@
+{
+  "model_architecture": "AcousticSMPCModel",
+  "threshold": 0.2534782588481903,
+  "target_recall": 0.9,
+  "percentile": 9.999999999999998,
+  "scale": 16.0,
+  "margin": 0.2,
+  "temperature": 2.0,
+  "alpha_energy": 0.1,
+  "num_classes": 3,
+  "sub_centers": 2,
+  "embedding_dim": 128,
+  "classes_3": [
+    "beeping",
+    "clicking",
+    "scratching"
+  ],
+  "classes_4": [
+    "beeping",
+    "clicking",
+    "normal",
+    "scratching"
+  ],
+  "weights_path": "best_smpc_model.pt",
+  "val_stats": {
+    "count": 131,
+    "mean": 1.175494909286499,
+    "std": 0.5484903454780579,
+    "min": -0.1878509223461151,
+    "max": 1.7770133018493652,
+    "median": 1.4010882377624512,
+    "p05": 0.14990492165088654,
+    "p10": 0.2534782588481903,
+    "p25": 0.7812514305114746,
+    "p75": 1.6270757913589478,
+    "p90": 1.7318427562713623,
+    "threshold": 0.2534782588481903
+  },
+  "per_class_stats": {
+    "beeping": {
+      "count": 27,
+      "mean": 0.9367336575631742,
+      "std": 0.5077299810712531,
+      "min": 0.049954935908317566,
+      "max": 1.635282278060913,
+      "above_threshold_ratio": 0.7777777777777778
+    },
+    "clicking": {
+      "count": 82,
+      "mean": 1.149965150781521,
+      "std": 0.5712278632051243,
+      "min": -0.1878509223461151,
+      "max": 1.7770133018493652,
+      "above_threshold_ratio": 0.9146341463414634
+    },
+    "scratching": {
+      "count": 22,
+      "mean": 1.5636760158972307,
+      "std": 0.18896168364275182,
+      "min": 1.0220539569854736,
+      "max": 1.7668752670288086,
+      "above_threshold_ratio": 1.0
+    }
+  }
+}

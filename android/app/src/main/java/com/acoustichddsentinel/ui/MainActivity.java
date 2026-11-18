@@ -351,6 +351,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showHistoryItemDialog(DiagnosticModel item) {
+        String statusText;
+        if (item.hasAnomaly()) {
+            statusText = "WYKRYTO AWARIĘ";
+        } else if ("ambient".equalsIgnoreCase(item.getPredictedClass())) {
+            statusText = "SZUM TŁA / BRAK DYSKU";
+        } else {
+            statusText = "DYSK SPRAWNY";
+        }
+
         MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this)
             .setTitle(item.getHddName())
             .setMessage(String.format(Locale.US,
@@ -358,7 +367,7 @@ public class MainActivity extends AppCompatActivity {
                 item.getFormattedDate(),
                 item.getPredictedClass().toUpperCase(Locale.US),
                 item.getConfidence() * 100.0f,
-                item.hasAnomaly() ? "WYKRYTO AWARIĘ" : "DYSK SPRAWNY",
+                statusText,
                 item.getSpectrogramPath() != null ? item.getSpectrogramPath() : "Brak"
             ));
 
@@ -379,6 +388,20 @@ public class MainActivity extends AppCompatActivity {
         builder.setPositiveButton("Zamknij", null)
             .setNeutralButton("Usuń wpis", (dialog, which) -> viewModel.deleteHistoryItem(item))
             .show();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        stopPulseAnimation();
+        if (pulseAnimatorX != null) {
+            pulseAnimatorX.cancel();
+            pulseAnimatorX = null;
+        }
+        if (pulseAnimatorY != null) {
+            pulseAnimatorY.cancel();
+            pulseAnimatorY = null;
+        }
     }
 
     private static String formatFaultClassName(String rawClass) {

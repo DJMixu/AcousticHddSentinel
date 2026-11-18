@@ -14,6 +14,7 @@ import os
 import sys
 import json
 import time
+import math
 import argparse
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
@@ -38,6 +39,118 @@ if str(current_dir) not in sys.path:
 
 from model_cnn import build_hdd_cnn_model, AcousticHddSentinelCNN, INPUT_SHAPE
 from dataset_pytorch import resolve_dataset_dir, create_pytorch_dataloaders
+
+
+class SubCenterArcMarginLoss(nn.Module):
+    """
+    Sub-Center Additive Angular Margin Loss (ArcFace).
+    cos(theta_{y_i} + m) = cos(theta) * cos(m) - sin(theta) * sin(m)
+    """
+
+    def __init__(
+        self,
+        scale: float = 16.0,
+        margin: float = 0.25,
+        easy_margin: bool = False,
+        class_weights: Optional[torch.Tensor] = None,
+        label_smoothing: float = 0.0
+    ):
+        super().__init__()
+        self.scale = scale
+        self.margin = margin
+        self.easy_margin = easy_margin
+        self.register_buffer("class_weights", class_weights if class_weights is not None else None)
+        self.label_smoothing = label_smoothing
+
+        self.cos_m = math.cos(margin)
+        self.sin_m = math.sin(margin)
+        self.th = math.cos(math.pi - margin)
+        self.mm = math.sin(math.pi - margin) * margin
+
+    def forward(self, cosine_similarities: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        if cosine_similarities.max() > 1.05 or cosine_similarities.min() < -1.05:
+            cosine = cosine_similarities / self.scale
+        else:
+            cosine = cosine_similarities
+
+        eps = 1e-7
+        cosine_clamped = torch.clamp(cosine, -1.0 + eps, 1.0 - eps)
+        sine = torch.sqrt(1.0 - torch.pow(cosine_clamped, 2))
+
+        phi = cosine_clamped * self.cos_m - sine * self.sin_m
+
+        if self.easy_margin:
+            phi = torch.where(cosine_clamped > 0, phi, cosine_clamped)
+        else:
+            phi = torch.where(cosine_clamped > self.th, phi, cosine_clamped - self.mm)
+
+        one_hot = torch.zeros_like(cosine)
+        one_hot.scatter_(1, targets.view(-1, 1).long(), 1.0)
+
+        output = (one_hot * phi) + ((1.0 - one_hot) * cosine)
+        output = output * self.scale
+
+        weights = self.class_weights if self.class_weights is not None else None
+        loss = F.cross_entropy(output, targets, weight=weights, label_smoothing=self.label_smoothing)
+        return loss
+
+
+def compute_orthogonality_loss(prototypes_weight: torch.Tensor, threshold: float = 0.30) -> torch.Tensor:
+    """
+    Wylicza karę ortogonalności sub-centrów:
+        L_ortho = sum_{k=0}^{K-1} sum_{m1 < m2} max(0, W_{k,m1} · W_{k,m2} - threshold)
+    na znormalizowanych sferycznie prototypach (K, M, D).
+    """
+    w_norm = F.normalize(prototypes_weight, p=2, dim=-1)  # (K, M, D)
+    K, M, D = w_norm.shape
+
+    if M < 2:
+        return torch.tensor(0.0, device=prototypes_weight.device, dtype=prototypes_weight.dtype)
+
+    if M == 2:
+        w1 = w_norm[:, 0, :]
+        w2 = w_norm[:, 1, :]
+        dot_prods = (w1 * w2).sum(dim=-1)
+        penalties = torch.clamp(dot_prods - threshold, min=0.0)
+        return penalties.sum()
+
+    total_penalty = torch.tensor(0.0, device=prototypes_weight.device, dtype=prototypes_weight.dtype)
+    for k in range(K):
+        for m1 in range(M):
+            for m2 in range(m1 + 1, M):
+                dot_prod = torch.dot(w_norm[k, m1], w_norm[k, m2])
+                total_penalty = total_penalty + torch.clamp(dot_prod - threshold, min=0.0)
+
+    return total_penalty
+
+
+def spherical_kmeans(features: torch.Tensor, k: int, max_iters: int = 50) -> torch.Tensor:
+    """Sferyczny K-Means na hipersferze S^{D-1}."""
+    n, d = features.shape
+    if n <= k:
+        centroids = F.normalize(features, p=2, dim=-1)
+        if n < k:
+            pad = torch.randn(k - n, d, device=features.device)
+            centroids = torch.cat([centroids, F.normalize(pad, p=2, dim=-1)], dim=0)
+        return centroids
+
+    indices = torch.randperm(n)[:k]
+    centroids = F.normalize(features[indices].clone(), p=2, dim=-1)
+    for _ in range(max_iters):
+        sims = torch.matmul(features, centroids.t())
+        labels = torch.argmax(sims, dim=-1)
+        new_centroids = torch.zeros_like(centroids)
+        for j in range(k):
+            mask = (labels == j)
+            if mask.sum() > 0:
+                new_centroids[j] = features[mask].sum(dim=0)
+            else:
+                new_centroids[j] = features[torch.randint(0, n, (1,))[0]]
+        new_centroids = F.normalize(new_centroids, p=2, dim=-1)
+        if torch.allclose(centroids, new_centroids, atol=1e-4):
+            break
+        centroids = new_centroids
+    return centroids
 
 
 def plot_and_save_confusion_matrix(
@@ -119,7 +232,11 @@ def train_one_epoch(
     loader,
     criterion,
     optimizer,
-    device: torch.device
+    device: torch.device,
+    prototypes_param: Optional[nn.Parameter] = None,
+    smpc_scale: float = 16.0,
+    ortho_lambda: float = 0.10,
+    ortho_threshold: float = 0.30
 ) -> Tuple[float, float]:
     model.train()
     running_loss = 0.0
@@ -131,8 +248,24 @@ def train_one_epoch(
         y_batch = y_batch.to(device, non_blocking=True)
 
         optimizer.zero_grad()
-        logits = model(x_batch, return_logits=True)
-        loss = criterion(logits, y_batch)
+        if prototypes_param is not None:
+            dense_feat = model.extract_features(x_batch)
+            z_norm = F.normalize(dense_feat, p=2, dim=-1)
+            K, M, D = prototypes_param.shape
+            w_norm = F.normalize(prototypes_param, p=2, dim=-1)
+            w_flat = w_norm.view(K * M, D)
+            sims_flat = torch.matmul(z_norm, w_flat.t())
+            sims = sims_flat.view(-1, K, M)
+            max_sims, _ = torch.max(sims, dim=-1)
+
+            margin_loss = criterion(max_sims, y_batch)
+            ortho_loss = compute_orthogonality_loss(prototypes_param, threshold=ortho_threshold)
+            loss = margin_loss + ortho_lambda * ortho_loss
+            logits = smpc_scale * max_sims
+        else:
+            logits = model(x_batch, return_logits=True)
+            loss = criterion(logits, y_batch)
+
         loss.backward()
         optimizer.step()
 
@@ -149,7 +282,9 @@ def evaluate_epoch(
     model: nn.Module,
     loader,
     criterion,
-    device: torch.device
+    device: torch.device,
+    prototypes_param: Optional[nn.Parameter] = None,
+    smpc_scale: float = 16.0
 ) -> Tuple[float, float, np.ndarray, np.ndarray]:
     model.eval()
     running_loss = 0.0
@@ -162,8 +297,20 @@ def evaluate_epoch(
         x_batch = x_batch.to(device, non_blocking=True)
         y_batch = y_batch.to(device, non_blocking=True)
 
-        logits = model(x_batch, return_logits=True)
-        loss = criterion(logits, y_batch)
+        if prototypes_param is not None:
+            dense_feat = model.extract_features(x_batch)
+            z_norm = F.normalize(dense_feat, p=2, dim=-1)
+            K, M, D = prototypes_param.shape
+            w_norm = F.normalize(prototypes_param, p=2, dim=-1)
+            w_flat = w_norm.view(K * M, D)
+            sims_flat = torch.matmul(z_norm, w_flat.t())
+            sims = sims_flat.view(-1, K, M)
+            max_sims, _ = torch.max(sims, dim=-1)
+            loss = criterion(max_sims, y_batch)
+            logits = smpc_scale * max_sims
+        else:
+            logits = model(x_batch, return_logits=True)
+            loss = criterion(logits, y_batch)
 
         running_loss += loss.item() * x_batch.size(0)
         preds = torch.argmax(logits, dim=-1)
@@ -184,7 +331,13 @@ def run_training(
     lr: float = 1e-3,
     weight_decay: float = 1e-4,
     patience: int = 8,
-    device_name: Optional[str] = None
+    device_name: Optional[str] = None,
+    use_smpc: bool = False,
+    smpc_subcenters: int = 3,
+    smpc_margin: float = 0.25,
+    smpc_scale: float = 16.0,
+    smpc_ortho_lambda: float = 0.10,
+    smpc_ortho_threshold: float = 0.30
 ):
     torch.manual_seed(777)
     np.random.seed(777)
@@ -193,6 +346,8 @@ def run_training(
 
     print("=" * 70)
     print("TRENING MODELU 2D CNN W PYTORCH (ACOUSTIC HDD SENTINEL)")
+    if use_smpc:
+        print(f"TRYB: Sub-Center Multi-Prototype Cosine (SMPC, M={smpc_subcenters}, margin={smpc_margin}, scale={smpc_scale})")
     print("=" * 70)
 
     if device_name:
@@ -226,8 +381,28 @@ def run_training(
     model = model.to(device)
 
     weights_tensor = class_weights.to(device)
-    criterion = nn.CrossEntropyLoss(weight=weights_tensor, label_smoothing=0.03)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+
+    if use_smpc:
+        prototypes_param = nn.Parameter(torch.randn(num_classes, smpc_subcenters, 128, device=device))
+        for k in range(num_classes):
+            q, _ = torch.linalg.qr(torch.randn(128, smpc_subcenters, device=device))
+            prototypes_param.data[k] = q.t()
+
+        criterion = SubCenterArcMarginLoss(
+            scale=smpc_scale,
+            margin=smpc_margin,
+            class_weights=weights_tensor,
+            label_smoothing=0.03
+        )
+        optimizer = torch.optim.AdamW([
+            {"params": model.parameters(), "lr": lr, "weight_decay": weight_decay},
+            {"params": [prototypes_param], "lr": lr, "weight_decay": 0.0}
+        ])
+    else:
+        prototypes_param = None
+        criterion = nn.CrossEntropyLoss(weight=weights_tensor, label_smoothing=0.03)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+
     scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=3)
 
     history = {
@@ -248,8 +423,15 @@ def run_training(
 
     for epoch in range(1, epochs + 1):
         t0 = time.time()
-        train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
-        val_loss, val_acc, _, _ = evaluate_epoch(model, val_loader, criterion, device)
+        train_loss, train_acc = train_one_epoch(
+            model, train_loader, criterion, optimizer, device,
+            prototypes_param=prototypes_param, smpc_scale=smpc_scale,
+            ortho_lambda=smpc_ortho_lambda, ortho_threshold=smpc_ortho_threshold
+        )
+        val_loss, val_acc, _, _ = evaluate_epoch(
+            model, val_loader, criterion, device,
+            prototypes_param=prototypes_param, smpc_scale=smpc_scale
+        )
         curr_lr = optimizer.param_groups[0]["lr"]
 
         scheduler.step(val_loss)
@@ -276,8 +458,11 @@ def run_training(
                 "val_loss": val_loss,
                 "val_acc": val_acc,
                 "classes": classes,
-                "num_classes": num_classes
+                "num_classes": num_classes,
+                "use_smpc": use_smpc
             }
+            if use_smpc and prototypes_param is not None:
+                checkpoint["smpc_prototypes"] = prototypes_param.data.cpu()
             torch.save(checkpoint, best_model_path)
             print(f"      -> Zapisano nowy najlepszy checkpoint: {best_model_path} (val_loss: {val_loss:.4f})")
         else:
@@ -309,23 +494,48 @@ def run_training(
 
     # Indeksy klas uszkodzeń: beeping (0), clicking (1), scratching (3)
     fault_indices = [0, 1, 3]
-    prototypes = torch.zeros((3, 128), dtype=torch.float32)
-    thresholds = torch.zeros(3, dtype=torch.float32)
 
-    for i, f_idx in enumerate(fault_indices):
-        mask = (all_t == f_idx)
-        class_f = all_f[mask]
-        class_f_norm = F.normalize(class_f, p=2, dim=1)
-        centroid = class_f_norm.mean(dim=0)
-        centroid = F.normalize(centroid.unsqueeze(0), p=2, dim=1).squeeze(0)
-        prototypes[i] = centroid
+    if use_smpc:
+        M = smpc_subcenters
+        prototypes = torch.zeros((3, M, 128), dtype=torch.float32)
+        thresholds = torch.zeros(3, dtype=torch.float32)
+        for i, f_idx in enumerate(fault_indices):
+            mask = (all_t == f_idx)
+            class_f = all_f[mask]
+            class_f_norm = F.normalize(class_f, p=2, dim=1)
 
-        sims = torch.matmul(class_f_norm, centroid)
-        thresh = torch.quantile(sims, 0.05).item()
-        thresh = max(0.35, min(0.65, thresh - 0.05))
-        thresholds[i] = thresh
-        cls_name = classes[f_idx]
-        print(f"  - Prototyp {cls_name:12s}: obliczono z {len(class_f)} tensorów, próg cosinusowy: {thresh:.3f}")
+            if prototypes_param is not None:
+                sub_centers = F.normalize(prototypes_param.data[f_idx].cpu(), p=2, dim=-1)
+            else:
+                sub_centers = spherical_kmeans(class_f_norm, k=M)
+
+            prototypes[i] = sub_centers
+
+            # Oblicz podobieństwo do najbliższego sub-centru
+            sims_m = torch.matmul(class_f_norm, sub_centers.t())
+            sims, _ = torch.max(sims_m, dim=-1)
+            thresh = torch.quantile(sims, 0.05).item()
+            thresh = max(0.35, min(0.65, thresh - 0.05))
+            thresholds[i] = thresh
+            cls_name = classes[f_idx]
+            print(f"  - Prototyp SMPC (M={M}) {cls_name:12s}: obliczono z {len(class_f)} tensorów, próg: {thresh:.3f}")
+    else:
+        prototypes = torch.zeros((3, 128), dtype=torch.float32)
+        thresholds = torch.zeros(3, dtype=torch.float32)
+        for i, f_idx in enumerate(fault_indices):
+            mask = (all_t == f_idx)
+            class_f = all_f[mask]
+            class_f_norm = F.normalize(class_f, p=2, dim=1)
+            centroid = class_f_norm.mean(dim=0)
+            centroid = F.normalize(centroid.unsqueeze(0), p=2, dim=1).squeeze(0)
+            prototypes[i] = centroid
+
+            sims = torch.matmul(class_f_norm, centroid)
+            thresh = torch.quantile(sims, 0.05).item()
+            thresh = max(0.35, min(0.65, thresh - 0.05))
+            thresholds[i] = thresh
+            cls_name = classes[f_idx]
+            print(f"  - Prototyp {cls_name:12s}: obliczono z {len(class_f)} tensorów, próg cosinusowy: {thresh:.3f}")
 
     model.set_fault_prototypes(prototypes.to(device), thresholds.to(device), gamma=12.0)
 
@@ -336,7 +546,11 @@ def run_training(
     print(f"      -> Zapisano checkpoint ze skalibrowanymi prototypami OOD: {best_model_path}")
 
     print(f"[6/6] Finalna ewaluacja na zbiorze testowym...")
-    test_loss, test_acc, y_true, y_pred = evaluate_epoch(model, test_loader, criterion, device)
+    test_loss, test_acc, y_true, y_pred = evaluate_epoch(
+        model, test_loader, criterion, device,
+        prototypes_param=prototypes_param if use_smpc else None,
+        smpc_scale=smpc_scale
+    )
 
     print(f"\nWyniki na zbiorze testowym:")
     print(f"  Test Loss:     {test_loss:.4f}")
@@ -387,6 +601,12 @@ def main():
     parser.add_argument("--dataset-dir", type=str, default="dataset_encoded", help="Ścieżka do dataset_encoded")
     parser.add_argument("--output-dir", type=str, default="training_output", help="Katalog wyjściowy")
     parser.add_argument("--patience", type=int, default=8, help="Cierpliwość EarlyStopping")
+    parser.add_argument("--use-smpc", action="store_true", default=False, help="Włącz architekturę Sub-Center Multi-Prototype Cosine (SMPC)")
+    parser.add_argument("--smpc-subcenters", type=int, default=3, help="Liczba podcentrów na klasę uszkodzenia (M)")
+    parser.add_argument("--smpc-margin", type=float, default=0.25, help="Margines kątowy ArcFace m (w radianach)")
+    parser.add_argument("--smpc-scale", type=float, default=16.0, help="Czynnik skalowania s dla podobieństw cosinusowych")
+    parser.add_argument("--smpc-ortho-lambda", type=float, default=0.10, help="Waga straty ortogonalności podcentrów")
+    parser.add_argument("--smpc-ortho-threshold", type=float, default=0.30, help="Próg odpychania podcentrów w stracie ortogonalności")
     args = parser.parse_args()
 
     ds_dir = resolve_dataset_dir(args.dataset_dir)
@@ -398,7 +618,13 @@ def main():
         epochs=args.epochs,
         batch_size=args.batch_size,
         lr=args.lr,
-        patience=args.patience
+        patience=args.patience,
+        use_smpc=args.use_smpc,
+        smpc_subcenters=args.smpc_subcenters,
+        smpc_margin=args.smpc_margin,
+        smpc_scale=args.smpc_scale,
+        smpc_ortho_lambda=args.smpc_ortho_lambda,
+        smpc_ortho_threshold=args.smpc_ortho_threshold
     )
 
 

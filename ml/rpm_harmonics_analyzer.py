@@ -99,6 +99,8 @@ def evaluate_harmonic_comb(
     # 2. Dynamiczne śledzenie wyższych harmonicznych proporcjonalnie do f0_exact_freq
     harmonic_hits = 0
     harmonic_energy = (f0_peak_val ** 2)
+    has_2nd_harmonic_hit = False
+    spec_mean = float(np.mean(spec))
     
     for m in multipliers:
         h_freq = f0_exact_freq * m
@@ -109,27 +111,118 @@ def evaluate_harmonic_comb(
         idx_h = np.where((freqs >= h_freq - h_tol) & (freqs <= h_freq + h_tol))[0]
         if len(idx_h) > 0:
             h_peak = np.max(spec[idx_h])
-            # Tło lokalne dla danej harmonicznej
-            h_bg_idx = np.where((freqs >= h_freq - 30.0) & (freqs <= h_freq + 30.0))[0]
+            # Tło lokalne dla danej harmonicznej: dynamiczne skalowanie promienia okna
+            # zapobiega wyzerowaniu liczby binów tła gdy h_tol przekracza sztywne 30 Hz (dla f > 1200 Hz)
+            h_bg_window = max(40.0, h_tol * 2.0)
+            h_bg_idx = np.where((freqs >= h_freq - h_bg_window) & (freqs <= h_freq + h_bg_window))[0]
             h_bg_idx = [i for i in h_bg_idx if abs(freqs[i] - h_freq) > h_tol]
             h_bg = np.median(spec[h_bg_idx]) if len(h_bg_idx) > 0 else 1e-6
             
-            if h_peak / (h_bg + 1e-9) > 1.6:
+            # Wymóg: wyrazistość względem lokalnego tła (> 1.6x) ORAZ bezwzględna energia względem średniej widma (> 5%)
+            if (h_peak / (h_bg + 1e-9) > 1.6) and (h_peak > spec_mean * 0.05):
                 harmonic_hits += 1
                 harmonic_energy += (h_peak ** 2)
+                if abs(m - 2.0) < 0.01:
+                    has_2nd_harmonic_hit = True
                 
+    # Wyznaczenie ostrości piku f0 względem bocznych ramion (+/- 2 biny widma)
+    if f0_max_idx >= 2 and f0_max_idx + 2 < len(spec):
+        skirt = (spec[f0_max_idx - 2] + spec[f0_max_idx + 2]) / 2.0
+        f0_sharpness = float(f0_peak_val / (skirt + 1e-9))
+    else:
+        f0_sharpness = 1.0
+
     comb_score = (f0_prominence * 0.4) + (harmonic_hits / len(multipliers) * 6.0)
-    comb_detected = ((f0_prominence >= 2.2 and harmonic_hits >= 2 and comb_score >= 3.0) or (f0_prominence >= 3.5 and harmonic_hits >= 1 and comb_score >= 3.0) or (f0_prominence >= 1.8 and harmonic_hits >= 3 and comb_score >= 3.8)) and (float(harmonic_energy / total_energy) >= 0.005 or harmonic_hits >= 4)
+    energy_ratio = float(harmonic_energy / total_energy)
+
+    # Kryteria detekcji rotacji HDD:
+    # 1. Multi-harmonic comb: harmonic_hits >= 2 i comb_score >= 3.0 oraz f0_prominence >= 2.2
+    #    (lub f0_prominence >= 1.8 przy min. 3 harmonicznych i comb_score >= 3.8)
+    # 2. Silny 2-tonowy rotor z f0 i 2f0 (np. autentyczne silniki FDB): harmonic_hits >= 1,
+    #    f0_prominence >= 3.0, comb_score >= 3.0, POD WARUNKIEM że trafienie przypada na 2. harmoniczną (m=2.0)
+    #    oraz ostrość piku f0_sharpness >= 6.0 (wyklucza szerokie wybrzuszenia modulacji wibrato głosu)
+    multi_hit_comb = (
+        harmonic_hits >= 2
+        and comb_score >= 3.0
+        and (
+            f0_prominence >= 2.2
+            or (f0_prominence >= 1.8 and harmonic_hits >= 3 and comb_score >= 3.8)
+        )
+    )
+    single_2nd_harmonic_comb = (
+        harmonic_hits >= 1
+        and has_2nd_harmonic_hit
+        and f0_prominence >= 3.0
+        and comb_score >= 3.0
+        and f0_sharpness >= 6.0
+    )
+
+    comb_detected = (
+        (multi_hit_comb or single_2nd_harmonic_comb)
+        and (energy_ratio >= 0.005 or harmonic_hits >= 4)
+    )
     
     return {
         "detected": bool(comb_detected),
         "score": float(comb_score),
         "f0_found": float(f0_exact_freq),
         "f0_prominence": float(f0_prominence),
+        "f0_sharpness": float(f0_sharpness),
         "harmonics_matched": int(harmonic_hits),
         "harmonics_total": len(multipliers),
         "harmonic_energy_ratio": float(harmonic_energy / total_energy)
     }
+
+
+def verify_temporal_pitch_stationarity(
+    y: np.ndarray,
+    f0_found: float,
+    sr: int = TARGET_SR,
+    max_delta_hz: float = 1.5,
+    n_fft: int = 4096
+) -> bool:
+    """
+    Weryfikacja stacjonarności częstotliwości podstawowej f0 w czasie.
+    Autentyczny silnik HDD wykazuje sztywną mechaniczną stabilność obrotów (wow & flutter < 0.05%, dryf < 0.2 Hz).
+    Głos ludzki (wibrato) oraz syreny charakteryzują się dynamiczną modulacją częstotliwości (FM delta >= 3.0 Hz).
+    Odrzuca sygnały, jeśli różnica częstotliwości f0 pomiędzy oknami przekracza max_delta_hz.
+    """
+    if len(y) < sr * 2.5:
+        return True
+
+    # 5 niespójnych (incommensurate) przesunięć czasowych w oknie 3.0s,
+    # eliminujących ryzyko rezonansu fazowego ze standardowymi częstotliwościami wibrato mowy (3, 5, 8 Hz)
+    offsets = [0, int(0.37 * sr), int(0.83 * sr), int(1.41 * sr), int(2.11 * sr)]
+    hann = 0.5 * (1.0 - np.cos(2.0 * np.pi * np.arange(n_fft) / n_fft))
+    bin_width = sr / n_fft
+
+    k_min = max(1, int(np.ceil((f0_found - 5.0) / bin_width)))
+    k_max = min(n_fft // 2 - 1, int(np.floor((f0_found + 5.0) / bin_width)))
+    if k_min > k_max:
+        k_min = max(1, int(np.round((f0_found - 5.0) / bin_width)))
+        k_max = min(n_fft // 2 - 1, int(np.round((f0_found + 5.0) / bin_width)))
+
+    f_subs = []
+    for off in offsets:
+        if off + n_fft > len(y):
+            continue
+        chunk = y[off : off + n_fft] * hann
+        spec = np.abs(np.fft.rfft(chunk, n=n_fft))
+
+        k_peak = k_min + int(np.argmax(spec[k_min : k_max + 1]))
+        alpha = float(spec[k_peak - 1])
+        beta = float(spec[k_peak])
+        gamma = float(spec[k_peak + 1])
+        denom = 2.0 * (2.0 * beta - alpha - gamma)
+        delta = (gamma - alpha) / denom if denom != 0.0 else 0.0
+        f_sub = (k_peak + delta) * bin_width
+        f_subs.append(f_sub)
+
+    if len(f_subs) < 3:
+        return True
+
+    delta_f = max(f_subs) - min(f_subs)
+    return bool(delta_f <= max_delta_hz)
 
 
 def analyze_frequency_peaks(y: np.ndarray, sr: int = TARGET_SR) -> Dict[str, Any]:
@@ -165,6 +258,14 @@ def analyze_frequency_peaks(y: np.ndarray, sr: int = TARGET_SR) -> Dict[str, Any
             best_rpm = rpm_key
             best_rpm_data = res
 
+    # Weryfikacja stacjonarności rotacji wrzeciona (odrzucenie modulacji głosu i syren)
+    if best_rpm is not None and best_rpm_data is not None:
+        f0_detected = best_rpm_data["f0_found"]
+        if not verify_temporal_pitch_stationarity(y, f0_detected, sr=sr):
+            best_rpm = None
+            best_rpm_data = None
+            best_score = 0.0
+
     # 2. Wykrywanie dominujących ostrych pików w całym paśmie (np. pisk stojana 1000 - 3000 Hz)
     peaks, properties = signal.find_peaks(spec, prominence=np.mean(spec) * 2.5, distance=15)
     top_peaks = []
@@ -193,12 +294,12 @@ def analyze_frequency_peaks(y: np.ndarray, sr: int = TARGET_SR) -> Dict[str, Any
         if beep_band_energy_ratio >= 0.005:
             for p in top_peaks:
                 f_p = p["frequency_hz"]
-                if 1050.0 <= f_p <= 3500.0 and p["prominence"] > np.mean(spec) * 6.0:
+                if 1050.0 <= f_p <= 3500.0:
                     # Weryfikacja wyrazistości piku względem lokalnego tła w otoczeniu +/- 65 Hz
                     m_bg = (freqs >= f_p - 65.0) & (freqs <= f_p + 65.0) & (np.abs(freqs - f_p) > 12.0)
                     local_bg = float(np.median(spec[m_bg])) if np.sum(m_bg) > 0 else float(np.mean(spec))
                     prominence_ratio = p["amplitude"] / (local_bg + 1e-9)
-                    if prominence_ratio >= 3.0:
+                    if (p["prominence"] > np.mean(spec) * 1.5 or p["amplitude"] > np.mean(spec) * 2.0) and prominence_ratio >= 2.0:
                         has_high_stall_beep = True
                         stall_beep_freq = f_p
                         break

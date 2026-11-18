@@ -250,6 +250,8 @@ def run_tests():
         android_dir / "app" / "src" / "main" / "java" / "com" / "acoustichddsentinel" / "data" / "DiagnosticRepository.java",
         android_dir / "app" / "src" / "main" / "java" / "com" / "acoustichddsentinel" / "data" / "DiagnosticModel.java",
         android_dir / "app" / "src" / "test" / "java" / "com" / "acoustichddsentinel" / "dsp" / "AudioPreprocessorTest.java",
+        android_dir / "app" / "src" / "test" / "java" / "com" / "acoustichddsentinel" / "dsp" / "DspPhysicalGuardTest.java",
+        android_dir / "app" / "src" / "test" / "java" / "com" / "acoustichddsentinel" / "audio" / "AudioRecorderDecimationTest.java",
     ]
 
     missing_files = [str(f) for f in required_android_files if not f.exists()]
@@ -257,6 +259,18 @@ def run_tests():
 
     onnx_asset = android_dir / "app" / "src" / "main" / "assets" / "best_hdd_cnn_model_int8.onnx"
     assert onnx_asset.stat().st_size > 500_000, "Zasób ONNX INT8 w Android assets jest niekompletny!"
+
+    # Weryfikacja bitowej synchronizacji MD5 między exported_models a android assets
+    import hashlib
+    exported_onnx = Path("exported_models") / "best_hdd_cnn_model_int8.onnx"
+    assert exported_onnx.exists(), "Brak modelu exported_models/best_hdd_cnn_model_int8.onnx!"
+
+    hash_exported = hashlib.md5(exported_onnx.read_bytes()).hexdigest()
+    hash_asset = hashlib.md5(onnx_asset.read_bytes()).hexdigest()
+    assert hash_exported == hash_asset, (
+        f"Niezgodność sumy kontrolnej MD5 między exported_models a android assets! "
+        f"({hash_exported} != {hash_asset})"
+    )
 
     print(f"  - Moduł Android: {android_dir} [KOMPLETNY]")
     print(f"  - Model ONNX INT8 w assets: {onnx_asset.stat().st_size / (1024*1024):.2f} MB")

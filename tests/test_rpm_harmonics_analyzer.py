@@ -11,9 +11,21 @@ Sprawdza:
 6. Działanie przy cichym sygnale ~45 dB SPL (telefon przy obudowie komputera / dysku)
 """
 
+import os
 import sys
 import unittest
 from pathlib import Path
+
+# Auto-dispatch to project virtualenv if running in system Python lacking dependencies
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_VENV_PYTHON = _PROJECT_ROOT / ".venv" / "bin" / "python"
+if _VENV_PYTHON.exists() and Path(sys.executable).resolve() != _VENV_PYTHON.resolve():
+    try:
+        import numpy
+    except ImportError:
+        import subprocess
+        sys.exit(subprocess.call([str(_VENV_PYTHON)] + sys.argv))
+
 import numpy as np
 import scipy.signal as signal
 
@@ -92,6 +104,28 @@ class TestRpmHarmonicsAnalyzer(unittest.TestCase):
         self.assertFalse(res["has_rotation"], "Głos ludzki z modulacją nie może być rozpoznany jako silnik HDD!")
         self.assertIsNone(res["detected_rpm"])
 
+    def test_human_voice_vibrato_120hz_rejection(self):
+        """Test odrzucania głosu ludzkiego z wibrato 120 Hz (+/- 15 Hz z modulacją 5 Hz) jako rotacji 7200 RPM."""
+        pitch_mod = 120.0 + 15.0 * np.sin(2 * np.pi * 5.0 * self.t)
+        phase = 2 * np.pi * np.cumsum(pitch_mod) / self.sr
+        vocal = 0.35 * np.sin(phase) + 0.25 * np.sin(2 * phase) + 0.18 * np.sin(3 * phase)
+
+        res = analyze_frequency_peaks(vocal.astype(np.float32), sr=self.sr)
+        self.assertEqual(res["status"], "ANALYZED")
+        self.assertFalse(res["has_rotation"], "Wibrato 120 Hz nie może być rozpoznane jako rotacja 7200 RPM!")
+        self.assertIsNone(res["detected_rpm"])
+
+    def test_human_voice_vibrato_90hz_rejection(self):
+        """Test odrzucania głosu ludzkiego z wibrato 90 Hz (+/- 10 Hz z modulacją 5 Hz) jako rotacji 5400 RPM."""
+        pitch_mod = 90.0 + 10.0 * np.sin(2 * np.pi * 5.0 * self.t)
+        phase = 2 * np.pi * np.cumsum(pitch_mod) / self.sr
+        vocal = 0.35 * np.sin(phase) + 0.22 * np.sin(2 * phase) + 0.15 * np.sin(3 * phase)
+
+        res = analyze_frequency_peaks(vocal.astype(np.float32), sr=self.sr)
+        self.assertEqual(res["status"], "ANALYZED")
+        self.assertFalse(res["has_rotation"], "Wibrato 90 Hz nie może być rozpoznane jako rotacja 5400 RPM!")
+        self.assertIsNone(res["detected_rpm"])
+
     def test_seized_spindle_stall_beep_detection(self):
         """Test wykrywania zatartego silnika wrzeciona (brak rotacji 90/120 Hz, ale ostry pisk 1.5 kHz)."""
         # Pisk stojana 1500 Hz (PWM beeper stojana)
@@ -118,6 +152,19 @@ class TestRpmHarmonicsAnalyzer(unittest.TestCase):
         self.assertEqual(res["status"], "ANALYZED")
         self.assertEqual(res["detected_rpm"], "7200_rpm")
         self.assertTrue(res["has_rotation"])
+
+    def test_two_tone_pure_motor_detection(self):
+        """Test autentycznego rotora o dominującej składowej f0 i 2f0 (np. łożyska hydrodynamiczne FDB)."""
+        for f0, exp_rpm in [(90.0, "5400_rpm"), (120.0, "7200_rpm")]:
+            for snr_noise in [0.0, 0.01, 0.03, 0.1]:
+                y = 0.30 * np.sin(2 * np.pi * f0 * self.t)
+                y += 0.18 * np.sin(2 * np.pi * 2.0 * f0 * self.t)
+                if snr_noise > 0:
+                    y += snr_noise * np.random.randn(self.num_samples)
+                res = analyze_frequency_peaks(y.astype(np.float32), sr=self.sr)
+                self.assertEqual(res["status"], "ANALYZED")
+                self.assertTrue(res["has_rotation"], f"Failed rotation for {exp_rpm} noise={snr_noise}")
+                self.assertEqual(res["detected_rpm"], exp_rpm)
 
 
 if __name__ == "__main__":

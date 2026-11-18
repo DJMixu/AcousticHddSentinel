@@ -9,9 +9,21 @@ Weryfikuje zadanie użytkownika:
 4. "należy uwzględnić że telefon będzie normalnie nagrywał dźwięk o głośności 45db (około) bo ogólnie dyski nie są głośne"
 """
 
+import os
 import sys
 import unittest
 from pathlib import Path
+
+# Auto-dispatch to project virtualenv if running in system Python lacking dependencies
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_VENV_PYTHON = _PROJECT_ROOT / ".venv" / "bin" / "python"
+if _VENV_PYTHON.exists() and Path(sys.executable).resolve() != _VENV_PYTHON.resolve():
+    try:
+        import numpy
+    except ImportError:
+        import subprocess
+        sys.exit(subprocess.call([str(_VENV_PYTHON)] + sys.argv))
+
 import numpy as np
 import librosa
 import scipy.signal as signal
@@ -36,7 +48,7 @@ class TestComputerSoundRejectionAndRpm(unittest.TestCase):
         y, _ = librosa.load(str(p), sr=self.sr)
         
         # Test na stabilnym segmencie pracy silnika (po rozruchu i ustabilizowaniu obrotów)
-        seg = y[int(10 * self.sr) : int(13 * self.sr)]
+        seg = y[int(14 * self.sr) : int(17 * self.sr)]
         
         res = self.sentinel.diagnose_chunk(seg)
         print(f"\n[TEST 1] Toshiba 7200 RPM: Decyzja={res['decision'].upper()}, RPM={res['rpm_detected']}, Anomalia={res['is_anomaly']}")

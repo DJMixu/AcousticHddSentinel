@@ -46,7 +46,7 @@ public class MainViewModel extends AndroidViewModel {
     private final DiagnosticRepository repository;
     private final ExecutorService backgroundExecutor;
 
-    private AcousticClassifier classifier;
+    private volatile AcousticClassifier classifier;
 
     public MainViewModel(@NonNull Application application) {
         super(application);

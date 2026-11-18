@@ -1,0 +1,203 @@
+{
+  "timestamp_utc": "2026-11-17T16:30:45.101065+00:00",
+  "status": "PASSED",
+  "selected_tiers": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "summary": {
+    "total_tests": 26,
+    "passed": 26,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "elapsed_seconds": 7.506
+  },
+  "tests": [
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier1_invariants.TestTier1Invariants.test_t1_01_ast_syntax",
+      "description": "AST parse all Python scripts in PrototypBezNormal/ to ensure syntax validity.",
+      "status": "PASSED",
+      "duration_s": 0.0187,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier1_invariants.TestTier1Invariants.test_t1_02_adr001_constants",
+      "description": "Verify ADR-001 DSP constants in ml/hdd_audio_encoder.py.",
+      "status": "PASSED",
+      "duration_s": 0.0,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier1_invariants.TestTier1Invariants.test_t1_03_zero_normal_leakage",
+      "description": "Verify dataset_encoded/train and validate contain 0 normal samples and exact counts.",
+      "status": "PASSED",
+      "duration_s": 0.0379,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier1_invariants.TestTier1Invariants.test_t1_04_tensor_format_and_shape",
+      "description": "Verify encode_audio_chunk produces valid tensors in both Channel-Last and Channel-First formats.",
+      "status": "PASSED",
+      "duration_s": 0.4462,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier1_invariants.TestTier1Invariants.test_t1_05_audio_hardware_config",
+      "description": "Verify scripts/audio_hardware_config.json mandates ALC1220 and forbids USB dongle.",
+      "status": "PASSED",
+      "duration_s": 0.0001,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier2_components.TestTier2Components.test_t2_01_forward_shapes",
+      "description": "Test model forward pass on Channel-First, Channel-Last, and unbatched inputs.",
+      "status": "PASSED",
+      "duration_s": 0.1736,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier2_components.TestTier2Components.test_t2_02_spherical_normalization",
+      "description": "Verify L2 spherical projection satisfies ||z||_2 = 1.0 \u00b1 10^{-4} on S^{127}.",
+      "status": "PASSED",
+      "duration_s": 0.1259,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier2_components.TestTier2Components.test_t2_03_subcenter_head_contract",
+      "description": "Verify sub-center prototypes tensor shape and cosine similarity contract.",
+      "status": "PASSED",
+      "duration_s": 0.0035,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier2_components.TestTier2Components.test_t2_04_subcenter_orthogonality",
+      "description": "Verify intra-class sub-center orthogonality loss penalties.",
+      "status": "PASSED",
+      "duration_s": 0.0032,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier2_components.TestTier2Components.test_t2_05_ood_engine_interface",
+      "description": "Verify SMPCFaultOODDetector.predict_chunk contract and return schema.",
+      "status": "PASSED",
+      "duration_s": 0.0275,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier2_components.TestTier2Components.test_t2_06_calibration_determinism",
+      "description": "Verify calibration threshold calculation determinism and quantile properties.",
+      "status": "PASSED",
+      "duration_s": 0.0037,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier3_workflows.TestTier3Workflows.test_t3_01_live_predict_cli_call",
+      "description": "Execute live_predict.py as an external CLI subprocess and verify clean exit.",
+      "status": "PASSED",
+      "duration_s": 1.7581,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier3_workflows.TestTier3Workflows.test_t3_02_live_predict_schema",
+      "description": "Verify returned dictionary schema from audio file analysis.",
+      "status": "PASSED",
+      "duration_s": 0.219,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier3_workflows.TestTier3Workflows.test_t3_03_record_cli_arguments",
+      "description": "Verify record_and_predict.py argument parser exposes --duration and --output options.",
+      "status": "PASSED",
+      "duration_s": 0.8313,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier3_workflows.TestTier3Workflows.test_t3_04_record_mic_device_guard",
+      "description": "Verify ALC1220 physical microphone guard and strict rejection of USB dongle.",
+      "status": "PASSED",
+      "duration_s": 0.0001,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier3_workflows.TestTier3Workflows.test_t3_05_short_audio_padding",
+      "description": "Verify that audio shorter than 3.0s is zero-padded without error to full shape (128, 259, 3).",
+      "status": "PASSED",
+      "duration_s": 0.0204,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier4_benchmarks.TestTier4Benchmarks.test_t4_01_wd_blue_60s_healthy_idle",
+      "description": "Verify continuous 60s recording of WD Blue 5400 RPM idle is classified as healthy/normal.",
+      "status": "PASSED",
+      "duration_s": 0.7561,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier4_benchmarks.TestTier4Benchmarks.test_t4_02_wd_blue_all_operational_modes",
+      "description": "Verify continuous 60s recordings across read, write, and mixed operational profiles.",
+      "status": "PASSED",
+      "duration_s": 2.2696,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier4_benchmarks.TestTier4Benchmarks.test_t4_03_authentic_fault_ground_truth",
+      "description": "Verify authentic acoustic laboratory fault recordings trigger fault verdicts.",
+      "status": "PASSED",
+      "duration_s": 0.7746,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier4_benchmarks.TestTier4Benchmarks.test_t4_04_test_set_auroc_gate",
+      "description": "Statistical Quality Gate: AUROC > 0.7233 on test dataset.",
+      "status": "PASSED",
+      "duration_s": 0.0002,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier4_benchmarks.TestTier4Benchmarks.test_t4_05_test_set_normal_f1_gate",
+      "description": "Statistical Quality Gate: Normal F1-score > 0.7492 (Baseline exceeded).",
+      "status": "PASSED",
+      "duration_s": 0.0001,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier4_benchmarks.TestTier4Benchmarks.test_t4_06_test_set_scratching_f1_gate",
+      "description": "Statistical Quality Gate: Scratching F1-score > 0.0435.",
+      "status": "PASSED",
+      "duration_s": 0.0001,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier4_benchmarks.TestTier4Benchmarks.test_t4_07_confusion_matrix_artifact",
+      "description": "Verify existence and validity of 4x4 confusion matrix artifact.",
+      "status": "PASSED",
+      "duration_s": 0.0001,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier5_adversarial.TestTier5Adversarial.test_t5_01_silence_rejection_rms",
+      "description": "Verify RMS < 0.002 silence rejection threshold and numerical stability on pure zeros.",
+      "status": "PASSED",
+      "duration_s": 0.006,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier5_adversarial.TestTier5Adversarial.test_t5_02_dc_offset_immunity",
+      "description": "Verify peak waveform normalization completely eliminates large DC offset bias.",
+      "status": "PASSED",
+      "duration_s": 0.0006,
+      "error": null
+    },
+    {
+      "test_id": "PrototypBezNormal.tests_e2e.test_tier5_adversarial.TestTier5Adversarial.test_t5_03_ambient_fan_noise_rejection",
+      "description": "Verify continuous ambient cooling fan noise (aerodynamic broadband airflow) is classified as normal.",
+      "status": "PASSED",
+      "duration_s": 0.0266,
+      "error": null
+    }
+  ]
+}

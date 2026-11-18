@@ -44,20 +44,32 @@ AcousticHddSentinel/
 ├── fineTuning.md                      # Dokumentacja prac optymalizacyjnych i wyników F1 >= 0.70
 ├── NOTES.md                           # Notatki badawcze (koncepcja Seed Ensembling)
 ├── requirements.txt                   # Zależności Python (PyTorch, Librosa, Scikit-learn, etc.)
+├── .agents/                           # Customizacje agentów AGY (Antigravity CLI)
+│   ├── rules/
+│   │   ├── adr-001-audio-pipeline.md  # Reguła: niezmienniki DSP pipeline (always_on)
+│   │   └── local-llm-orchestration.md # Reguła: kooperacja z lokalnymi LLM Ollama (always_on)
+│   └── skills/
+│       └── local-llm-teamwork/        # Skill: Hybryda /teamwork + lokalne agenty LLM
+│           └── SKILL.md               # Instrukcja integracji swarm z Qwen 3.8 + Coder 14B
 ├── .gitignore                         # Wykluczenia git (duże zbiory .npy, venv, cache)
 │
 ├── ml/                                # 🧠 Pipeline uczenia maszynowego (PyTorch 2D CNN, DSP, eksport)
-│   ├── model_cnn.py                   # Architektura sieci 2D CNN w PyTorch (AcousticHddSentinelCNN & FusedEnsemblePyTorch)
+│   ├── model_cnn.py                   # Architektura sieci 2D CNN w PyTorch (AcousticHddSentinelCNN, SMPC Option A & FusedEnsemblePyTorch)
 │   ├── dataset_pytorch.py             # PyTorch Dataset z preloadem RAM i SpecAugment (HddNpyDataset)
 │   ├── hdd_audio_encoder.py           # Enkoder audio do tensorów .npy zgodny z ADR-001
+│   ├── rpm_harmonics_analyzer.py      # Analizator pików częstotliwościowych, stacjonarności pitch w czasie (5 niespójnych przesunięć, interpolacja paraboliczna), ostrości piku (sharpness >= 6.0) oraz grzebienia harmonicznego RPM (5400/7200/10000)
+│   ├── hybrid_acoustic_sentinel.py    # Hybrydowa fuzja decyzyjna (DSP RPM Guard + OOD Ambient Rejection + SMPC Gałąź D + 2D CNN)
 │   ├── prepare_audio_dataset.py       # Kategoryzator bazy audio i generator klasy 'normal'
-│   ├── train_cnn.py                   # Kompletny pipeline treningowy w PyTorch (AdamW, Label Smoothing, ROCm)
+│   ├── train_cnn.py                   # Kompletny pipeline treningowy w PyTorch (AdamW, Label Smoothing, ROCm, SMPC)
 │   ├── train_ensemble.py              # Pipeline Seed Ensembling (komitet modeli o różnych ziarnach)
 │   ├── export_model.py                # Eksport do formatów ONNX (FP32/INT8), TorchScript z auto-sync do Androida
 │   └── compare_ensembles.py           # Narzędzie ewaluacji porównawczej komitetu modeli z modelem bazowym
 │
 ├── tests/                             # 🧪 Testy logiczne, weryfikacja wag, profilowanie i stress-testy
 │   ├── test_project_logic.py          # Automatyczny test integralności projektu i niezmienników ADR-001 (6/6)
+│   ├── test_smpc_architecture.py      # Testy jednostkowe architektury Sub-Center Multi-Prototype Cosine (SMPC Option A, 7/7)
+│   ├── test_rpm_harmonics_analyzer.py # Testy jednostkowe analizatora harmonicznych obrotowych RPM i odrzucania głosu (9/9)
+│   ├── test_computer_sound_rejection.py # Testy odporności fuzji hybrydowej na szumy wentylatorów, GPU i cichy sygnał 45 dB (6/6)
 │   ├── verify_cnn_model.py            # 6-etapowy test weryfikacyjny sprawności modelu PyTorch
 │   ├── profile_normalization_quality.py # Profiler i weryfikator jakości normalizacji DSP
 │   ├── stress_test.py                 # Test ciągły odporności potoku DSP + CNN (latencja, wycieki RAM, edge cases)
@@ -68,7 +80,7 @@ AcousticHddSentinel/
 │   ├── install_apk.sh                 # Automatyczna instalacja APK i uruchomienie na telefonie Android
 │   ├── record_mic.sh                  # Skrypt nagrywania z fizycznego mikrofonu (ALC1220 Analog)
 │   ├── audio_hardware_config.json     # Konfiguracja fizycznych źródeł audio w systemie Linux
-│   ├── local_llm_bridge.py            # Most orkiestrujący lokalne modele Ollama (27B + Coder 14B)
+│   ├── local_llm_bridge.py            # Most orkiestrujący lokalne modele Ollama (27B + Coder 14B) z 7 presetami
 │   ├── start_services.sh              # Skrypt uruchamiania usług Ollama i Open WebUI
 │   └── stop_services.sh               # Skrypt zatrzymywania usług Ollama i Open WebUI
 │
@@ -77,19 +89,19 @@ AcousticHddSentinel/
 │   │   ├── src/main/assets/           # Skwantyzowany model ONNX INT8, classes.json, model_card.json
 │   │   ├── src/main/java/             # Pakiety: audio (AudioRecord), data (SQLiteOpenHelper), dsp (ADR-001 DSP), ml (ONNX), ui (MVVM & LiveData)
 │   │   ├── src/main/res/              # Zasoby UI (layouty, motywy Material 3, kolory, ikony)
-│   │   ├── src/test/java/             # Testy jednostkowe DSP (AudioPreprocessorTest.java)
-│   │   ├── build.gradle.kts           # Zależności: ONNX Runtime Mobile, AndroidX AppCompat, Material 3, Lifecycle
+│   │   ├── src/test/java/             # 8 klas testowych (37 testów jednostkowych: AudioChunk, Decymacja, Preprocessor, RPM, Strażnik fizyczny, Audio, Baza SQLite, Klasyfikacja)
+│   │   ├── build.gradle.kts           # Zależności: ONNX Runtime Mobile, AndroidX AppCompat, Material 3, Lifecycle (0 Kotlina)
 │   │   └── AndroidManifest.xml        # Uprawnienia RECORD_AUDIO, deklaracje aktywności
 │   ├── build.gradle.kts / settings.gradle.kts # Konfiguracja projektu Gradle
 │   ├── gradlew / gradlew.bat          # Wrapper narzędzia Gradle
 │   └── README.md                      # Instrukcja uruchomienia i testowania w Android Studio
 │
 ├── data/                              # Baza surowych nagrań laboratoryjnych (Ground Truth)
-│   └── raw/                           # 288 autentycznych nagrań audio (northwind, aesonlabs, archive, freesound, web, verified_real)
+│   └── raw/                           # 353 autentyczne nagrania audio (northwind, aesonlabs, archive, freesound, web, verified_real)
 │       └── PROCESSED_SOURCES_REGISTRY.json # Rejestr unikalnych próbek i sum kontrolnych MD5
 │
 ├── dataset_categorized/               # Nagrania źródłowe podzielone na 4 klasy
-├── dataset_encoded/                   # 5 716 tensorów .npy (Zero Data Leakage: train, validate, test)
+├── dataset_encoded/                   # 6 840 tensorów .npy (Zero Data Leakage: train 6045, validate 279, test 516)
 │
 ├── training_output/                   # Produkcyjny model, wagi i raporty ewaluacji (Accuracy 83.8%, Macro F1 84.6%)
 │   ├── best_hdd_cnn_model.pt          # Wagi najlepszego pojedynczego modelu PyTorch (seed 777)
@@ -109,7 +121,7 @@ AcousticHddSentinel/
 │   ├── best_hdd_cnn_model.onnx        # Model ONNX FP32 z dynamiczną osią batcha (4.61 MB)
 │   ├── best_hdd_cnn_model_int8.onnx   # Skwantyzowany model ONNX INT8 (1.17 MB - redukcja o 74.6%)
 │   ├── best_hdd_cnn_model_torchscript.pt # Model TorchScript / PyTorch Mobile (4.68 MB)
-│   ├── AcousticClassifierAndroid.kt   # Szablon integracyjny w Kotlin dla Androida
+│   ├── AcousticClassifierAndroid.java # Szablon integracyjny w czystej Javie 17 dla Androida (ADR-002)
 │   ├── model_card.json                # Karta modelu z parametrami DSP i specyfikacją
 │   └── classes.json                   # Mapowanie indeksów klas dla aplikacji
 │
@@ -127,9 +139,22 @@ AcousticHddSentinel/
 
 Każdy agent lub programista może uruchomić kluczowe etapy za pomocą gotowych poleceń:
 
-### A. Sprawdzenie integralności i testów logicznych projektu:
+### A. Sprawdzenie integralności i 5 oficjalnych zestawów testowych systemu:
 ```bash
+# 1. Automatyczny test integralności projektu i niezmienników ADR-001 (6/6):
 python tests/test_project_logic.py
+
+# 2. Test architektury wielomodalnych podcentrów (SMPC Option A, 7/7):
+python tests/test_smpc_architecture.py
+
+# 3. Test analizatora harmonicznych obrotowych RPM i odrzucania głosu (9/9):
+python tests/test_rpm_harmonics_analyzer.py
+
+# 4. Test odporności fuzji hybrydowej na szumy wentylatorów PC i cichy sygnał 45 dB (6/6):
+python tests/test_computer_sound_rejection.py
+
+# 5. Zestaw testów jednostkowych aplikacji mobilnej Android (Czysta Java 17, 37/37):
+cd android && ./gradlew test && cd ..
 ```
 
 ### B. Weryfikacja sprawności modelu na GPU/CPU:
@@ -158,7 +183,7 @@ python ml/train_cnn.py --epochs 35 --batch-size 32 --output-dir ./training_outpu
 python ml/train_ensemble.py --epochs 35 --batch-size 32 --output-dir ./training_output
 ```
 
-### G. Eksport do formatów produkcyjnych (ONNX, TorchScript, Android Kotlin):
+### G. Eksport do formatów produkcyjnych (ONNX, TorchScript, Android Java 17):
 ```bash
 python ml/export_model.py --weights training_output/best_hdd_cnn_model.pt --output-dir exported_models
 ```
@@ -218,6 +243,44 @@ Agent AGY (Antigravity) posiada pełne uprawnienie i zalecenie do autonomicznego
 3. **Zasady koordynacji:**
    - Subagenci raportują wyniki asynchronicznie poprzez system wiadomości (`send_message`).
    - Agent główny nie polluje w pętli – oczekuje reaktywnie na powiadomienia o zakończeniu prac subagentów.
+
+### 7.1 Oficjalny Standard Zespołowy: Natywny `swarm` z Modelami Qwen (Zastępuje generyczny `/teamwork`)
+W projekcie obowiązuje **bezwzględny priorytet natywnego narzędzia `swarm`** nad generycznym `/teamwork`.
+Skill `local-llm-teamwork` ([.agents/skills/local-llm-teamwork/SKILL.md](file:///home/DJMixu/Pulpit/AcousticHddSentinel/.agents/skills/local-llm-teamwork/SKILL.md)) definiuje oficjalne procedury pracy swarma:
+
+1. **Dlaczego `swarm` jest standardem projektu?**
+   - **Oszczędność ~90% tokenów chmurowych:** Koordynator zarządza jedynie zwięzłą tablicą wiadomości. Nie duplikuje gigantycznego kontekstu repozytorium do chmury, eliminując błędy `429 Resource Exhausted`.
+   - **Czysty kod produkcyjny:** Wyspecjalizowany model `qwen2.5-coder:14b` na GPU (`temp=0.1`) generuje kompletne implementacje bez ucięć, skrótów i placeholderów `TODO`.
+   - **Architekt 128k VRAM:** Model `Qwen 3.8 27B` (IQ3_S, RCO reasoning) analizuje całą architekturę w 12 GB VRAM z pełnym kanałem myślenia.
+   - **ZAKAZ PISANIA KODU Z GŁOWY PRZEZ CHMURĘ:** Koordynator i chmurowe workery mają zakaz generowania kodu z głowy – kod MUSI pochodzić z lokalnego GPU poprzez `scripts/local_llm_bridge.py`.
+
+2. **Role workerów w `swarm` i profile zadań (`--preset`):**
+   | Worker / Rola | Narzędzie Swarm | Delegacja na GPU | Flaga / Preset |
+   |:---|:---|:---|:---|
+   | `architect` | `swarm{action:"add", name:"architect"}` | ✅ Qwen 3.8 27B | `--arch-only` (128k ctx) |
+   | `coder` | `swarm{action:"add", name:"coder"}` | ✅ Qwen 2.5 Coder 14B | `--coder-only` (temp=0.1) |
+   | `implementer` | `swarm{action:"add", name:"implementer"}` | ✅ Tandem obu modeli | Pełny potok |
+   | `verifier` / `reviewer` | `swarm{action:"add", name:"verifier"}` | ✅ Qwen 2.5 Coder 14B | `--preset code-review` |
+   | `dsp-translator` | `swarm{action:"add", name:"dsp-translator"}` | ✅ Qwen 2.5 Coder 14B | `--preset dsp-translate` |
+   | `adversarial-gen` | `swarm{action:"add", name:"adversarial-gen"}` | ✅ Qwen 3.8 27B | `--preset adversarial-gen` |
+   | `android-opt` | `swarm{action:"add", name:"android-opt"}` | ✅ Qwen 2.5 Coder 14B | `--preset android-opt` |
+   | `smpc-architect` | `swarm{action:"add", name:"smpc-architect"}` | ✅ Qwen 3.8 27B | `--preset smpc-arch` |
+   | `num-auditor` | `swarm{action:"add", name:"num-auditor"}` | ✅ Qwen 2.5 Coder 14B | `--preset num-audit` |
+   | `telemetry-analyst` | `swarm{action:"add", name:"telemetry-analyst"}` | ✅ Qwen 3.8 27B | `--preset smart-telemetry` |
+   | `tester` | `swarm{action:"add", name:"tester"}` | ❌ Brak (AGY / Bash) | — |
+
+3. **Sekwencyjność GPU i porządek zwolnienia pamięci:**
+   Tylko jeden proces na raz może korzystać z GPU (16 GB VRAM). Kolejność w potoku:
+   `Architect` $\to$ `Coder` $\to$ `Verifier` $\to$ czyszczenie VRAM przed jakimkolwiek treningiem PyTorch.
+
+4. **Wczesne Uruchamianie (Front-Loaded Execution — ZAKAZ OPÓŹNIANIA):**
+   Zadania dla modeli Qwen na GPU **MUSZĄ być zlecane w pierwszej kolejności na starcie każdego cyklu pracy**, eliminując przestoje zespołu.
+
+5. **Sprawdzanie i zwalnianie VRAM:**
+   ```bash
+   python scripts/local_llm_bridge.py --check-ready   # Stan Ollama i VRAM
+   python scripts/local_llm_bridge.py --free-vram      # Wyładowanie modeli przed treningiem
+   ```
 
 ---
 

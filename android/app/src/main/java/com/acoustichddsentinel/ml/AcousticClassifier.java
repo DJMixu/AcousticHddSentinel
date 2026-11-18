@@ -36,7 +36,8 @@ public class AcousticClassifier implements AutoCloseable {
     };
 
     private final OrtEnvironment environment;
-    private final OrtSession session;
+    private OrtSession session;
+    private volatile boolean isClosed;
 
     public AcousticClassifier(Context context) throws IOException, OrtException {
         this.environment = OrtEnvironment.getEnvironment();
@@ -127,10 +128,15 @@ public class AcousticClassifier implements AutoCloseable {
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
+        if (isClosed) {
+            return;
+        }
+        isClosed = true;
         try {
             if (session != null) {
                 session.close();
+                session = null;
             }
         } catch (OrtException e) {
             Log.e(TAG, "Błąd podczas zamykania sesji ONNX", e);

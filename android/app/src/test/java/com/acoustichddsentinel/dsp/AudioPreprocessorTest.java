@@ -83,6 +83,27 @@ public class AudioPreprocessorTest {
     }
 
     @Test
+    public void testQuietAudioBoosterRange() {
+        // 1. Bardzo cichy sygnał (RMS = 0.0008, poniżej starej bramki 0.002, ale powyżej 0.0003)
+        float[] quiet = new float[1000];
+        java.util.Arrays.fill(quiet, 0.0008f);
+        float[] boosted = AudioPreprocessor.checkAndBoostAudio(quiet, DspConstants.TARGET_BOOST_RMS);
+        float boostedRms = AudioPreprocessor.computeRms(boosted);
+        assertTrue("Cichy sygnał (0.0008) musi zostać podbity powyżej progu ciszy 0.002",
+            boostedRms >= DspConstants.RMS_SILENCE_THRESHOLD);
+        assertEquals("Podbicie powinno osiągnąć cel TARGET_BOOST_RMS",
+            DspConstants.TARGET_BOOST_RMS, boostedRms, 1e-4f);
+
+        // 2. Szum cyfrowy / cisza bezwzględna (RMS = 0.0001 < 0.0003)
+        float[] silence = new float[1000];
+        java.util.Arrays.fill(silence, 0.0001f);
+        float[] unboosted = AudioPreprocessor.checkAndBoostAudio(silence, DspConstants.TARGET_BOOST_RMS);
+        float unboostedRms = AudioPreprocessor.computeRms(unboosted);
+        assertEquals("Cisza cyfrowa < 0.0003 nie powinna być sztucznie podbijana",
+            0.0001f, unboostedRms, 1e-5f);
+    }
+
+    @Test
     public void testMelFilterBankDimensions() {
         assertEquals("Liczba filtrów Mel musi wynosić 128", 128, melFilterBank.getNumMels());
         assertEquals("Liczba binów FFT musi wynosić 513", 513, melFilterBank.getNumFftBins());

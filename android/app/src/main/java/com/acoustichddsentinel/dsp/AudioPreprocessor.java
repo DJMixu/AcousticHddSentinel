@@ -367,14 +367,14 @@ public final class AudioPreprocessor {
     }
 
     /**
-     * Wzmacnia ciche nagrania (RMS >= 0.002 i < 0.005) in-place,
-     * zabezpieczając przed wzmacnianiem szumu własnego przetwornika ADC poniżej bramki 0.002.
+     * Wzmacnia ciche nagrania (RMS >= 0.0003 i < 0.005) in-place,
+     * zabezpieczając przed wzmacnianiem szumu własnego przetwornika ADC poniżej bramki 0.0003.
      */
     public static void checkAndBoostAudioInPlace(float[] waveform, float targetRms) {
         if (waveform == null || waveform.length == 0) return;
         float rms = computeRms(waveform);
-        if (rms >= DspConstants.RMS_SILENCE_THRESHOLD && rms < DspConstants.RMS_QUIET_BOOST_THRESHOLD) {
-            float gain = targetRms / rms;
+        if (rms >= DspConstants.RMS_MIN_BOOSTABLE_THRESHOLD && rms < DspConstants.RMS_QUIET_BOOST_THRESHOLD) {
+            float gain = targetRms / Math.max(rms, 1e-6f);
             gain = Math.min(gain, 40.0f); // Ograniczenie maksymalnego wzmocnienia do +32 dB
             for (int i = 0; i < waveform.length; i++) {
                 waveform[i] *= gain;
@@ -383,7 +383,7 @@ public final class AudioPreprocessor {
     }
 
     /**
-     * Wzmacnia ciche nagrania (RMS >= 0.002 i < 0.005) bez zbędnej alokacji pamięci.
+     * Wzmacnia ciche nagrania (RMS >= 0.0003 i < 0.005) bez zbędnej alokacji pamięci.
      */
     public static float[] checkAndBoostAudio(float[] waveform, float targetRms) {
         checkAndBoostAudioInPlace(waveform, targetRms);

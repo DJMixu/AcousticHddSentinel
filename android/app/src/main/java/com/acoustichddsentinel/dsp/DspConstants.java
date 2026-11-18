@@ -55,6 +55,12 @@ public final class DspConstants {
      */
     public static final float RMS_SILENCE_THRESHOLD = 0.002f;
 
+    /** Dolny próg energii kwalifikujący ciche nagranie do programowego podbicia (chroni przed podbijaniem czystej ciszy cyfrowej < 0.0003). */
+    public static final float RMS_MIN_BOOSTABLE_THRESHOLD = 0.0003f;
+
+    /** Mnożnik cyfrowej kompensacji czułości (+18.06 dB) dla sprzętowych źródeł UNPROCESSED pozbawionych analogowego przedwzmacniacza. */
+    public static final float UNPROCESSED_HARDWARE_PREGAIN = 8.0f;
+
     /** Próg energii, poniżej którego aktywowane jest programowe podbicie cichych nagrań. */
     public static final float RMS_QUIET_BOOST_THRESHOLD = 0.005f;
 

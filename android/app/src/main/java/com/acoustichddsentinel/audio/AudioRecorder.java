@@ -287,6 +287,11 @@ public class AudioRecorder {
             this.audioRecord = initResult.record;
             final int finalHardwareSr = initResult.sampleRate;
             final int bufferSize = initResult.bufferSize;
+            final int actualSource = initResult.audioSource;
+            // Dla UNPROCESSED (który w Android HAL pozbawiony jest przedwzmacniacza) stosujemy cyfrową kompensację czułości ADC (+18 dB)
+            final float sourcePreGain = (actualSource == MediaRecorder.AudioSource.UNPROCESSED)
+                    ? DspConstants.UNPROCESSED_HARDWARE_PREGAIN
+                    : 1.0f;
 
             // W trybie RAW zdejmujemy filtry systemowe z sesji AudioRecord
             if (this.rawAudioMode) {
@@ -358,13 +363,13 @@ public class AudioRecorder {
                         if (finalHardwareSr == 22050) {
                             for (int i = 0; i < readShorts; i++) {
                                 if (sampleCount < maxCapacity) {
-                                    sampleBuffer[sampleCount++] = readBuffer[i] / 32768.0f;
+                                    sampleBuffer[sampleCount++] = (readBuffer[i] / 32768.0f) * sourcePreGain;
                                 }
                             }
                         } else {
                             // Decymacja 44100 Hz -> 22050 Hz filtrem Butterwortha 4. rzędu
                             for (int i = 0; i < readShorts; i++) {
-                                float s = readBuffer[i] / 32768.0f;
+                                float s = (readBuffer[i] / 32768.0f) * sourcePreGain;
 
                                 float y1 = B0_1 * s + s1_1;
                                 s1_1 = B1_1 * s - A1_1 * y1 + s2_1;
@@ -429,7 +434,15 @@ public class AudioRecorder {
                     for (int i = 0; i < sampleCount; i++) {
                         totalSumSq += sampleBuffer[i] * sampleBuffer[i];
                     }
-                    float overallRms = sampleCount > 0 ? (float) Math.sqrt(totalSumSq / sampleCount) : 0.0f;
+                    float rawOverallRms = sampleCount > 0 ? (float) Math.sqrt(totalSumSq / sampleCount) : 0.0f;
+                    float overallRms = rawOverallRms;
+                    if (!evaluatedChunks.isEmpty()) {
+                        float sumChunkRms = 0.0f;
+                        for (AudioChunk c : evaluatedChunks) {
+                            sumChunkRms += c.getRms();
+                        }
+                        overallRms = Math.max(rawOverallRms, sumChunkRms / evaluatedChunks.size());
+                    }
 
                     callback.onStreamComplete(evaluatedChunks, overallRms, stoppedEarly);
                 }
@@ -446,11 +459,13 @@ public class AudioRecorder {
         final AudioRecord record;
         final int sampleRate;
         final int bufferSize;
+        final int audioSource;
 
-        InitResult(AudioRecord record, int sampleRate, int bufferSize) {
+        InitResult(AudioRecord record, int sampleRate, int bufferSize, int audioSource) {
             this.record = record;
             this.sampleRate = sampleRate;
             this.bufferSize = bufferSize;
+            this.audioSource = audioSource;
         }
     }
 
@@ -466,19 +481,19 @@ public class AudioRecorder {
 
     /**
      * Próba utworzenia zainicjalizowanego obiektu AudioRecord z kaskadowym fallbackiem źródeł.
-     * W trybie RAW: priorytetyzuje UNPROCESSED (22.05 kHz -> 44.1 kHz z decymacją),
-     * eliminując inwersję priorytetów i omijając filtry mowy.
+     * W trybie RAW: priorytetyzuje VOICE_RECOGNITION (pełna nominalna czułość, ominięte filtry mowy/AEC),
+     * a w przypadku UNPROCESSED wspiera cyfrową kompensację czułości ADC.
      */
     @SuppressLint("MissingPermission")
     private static InitResult tryInitializeAudioRecord(int targetSr, int channelConfig, int audioFormat, boolean rawAudioMode) {
         List<SourceSrPair> candidates = new ArrayList<>();
 
         if (rawAudioMode) {
-            // Tryb czystego toru RAW: w pierwszej kolejności UNPROCESSED na obu próbkowaniach
-            candidates.add(new SourceSrPair(MediaRecorder.AudioSource.UNPROCESSED, targetSr));
-            candidates.add(new SourceSrPair(MediaRecorder.AudioSource.UNPROCESSED, DspConstants.FALLBACK_SAMPLE_RATE));
+            // Tryb czystego toru RAW: w pierwszej kolejności VOICE_RECOGNITION (nominalna czułość, ominięte filtry mowy/AEC)
             candidates.add(new SourceSrPair(MediaRecorder.AudioSource.VOICE_RECOGNITION, targetSr));
             candidates.add(new SourceSrPair(MediaRecorder.AudioSource.VOICE_RECOGNITION, DspConstants.FALLBACK_SAMPLE_RATE));
+            candidates.add(new SourceSrPair(MediaRecorder.AudioSource.UNPROCESSED, targetSr));
+            candidates.add(new SourceSrPair(MediaRecorder.AudioSource.UNPROCESSED, DspConstants.FALLBACK_SAMPLE_RATE));
             candidates.add(new SourceSrPair(MediaRecorder.AudioSource.MIC, targetSr));
             candidates.add(new SourceSrPair(MediaRecorder.AudioSource.MIC, DspConstants.FALLBACK_SAMPLE_RATE));
         } else {
@@ -503,7 +518,7 @@ public class AudioRecorder {
                 if (record.getState() == AudioRecord.STATE_INITIALIZED) {
                     Log.i(TAG, "AudioRecord pomyślnie zainicjalizowany ze źródłem: " +
                             getSourceName(pair.source) + " (" + pair.sampleRate + " Hz, rawMode=" + rawAudioMode + ")");
-                    return new InitResult(record, pair.sampleRate, bufferSize);
+                    return new InitResult(record, pair.sampleRate, bufferSize, pair.source);
                 }
                 record.release();
             } catch (Exception e) {

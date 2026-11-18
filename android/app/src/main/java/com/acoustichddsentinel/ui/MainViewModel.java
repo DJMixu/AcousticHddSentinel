@@ -20,6 +20,9 @@ import com.acoustichddsentinel.dsp.RpmHarmonicsAnalyzer;
 import com.acoustichddsentinel.dsp.SpectrogramImageSaver;
 import com.acoustichddsentinel.ml.AcousticClassifier;
 import com.acoustichddsentinel.ml.ClassificationResult;
+import com.acoustichddsentinel.ml.DiskFailureDetector;
+import com.acoustichddsentinel.ml.ModelStrategyManager;
+import com.acoustichddsentinel.ml.ModelType;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -46,7 +49,8 @@ public class MainViewModel extends AndroidViewModel {
     private final DiagnosticRepository repository;
     private final ExecutorService backgroundExecutor;
 
-    private volatile AcousticClassifier classifier;
+    private final ModelStrategyManager modelStrategyManager;
+    private final MutableLiveData<ModelType> selectedModelType;
 
     public MainViewModel(@NonNull Application application) {
         super(application);
@@ -56,19 +60,50 @@ public class MainViewModel extends AndroidViewModel {
         this.dspPhysicalGuard = new DspPhysicalGuard();
         this.repository = new DiagnosticRepository(application);
         this.backgroundExecutor = Executors.newFixedThreadPool(2);
+        this.modelStrategyManager = new ModelStrategyManager(application);
+        this.selectedModelType = new MutableLiveData<>(modelStrategyManager.getActiveModelType());
 
-        // Asynchroniczne załadowanie modelu ONNX
+        // Asynchroniczne załadowanie aktywnego modelu ONNX
         backgroundExecutor.execute(() -> {
             try {
-                classifier = new AcousticClassifier(application);
-                Log.i(TAG, "Klasyfikator ONNX zainicjalizowany pomyślnie.");
+                modelStrategyManager.loadActiveModel();
+                Log.i(TAG, "Aktywny model (" + modelStrategyManager.getActiveModelType() + ") zainicjalizowany pomyślnie.");
             } catch (Exception e) {
-                Log.e(TAG, "Błąd inicjalizacji klasyfikatora ONNX", e);
+                Log.e(TAG, "Błąd inicjalizacji modelu ONNX", e);
                 uiState.postValue(DiagnosticUiState.error("Błąd ładowania modelu ONNX: " + e.getMessage()));
             }
         });
 
         loadHistory();
+    }
+
+    public LiveData<ModelType> getSelectedModelType() {
+        return selectedModelType;
+    }
+
+    public ModelType getActiveModelType() {
+        return modelStrategyManager.getActiveModelType();
+    }
+
+    public void setModelType(ModelType modelType) {
+        if (modelType == null || modelType == modelStrategyManager.getActiveModelType()) {
+            return;
+        }
+        backgroundExecutor.execute(() -> {
+            modelStrategyManager.setModelType(modelType);
+            selectedModelType.postValue(modelType);
+            try {
+                modelStrategyManager.loadActiveModel();
+                Log.i(TAG, "Załadowano nowy model po przełączeniu: " + modelType);
+            } catch (Exception e) {
+                Log.e(TAG, "Błąd ładowania modelu po przełączeniu: " + modelType, e);
+                uiState.postValue(DiagnosticUiState.error("Błąd ładowania wybranego modelu: " + e.getMessage()));
+            }
+        });
+    }
+
+    public ModelStrategyManager getModelStrategyManager() {
+        return modelStrategyManager;
     }
 
     public LiveData<DiagnosticUiState> getUiState() {
@@ -104,7 +139,7 @@ public class MainViewModel extends AndroidViewModel {
             ? "HDD Generic"
             : hddName.trim();
 
-        if (classifier == null) {
+        if (modelStrategyManager == null) {
             uiState.setValue(DiagnosticUiState.error("Silnik AI (ONNX) nie jest jeszcze gotowy."));
             return;
         }
@@ -140,7 +175,7 @@ public class MainViewModel extends AndroidViewModel {
 
                     float[][] logMelRaw = audioPreprocessor.extractLogMelForVisualization(samples);
                     float[] flatTensor = audioPreprocessor.processAudioChunkToFlatTensor(samples);
-                    ClassificationResult res = classifier.classifyChunk(flatTensor);
+                    ClassificationResult res = modelStrategyManager.classifyChunk(flatTensor);
 
                     // Pobranie surowych prawdopodobieństw z modelu ONNX
                     float[] rawProbs = new float[]{
@@ -412,8 +447,8 @@ public class MainViewModel extends AndroidViewModel {
         if (audioRecorder != null) {
             audioRecorder.stopRecording();
         }
-        if (classifier != null) {
-            classifier.close();
+        if (modelStrategyManager != null) {
+            modelStrategyManager.close();
         }
         backgroundExecutor.shutdown();
     }

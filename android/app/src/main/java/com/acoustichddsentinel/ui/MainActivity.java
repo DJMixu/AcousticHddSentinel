@@ -21,6 +21,7 @@ import com.acoustichddsentinel.R;
 import com.acoustichddsentinel.data.DiagnosticModel;
 import com.acoustichddsentinel.databinding.ActivityMainBinding;
 import com.acoustichddsentinel.ml.ClassificationResult;
+import com.acoustichddsentinel.ml.ModelType;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.io.File;
@@ -82,6 +83,21 @@ public class MainActivity extends AppCompatActivity {
 
         binding.rvHistory.setLayoutManager(new LinearLayoutManager(this));
         binding.rvHistory.setAdapter(adapter);
+
+        setupModelSelectionToggle();
+    }
+
+    private void setupModelSelectionToggle() {
+        binding.toggleGroupModel.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+            if (!isChecked) {
+                return;
+            }
+            ModelType targetType = (checkedId == R.id.btnModelAlternative) ? ModelType.ALTERNATIVE : ModelType.LEGACY;
+            if (viewModel.getActiveModelType() != targetType) {
+                viewModel.setModelType(targetType);
+                Toast.makeText(this, getString(R.string.toast_model_switched, targetType.getTitle()), Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void handleHeroClick() {
@@ -114,6 +130,13 @@ public class MainActivity extends AppCompatActivity {
 
     private void observeViewModel() {
         viewModel.getUiState().observe(this, this::renderUiState);
+
+        viewModel.getSelectedModelType().observe(this, modelType -> {
+            int targetId = (modelType == ModelType.ALTERNATIVE) ? R.id.btnModelAlternative : R.id.btnModelLegacy;
+            if (binding.toggleGroupModel.getCheckedButtonId() != targetId) {
+                binding.toggleGroupModel.check(targetId);
+            }
+        });
 
         viewModel.getHistoryList().observe(this, list -> {
             adapter.submitList(list);
@@ -163,6 +186,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void renderUiState(DiagnosticUiState state) {
         if (state == null) return;
+
+        boolean isBusy = (state.getStatus() == DiagnosticUiState.Status.RECORDING || state.getStatus() == DiagnosticUiState.Status.PROCESSING);
+        binding.toggleGroupModel.setEnabled(!isBusy);
+        binding.btnModelLegacy.setEnabled(!isBusy);
+        binding.btnModelAlternative.setEnabled(!isBusy);
 
         switch (state.getStatus()) {
             case IDLE:

@@ -3,6 +3,6 @@
     android:shape="oval">
     <stroke
         android:width="2dp"
-        android:color="#93C5FD" />
-    <solid android:color="#1A3B82F6" />
+        android:color="#00E5FF" />
+    <solid android:color="@color/radar_pulse" />
 </shape>

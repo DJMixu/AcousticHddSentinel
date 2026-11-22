@@ -8,100 +8,299 @@
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground"
+    app:cardBackgroundColor="@color/surface"
     app:cardCornerRadius="12dp"
     app:cardElevation="1dp"
-    app:strokeColor="#E2E8F0"
+    app:strokeColor="@color/card_stroke"
     app:strokeWidth="1dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:padding="12dp">
+        android:orientation="vertical">
 
-        <!-- Kolumna informacyjna o dysku -->
+        <!-- Główny wiersz elementu historii -->
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="12dp">
 
+            <!-- Kolumna informacyjna o dysku -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvHistoryHddName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    tools:text="HDD WDC WD10EZEX" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvHistoryDate"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:singleLine="true"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp"
+                        tools:text="11.11.2026 23:45" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingHorizontal="4dp"
+                        android:text="•"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/tvHistoryConfidence"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:singleLine="true"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp"
+                        tools:text="98.4%" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Badge statusu -->
             <TextView
-                android:id="@+id/tvHistoryHddName"
+                android:id="@+id/tvHistoryBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_badge_normal"
+                android:ellipsize="end"
+                android:gravity="center"
+                android:maxWidth="120dp"
+                android:maxLines="1"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="4dp"
+                android:text="SPRAWNY"
+                android:textColor="@color/status_normal_text"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <!-- Przycisk odtwarzania nagrania audio WAV -->
+            <ImageButton
+                android:id="@+id/btnHistoryPlayAudio"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="6dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Odtwórz nagranie dźwięku HDD"
+                android:src="@drawable/ic_audio_play"
+                android:visibility="gone"
+                app:tint="@color/accent"
+                tools:visibility="visible" />
+
+            <!-- Przycisk usunięcia wpisu -->
+            <ImageButton
+                android:id="@+id/btnHistoryDelete"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Usuń wpis"
+                android:src="@android:drawable/ic_menu_delete"
+                app:tint="@color/text_secondary" />
+
+        </LinearLayout>
+
+        <!-- Rozwijana sekcja szczegółowych parametrów akustycznych i AI -->
+        <LinearLayout
+            android:id="@+id/layoutHistoryDetails"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/background_secondary"
+            android:orientation="vertical"
+            android:paddingHorizontal="12dp"
+            android:paddingBottom="12dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginBottom="8dp"
+                android:background="@color/divider" />
+
+            <!-- Metryki fizyczne DSP: Crest Factor, RMS, Czas -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:singleLine="true"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvHistoryCrestFactor"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    tools:text="Crest Factor: 4.85" />
+
+                <TextView
+                    android:id="@+id/tvHistoryDuration"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    tools:text="Czas: 3.0 s" />
+
+                <TextView
+                    android:id="@+id/tvHistoryPeakRms"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    tools:text="Peak RMS: 0.042" />
+            </LinearLayout>
+
+            <!-- Rozkład prawdopodobieństw klas AI -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Rozkład klas AI (2D CNN):"
                 android:textColor="@color/text_primary"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                tools:text="HDD WDC WD10EZEX" />
+                android:textSize="11sp"
+                android:textStyle="bold" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:gravity="center_vertical"
+                android:layout_marginTop="2dp"
                 android:orientation="horizontal">
 
                 <TextView
-                    android:id="@+id/tvHistoryDate"
-                    android:layout_width="wrap_content"
+                    android:id="@+id/tvHistoryProbNormal"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:singleLine="true"
+                    android:layout_weight="1"
                     android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    tools:text="11.11.2026 23:45" />
+                    android:textSize="11sp"
+                    tools:text="Normal: 98%" />
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:id="@+id/tvHistoryProbClicking"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:paddingHorizontal="4dp"
-                    android:text="•"
+                    android:layout_weight="1"
                     android:textColor="@color/text_secondary"
-                    android:textSize="12sp" />
+                    android:textSize="11sp"
+                    tools:text="Clicking: 1%" />
 
                 <TextView
-                    android:id="@+id/tvHistoryConfidence"
-                    android:layout_width="wrap_content"
+                    android:id="@+id/tvHistoryProbBeeping"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:singleLine="true"
+                    android:layout_weight="1"
                     android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    tools:text="98.4%" />
+                    android:textSize="11sp"
+                    tools:text="Beeping: 0%" />
+
+                <TextView
+                    android:id="@+id/tvHistoryProbScratching"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    tools:text="Scratching: 1%" />
             </LinearLayout>
+
+            <!-- Rekomendacja serwisowa -->
+            <TextView
+                android:id="@+id/tvHistoryRecommendation"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_listening_panel"
+                android:padding="8dp"
+                android:textColor="@color/text_primary"
+                android:textSize="11sp"
+                android:visibility="gone"
+                tools:text="Zalecenie: Dysk wykazuje objawy uszkodzenia mechanicznego głowic. Natychmiast zabezpiecz kopię bitową."
+                tools:visibility="visible" />
+
+            <!-- Wizualizacja Akustycznego Odcisku Palca (Spektrogram Mel) -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Spektrogram akustyczny Mel (Inferno):"
+                android:textColor="@color/text_primary"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="110dp"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_card_rounded">
+
+                <ImageView
+                    android:id="@+id/ivHistorySpectrogram"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="Spektrogram akustyczny HDD"
+                    android:scaleType="fitXY" />
+
+                <TextView
+                    android:id="@+id/tvHistoryNoSpectrogram"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="Brak pliku spektrogramu"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="end"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnHistorySaveSpectrogram"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:paddingHorizontal="6dp"
+                    android:text="Zapisz w Galerii"
+                    android:textColor="@color/accent"
+                    android:textSize="10sp"
+                    app:icon="@android:drawable/ic_menu_save"
+                    app:iconSize="14dp"
+                    app:iconTint="@color/accent" />
+            </LinearLayout>
+
         </LinearLayout>
-
-        <!-- Badge statusu -->
-        <TextView
-            android:id="@+id/tvHistoryBadge"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/bg_badge_normal"
-            android:ellipsize="end"
-            android:gravity="center"
-            android:maxWidth="130dp"
-            android:maxLines="1"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="4dp"
-            android:text="SPRAWNY"
-            android:textColor="@color/status_normal_text"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-
-        <!-- Przycisk usunięcia wpisu -->
-        <ImageButton
-            android:id="@+id/btnHistoryDelete"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_marginStart="6dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Usuń wpis"
-            android:src="@android:drawable/ic_menu_delete" />
 
     </LinearLayout>
 

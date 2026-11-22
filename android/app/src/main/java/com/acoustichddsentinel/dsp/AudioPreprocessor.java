@@ -50,12 +50,13 @@ public final class AudioPreprocessor {
     }
 
     /**
-     * Główny potok przetwarzania: surowy bufor PCM -> płaski bufor tensora (3 * 128 * 259 = 99456 elementów).
-     *
-     * @param rawSamples surowe próbki audio float z mikrofonu
-     * @return spłaszczony bufor float[] o długości 99456 (format [1, 3, 128, 259])
+     * Wersja Zero-GC z jawnym buforem docelowym (eliminuje ryzyko nadpisania współdzielonej tablicy).
      */
-    public synchronized float[] processAudioChunkToFlatTensor(float[] rawSamples) {
+    public synchronized void processAudioChunkToFlatTensor(float[] rawSamples, float[] outFlatTensor) {
+        if (outFlatTensor == null || outFlatTensor.length < DspConstants.TENSOR_FLAT_SIZE) {
+            throw new IllegalArgumentException("Bufor docelowy musi mieć długość >= " + DspConstants.TENSOR_FLAT_SIZE);
+        }
+
         // 1. Dopasowanie długości do dokładnie CHUNK_SAMPLES (66150) in-place
         float[] chunk;
         if (rawSamples != null && rawSamples.length == DspConstants.CHUNK_SAMPLES) {
@@ -65,26 +66,22 @@ public final class AudioPreprocessor {
             chunk = prepareFixedChunk(rawSamples, DspConstants.CHUNK_SAMPLES, preallocatedChunk);
         }
 
-        // 1b. Soft Pre-Amp in-place (bez alokacji bufora na stercie)
-        checkAndBoostAudioInPlace(chunk, DspConstants.TARGET_BOOST_RMS);
-
-        // 2. Normalizacja szczytowa fali (Peak Normalization) do [-1.0, 1.0] z usunięciem DC offsetu
+        // 2. Normalizacja szczytowa z usunięciem DC offsetu (zastępuje zbędny liniowy booster)
         normalizeWaveformPeak(chunk);
 
-        // 3. Obliczenie STFT i banku Mel -> Log-Mel Spectrogram [128][259] w prealokowanym logMelBuffer
+        // 3. STFT + Sparse Mel -> Log-Mel [128][259]
         computeLogMelSpectrogramInternal(chunk);
 
-        // 4. Obliczenie kanałów pochodnych czasowych (Delta i Delta-Delta) z unrollowanymi jądrami Savitzky-Golay
+        // 4. Pochodne czasowe Savitzky-Golay (Delta i Delta-Delta)
         computeDelta1Internal(logMelBuffer, delta1Buffer);
         computeDelta2Internal(logMelBuffer, delta2Buffer);
 
-        // 5. Standaryzacja Z-score z fizycznymi progami minimalnego odchylenia standardowego (Noise Floor)
-        normalizeChannelZScore(logMelBuffer, DspConstants.MIN_STD_LOG_MEL);
-        normalizeChannelZScore(delta1Buffer, DspConstants.MIN_STD_DELTA);
-        normalizeChannelZScore(delta2Buffer, DspConstants.MIN_STD_DELTA_DELTA);
+        // 5. Standaryzacja Z-score zgodna 1:1 z treningiem Pythona (eps = 1e-6)
+        normalizeChannelZScore(logMelBuffer, DspConstants.EPSILON);
+        normalizeChannelZScore(delta1Buffer, DspConstants.EPSILON);
+        normalizeChannelZScore(delta2Buffer, DspConstants.EPSILON);
 
-        // 6. Spłaszczenie do bufora NCHW: Channel 0 (Mel), Channel 1 (Delta), Channel 2 (Delta-Delta)
-        float[] flatTensor = preallocatedFlatTensor;
+        // 6. Spłaszczenie do NCHW: [Log-Mel, Delta, Delta-Delta]
         int numMels = DspConstants.N_MELS;
         int timeSteps = DspConstants.TIME_STEPS;
         int channelStride = numMels * timeSteps;
@@ -97,13 +94,19 @@ public final class AudioPreprocessor {
 
             for (int t = 0; t < timeSteps; t++) {
                 int baseIndex = mOffset + t;
-                flatTensor[baseIndex] = melRow[t];                      // Kanał 0
-                flatTensor[channelStride + baseIndex] = d1Row[t];      // Kanał 1
-                flatTensor[2 * channelStride + baseIndex] = d2Row[t];  // Kanał 2
+                outFlatTensor[baseIndex] = melRow[t];
+                outFlatTensor[channelStride + baseIndex] = d1Row[t];
+                outFlatTensor[2 * channelStride + baseIndex] = d2Row[t];
             }
         }
+    }
 
-        return flatTensor;
+    /**
+     * Metoda wstecznie kompatybilna (zwraca wewnętrzny bufor preallocatedFlatTensor).
+     */
+    public synchronized float[] processAudioChunkToFlatTensor(float[] rawSamples) {
+        processAudioChunkToFlatTensor(rawSamples, preallocatedFlatTensor);
+        return preallocatedFlatTensor;
     }
 
     /**
@@ -352,7 +355,7 @@ public final class AudioPreprocessor {
             }
         }
         float std = (float) Math.sqrt(sumSq / total);
-        float floor = Math.max(minStd, DspConstants.MIN_STD);
+        float floor = Math.max(minStd, DspConstants.EPSILON);
         if (std < floor) {
             std = floor;
         }

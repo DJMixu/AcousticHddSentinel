@@ -1,0 +1,35 @@
+<resources>
+    <style name="Theme.AcousticHddSentinel" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Główny akcent Glowing Cyan -->
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorOnPrimary">#0B0F17</item>
+        <item name="colorPrimaryContainer">#131A28</item>
+        <item name="colorOnPrimaryContainer">@color/accent</item>
+
+        <!-- Akcent drugorzędny Radar Green -->
+        <item name="colorSecondary">@color/accent_green</item>
+        <item name="colorOnSecondary">#0B0F17</item>
+        <item name="colorSecondaryContainer">#132E22</item>
+        <item name="colorOnSecondaryContainer">@color/accent_green</item>
+
+        <!-- Paski systemowe (Dark Obsidian) -->
+        <item name="android:statusBarColor">@color/primary_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@color/background</item>
+        <item name="android:windowLightNavigationBar">false</item>
+
+        <!-- Powierzchnie i tła -->
+        <item name="android:colorBackground">@color/background</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorSurfaceVariant">@color/surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+        <item name="colorOutline">@color/card_stroke</item>
+        <item name="colorOutlineVariant">@color/surface_variant</item>
+
+        <!-- Domyślny styl kart Material 3 -->
+        <item name="materialCardViewStyle">@style/Widget.AcousticHddSentinel.CardView</item>
+        <!-- Styl szuflady nawigacyjnej -->
+        <item name="navigationViewStyle">@style/Widget.AcousticHddSentinel.NavigationView</item>
+    </style>
+</resources>

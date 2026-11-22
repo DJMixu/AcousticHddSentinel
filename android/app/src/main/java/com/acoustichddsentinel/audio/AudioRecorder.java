@@ -20,7 +20,7 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * Rejestrator sygnału audio z mikrofonu sprzętowego smartfona (android.media.AudioRecord).
  * Obsługuje:
- * 1. Adaptacyjny nasłuch strumieniowy w stylu Shazam (Early Stopping & Multi-Window Voting).
+ * 1. Adaptacyjny nasłuch strumieniowy (Early Stopping & Multi-Window Voting).
  * 2. Próbkowanie 22050 Hz z antyaliasingową decymacją 2:1 w czasie rzeczywistym przy fallbacku 44100 Hz.
  * 3. Opcjonalny tryb czystego toru RAW (AudioSource.UNPROCESSED + decymacja) omijający systemowe DSP.
  * 4. Odpinanie i wyłączanie sprzętowych filtrów systemowych (NoiseSuppressor, AcousticEchoCanceler, AGC)
@@ -64,6 +64,39 @@ public class AudioRecorder {
             s1_2 = 0.0f;
             s2_2 = 0.0f;
             decimateToggle = false;
+        }
+
+        public int decimateInto(
+                short[] inputShorts44k,
+                int length,
+                float preGain,
+                float[] outputBuffer22k,
+                int outOffset,
+                int maxCapacity
+        ) {
+            if (inputShorts44k == null || length <= 0) {
+                return outOffset;
+            }
+            int idx = outOffset;
+            for (int i = 0; i < length; i++) {
+                // Nie przycinamy programowo po preGain: prawdziwy hardware clip ADC (±32767)
+                // zachowa płaskie wierzchołki, a głośny zdrowy pik nie dostanie sztucznego flat-topu.
+                float s = (inputShorts44k[i] / 32768.0f) * preGain;
+
+                float y1 = B0_1 * s + s1_1;
+                s1_1 = B1_1 * s - A1_1 * y1 + s2_1;
+                s2_1 = B2_1 * s - A2_1 * y1;
+
+                float y2 = B0_2 * y1 + s1_2;
+                s1_2 = B1_2 * y1 - A1_2 * y2 + s2_2;
+                s2_2 = B2_2 * y1 - A2_2 * y2;
+
+                decimateToggle = !decimateToggle;
+                if (decimateToggle && idx < maxCapacity) {
+                    outputBuffer22k[idx++] = y2;
+                }
+            }
+            return idx;
         }
 
         public float[] process(float[] input44k) {
@@ -231,7 +264,7 @@ public class AudioRecorder {
     }
 
     /**
-     * Uruchamia adaptacyjny nasłuch wielookienkowy w stylu Shazam (od 3.0s do maxSeconds z krokiem 1.5s).
+     * Uruchamia adaptacyjny nasłuch wielookienkowy (od 3.0s do maxSeconds z krokiem 1.5s).
      *
      * @param maxSeconds maksymalny czas nasłuchu (np. 9 sekund)
      * @param callback   interfejs zdarzeń dla kolejnych okien i zakończenia strumienia
@@ -288,10 +321,15 @@ public class AudioRecorder {
             final int finalHardwareSr = initResult.sampleRate;
             final int bufferSize = initResult.bufferSize;
             final int actualSource = initResult.audioSource;
-            // Dla UNPROCESSED (który w Android HAL pozbawiony jest przedwzmacniacza) stosujemy cyfrową kompensację czułości ADC (+18 dB)
-            final float sourcePreGain = (actualSource == MediaRecorder.AudioSource.UNPROCESSED)
-                    ? DspConstants.UNPROCESSED_HARDWARE_PREGAIN
-                    : 1.0f;
+            // Dla UNPROCESSED lub trybu RAW bez systemowego AGC stosujemy kompensację czułości przetwornika ADC
+            final float sourcePreGain;
+            if (actualSource == MediaRecorder.AudioSource.UNPROCESSED) {
+                sourcePreGain = DspConstants.UNPROCESSED_HARDWARE_PREGAIN;
+            } else if (this.rawAudioMode) {
+                sourcePreGain = DspConstants.RAW_MIC_HARDWARE_PREGAIN;
+            } else {
+                sourcePreGain = 1.0f;
+            }
 
             // W trybie RAW zdejmujemy filtry systemowe z sesji AudioRecord
             if (this.rawAudioMode) {
@@ -334,9 +372,7 @@ public class AudioRecorder {
                 List<AudioChunk> evaluatedChunks = new ArrayList<>();
                 int nextWindowIndex = 0;
                 boolean stoppedEarly = false;
-                float s1_1 = 0.0f, s2_1 = 0.0f;
-                float s1_2 = 0.0f, s2_2 = 0.0f;
-                boolean decimateToggle = false;
+                final ButterworthDecimator decimator = new ButterworthDecimator();
 
                 try {
                     while (isRecording.get()) {
@@ -367,23 +403,9 @@ public class AudioRecorder {
                                 }
                             }
                         } else {
-                            // Decymacja 44100 Hz -> 22050 Hz filtrem Butterwortha 4. rzędu
-                            for (int i = 0; i < readShorts; i++) {
-                                float s = (readBuffer[i] / 32768.0f) * sourcePreGain;
-
-                                float y1 = B0_1 * s + s1_1;
-                                s1_1 = B1_1 * s - A1_1 * y1 + s2_1;
-                                s2_1 = B2_1 * s - A2_1 * y1;
-
-                                float y2 = B0_2 * y1 + s1_2;
-                                s1_2 = B1_2 * y1 - A1_2 * y2 + s2_2;
-                                s2_2 = B2_2 * y1 - A2_2 * y2;
-
-                                decimateToggle = !decimateToggle;
-                                if (decimateToggle && sampleCount < maxCapacity) {
-                                    sampleBuffer[sampleCount++] = y2;
-                                }
-                            }
+                            sampleCount = decimator.decimateInto(
+                                    readBuffer, readShorts, sourcePreGain, sampleBuffer, sampleCount, maxCapacity
+                            );
                         }
 
                         // Raportowanie poziomu RMS
@@ -397,15 +419,21 @@ public class AudioRecorder {
                             callback.onProgress((int) elapsedMs, (int) maxDurationMs, currentRms);
                         }
 
-                        // Wnioskowanie wielookienkowe
+                        // Wnioskowanie wielookienkowe (bez sztucznego boostowania ciszy)
                         while (sampleCount >= (nextWindowIndex * step + windowSize) && nextWindowIndex < maxWindows) {
                             int windowOffset = nextWindowIndex * step;
                             float[] windowSamples = new float[windowSize];
                             System.arraycopy(sampleBuffer, windowOffset, windowSamples, 0, windowSize);
 
-                            float[] processedSamples = AudioPreprocessor.checkAndBoostAudio(windowSamples, DspConstants.TARGET_BOOST_RMS);
-                            float windowRms = AudioPreprocessor.computeRms(processedSamples);
-                            AudioChunk chunk = new AudioChunk(nextWindowIndex, processedSamples, targetSr, windowRms, System.currentTimeMillis());
+                            // Uczciwe RMS okna z automatycznym programowym wzmocnieniem cichych sygnałów
+                            float windowRms = AudioPreprocessor.computeRms(windowSamples);
+                            if (windowRms >= DspConstants.RMS_MIN_BOOSTABLE_THRESHOLD && windowRms < DspConstants.RMS_QUIET_BOOST_THRESHOLD) {
+                                AudioPreprocessor.checkAndBoostAudioInPlace(windowSamples, DspConstants.TARGET_BOOST_RMS);
+                                windowRms = AudioPreprocessor.computeRms(windowSamples);
+                            }
+                            AudioChunk chunk = new AudioChunk(
+                                    nextWindowIndex, windowSamples, targetSr, windowRms, System.currentTimeMillis()
+                            );
                             evaluatedChunks.add(chunk);
 
                             boolean shouldStop = callback.onWindowReady(nextWindowIndex, chunk);

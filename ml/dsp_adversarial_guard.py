@@ -209,7 +209,9 @@ class DSPAdversarialGuard:
                 return False, ""
 
             # Pozytywne kryterium szumu aerodynamicznego (spadek 1/f i quasigaussowska kurtoza)
-            if slope < -0.70 and kurt < 5.5 and crest < 6.2:
+            # Prawdziwe wentylatory komputerowe mają nachylenie slope <= -1.80 (średnio -2.29)
+            # oraz brak ostrych transjentów mechanicznych HDD (crest < 4.2).
+            if slope < -1.80 and kurt < 4.5 and crest < 4.2:
                 reason = f"Aerodynamic fan/turbulence (slope={slope:.2f}, kurtosis={kurt:.2f}, crest={crest:.2f}, high_freq={high_freq_ratio*100:.1f}%)"
                 return True, reason
 
@@ -458,8 +460,9 @@ class DSPAdversarialGuard:
 
         # 5. Neutralizacja Szumu Miasta / Ruchu Ulicznego (dominacja pasma < 300 Hz)
         if is_city:
-            veto_scratching = p[scratching_idx] > 0.15
-            veto_clicking = p[clicking_idx] > 0.15
+            crest_val = float(np.max(np.abs(waveform))) / max(float(np.sqrt(np.mean(waveform ** 2))), 1e-12) if waveform is not None else 0.0
+            veto_scratching = (p[scratching_idx] > 0.15) and (p[scratching_idx] < 0.40)
+            veto_clicking = (p[clicking_idx] > 0.15) and (crest_val < 4.0)
             veto_beeping = (not has_stall_tone) and (p[beeping_idx] > 0.15)
             if veto_scratching or veto_clicking or veto_beeping:
                 new_p = np.copy(p)

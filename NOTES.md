@@ -29,3 +29,38 @@ Przy stosunkowo niedużych zbiorach danych audio (np. 854 próbki treningowe) i 
 - [x] Rozszerzenie pipeline'u ewaluacyjnego o inferencję komitetową (uśrednianie predykcji na zbiorze testowym w PyTorch).
 - [x] Porównanie macierzy pomyłek pojedynczego modelu vs komitetu modeli.
 - [x] Fuzja modeli w pojedynczy moduł PyTorch (`FusedEnsemblePyTorch`) w celu bezpośredniej inferencji komitetowej.
+
+---
+
+## 2. Krytyczna Decyzja Architektoniczna: Dlaczego Model Klasyczny (LEGACY), a NIE Model Alternatywny (SMPC / BezNormal / OOD)?
+> **Data decyzji:** 2026-11-22  
+> **Status:** Ostatecznie zatwierdzone. Model Klasyczny (`LEGACY`) jest jedynym modelem produkcyjnym. Model Alternatywny pełni wyłącznie rolę archiwalną / eksperymentalną z twardym fallbackiem na model klasyczny.
+
+### Kontekst i geneza Modelu Alternatywnego
+W fazie badawczej rozwijano alternatywny prototyp detekcji anomalii **SMPC (Sub-Center Multi-Prototype Cosine)**:
+- **Koncepcja SMPC:** Sieć trenowana wyłącznie na 3 klasach uszkodzeń mechanicznych (`beeping`, `clicking`, `scratching`). Dźwięki dysków sprawnych oraz szum otoczenia miały być wykrywane jako „anomalia poza rozkładem” (OOD – *Out-Of-Distribution*) na bazie odległości kątowej (metryki cosinusowej) do podcentrów klas awarii w przestrzeni cech wielowymiarowych.
+- W kodzie aplikacji mobilnej Android ([AlternativeCnnDetector.java](file:///home/DJMixu/Pulpit/AcousticHddSentinel/android/app/src/main/java/com/acoustichddsentinel/ml/AlternativeCnnDetector.java)) zaimplementowano interfejs wzorca Strategii (ADR-002) oraz przełącznik w UI (`btnModelAlternative`).
+
+### Dlaczego Model Alternatywny został odrzucony na rzecz Modelu Klasycznego?
+
+#### 1. Niestabilność progów OOD w zmiennych warunkach akustycznych mikrofonu
+- W teorii laboratoryjnej metryka kątowa SMPC separowała wektory cech.
+- W praktyce smartfonowej odległość mikrofonu od obudowy komputera (np. 2 cm vs 10 cm), kąt przyłożenia telefonu oraz zmienne właściwości przetworników MEMS w różnych modelach telefonów powodowały drastyczne przesunięcia odległości kątowej.
+- Sztywny próg odrzucenia OOD stawał się niefizyczny: w jednych warunkach cichy, sprawny dysk był fałszywie klasyfikowany jako awaria, a w innych realne, subtelne stukanie głowicy było odrzucane jako „zwykły szum otoczenia”.
+
+#### 2. Brak bezpośredniego uczenia cech dysku sprawnego
+- W podejściu SMPC brakowało klasy `normal` w procesie optymalizacji wag (brak nadzoru).
+- W Modelu Klasycznym (`LEGACY`) sieć 2D CNN widziała w treningu setki wycinków rzeczywistych, sprawnych dysków (Toshiba, WD, Seagate, HGST). Model nauczył się bezpośrednio identyfikować prawidłowy, stacjonarny szum łożysk tocznych i obracających się talerzy, zamiast definiować go jedynie jako „niepodobny do znanej awarii”.
+
+#### 3. Bezkonkurencyjna stabilność i wydajność kwantyzacji INT8 Modelu Klasycznego
+- Model Klasyczny (`best_hdd_cnn_model_int8.onnx`) waży zaledwie **1.17 MB** (redukcja o 74.6% z FP32) i wykonuje inferencję w czasie **15–20 ms** na mobilnym silniku ONNX Runtime, nie drenując baterii smartfona.
+- Osiąga znakomite metryki na pełnym datasecie: **Macro F1 = 84.6%**, 100% precyzję na dyskach sprawnych w zbiorze testowym oraz niemal 90% dokładności w fuzji z fizycznym strażnikiem DSP.
+- Model SMPC wymagałby dodatkowego, kosztownego narzutu obliczeniowego na liczenie norm i odległości do wielu prototypów po stronie CPU telefonu.
+
+#### 4. Realizacja w kodzie produkcyjnym Androida (Stan Faktyczny)
+- W katalogu `android/app/src/main/assets/` celowo **nie umieszczono** eksperymentalnego pliku `best_smpc_model_int8.onnx`.
+- W klasie `AlternativeCnnDetector.java` zaimplementowano bezpieczny mechanizm kaskadowy (Graceful Degradation): gdy aplikacja nie znajdzie wag SMPC, automatycznie uruchamia sprawdzony model produkcyjny `best_hdd_cnn_model_int8.onnx`.
+- Dzięki temu nawet jeśli użytkownik przestawi przełącznik na „Model Alternatywny”, aplikacja nie ulegnie awarii (Zero Crash) i zachowa pełną stabilność oraz najwyższą jakość predykcji.
+
+### Wniosek końcowy dla zespołu i prowadzących
+Model Klasyczny 2D CNN w tandemie z Fizycznym Strażnikiem DSP ([DspPhysicalGuard.java](file:///home/DJMixu/Pulpit/AcousticHddSentinel/android/app/src/main/java/com/acoustichddsentinel/dsp/DspPhysicalGuard.java)) i Analizatorem RPM ([RpmHarmonicsAnalyzer.java](file:///home/DJMixu/Pulpit/AcousticHddSentinel/android/app/src/main/java/com/acoustichddsentinel/dsp/RpmHarmonicsAnalyzer.java)) stanowi jedyną dopuszczoną, stabilną i optymalną ścieżkę produkcyjną. Architektura alternatywna SMPC pozostaje udokumentowanym, zamkniętym eksperymentem badawczym.

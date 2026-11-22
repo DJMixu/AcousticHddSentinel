@@ -160,5 +160,14 @@ tests/adversarial_lab/samples/
 tests/tmp_parity/java_tensor_out.raw
 !tests/tmp_parity/test_signal_in.raw
 
+# ------------------------------------------------------------------------------
+# 7. Archiwa historyczne i paczki ewaluacyjne
+# ------------------------------------------------------------------------------
+archive/
+archive.zip
+projekt_calosc.txt
+kod_v4_smpc_pytorch.txt
+kod_v5_android_dsp.txt
+
 # Logi systemowe
 *.log

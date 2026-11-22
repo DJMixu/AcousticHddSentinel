@@ -1,7 +1,7 @@
 # Kontekst Projektu i Kompendium Wiedzy Inżynierskiej — Acoustic HDD Sentinel
 
 > **Data aktualizacji:** 22 listopada 2026 r.  
-> **Cel dokumentu:** Pełne, usystematyzowane podsumowanie wszystkich dotychczasowych etapów rozwoju, sesji badawczych, audytów forensicznych, decyzji architektonicznych (ADR-001, ADR-002), modułu mobilnego Android (czysta Java 17, wzorzec Dual-Model Strategy, tryb RAW Audio z deaktywacją AudioFx i dynamiczną kalibracją czułości, UI w stylu Shazam z pulsującym radarem), silnika hybrydowego z analizą harmonicznych RPM, strażników DSP i odporności OOD/Adversarial, testów laboratoryjnych na 4 fizycznych dyskach twardych oraz wdrożenia na fizycznym smartfonie.
+> **Cel dokumentu:** Pełne, usystematyzowane podsumowanie wszystkich dotychczasowych etapów rozwoju, sesji badawczych, audytów forensicznych, decyzji architektonicznych (ADR-001, ADR-002), modułu mobilnego Android (czysta Java 17, wzorzec Dual-Model Strategy, tryb RAW Audio z deaktywacją AudioFx i dynamiczną kalibracją czułości, nowoczesny interfejs Material 3 z pulsującym radarem), silnika hybrydowego z analizą harmonicznych RPM, strażników DSP i odporności OOD/Adversarial, testów laboratoryjnych na 4 fizycznych dyskach twardych oraz wdrożenia na fizycznym smartfonie.
 
 ---
 
@@ -110,7 +110,7 @@ Projekt **Acoustic HDD Sentinel** to system wibroakustycznej detekcji i wielokla
   - **`dsp/AudioPreprocessor.java`:** Wierna implementacja Radix-2 FFT, okna Hanna, trójkątnego banku filtrów Mel i wag Savitzky'ego-Golaya w Javie dająca tensory tożsame z Librosa.
   - **`ml/AcousticClassifier.java`:** Inferencja `OrtSession` z optymalizacją pamięciową i mapowaniem etykiet.
   - **`data/DiagnosticDbHelper.java`:** Czysty `SQLiteOpenHelper` z pełną historią diagnoz i eksportem (wraz z `DiagnosticModel.java` i `DiagnosticRepository.java`).
-  - **`ui/MainActivity.java` & `MainViewModel.java`:** Wzorzec MVVM z `LiveData`, interfejs w stylu Shazam z pulsującym radarem, animowanymi falami oraz mechanizmem **Early Stopping** (natychmiastowe zatrzymanie przy pewności $\ge 75-80\%$ lub konsensusie okien).
+  - **`ui/MainActivity.java` & `MainViewModel.java`:** Wzorzec MVVM z `LiveData`, interfejs Material 3 z pulsującym radarem, animowanymi falami oraz mechanizmem **Early Stopping** (natychmiastowe zatrzymanie przy pewności $\ge 75-80\%$ lub konsensusie okien).
 - Utworzono 8 kompleksowych klas testowych obejmujących 37 testów jednostkowych w czystej Javie zdanych w 100%.
 
 ---
@@ -218,7 +218,7 @@ Projekt **Acoustic HDD Sentinel** to system wibroakustycznej detekcji i wielokla
 - **Wyeliminowanie obcinania fal radaru (Pulse Ring Clipping):**
   Na ekranach o wysokim DPI zewnętrzne pierścienie animacji pulsującego radaru były ucinane przez krawędzie kontenera. Rozwiązano problem poprzez wyłączenie przycinania w widokach nadrzędnych (`android:clipChildren="false"`, `android:clipToPadding="false"`) oraz optymalizację marginesów w `activity_main.xml`.
 - **Płynna dynamika wizualna radaru i fal dźwiękowych:**
-  Dostosowano animacje fali dźwiękowej i radaru Shazam do rzeczywistego stanu pętli audio (pulsowanie w czasie oczekiwania na sygnał, aktywne rozchodzenie się fal podczas akwizycji 3-sekundowych okien).
+  Dostosowano animacje fali dźwiękowej i pulsującego radaru do rzeczywistego stanu pętli audio (pulsowanie w czasie oczekiwania na sygnał, aktywne rozchodzenie się fal podczas akwizycji 3-sekundowych okien).
 - **Poprawa responsywności widoków historii:**
   Zoptymalizowano `item_diagnostic_history.xml` oraz layout główny, zapewniając pełną czytelność etykiet, wskaźników pewności i zaleceń inżynierskich na ekranach o proporcjach od 16:9 do 21:9 w standardzie Material 3.
 
@@ -249,6 +249,29 @@ Projekt **Acoustic HDD Sentinel** to system wibroakustycznej detekcji i wielokla
 - **Weryfikacja działania w terenie:**
   Potwierdzono poprawność inicjalizacji silnika ONNX Runtime Mobile INT8, bezproblemowe przełączanie modeli w locie (Dual-Model Strategy), brak przesterowań i prawidłową czułość toru audio zarówno przy włączonym, jak i wyłączonym trybie RAW Audio.
 - **Stan drzewa Git:** Wszystkie commity zsynchronizowane ze zdalnym repozytorium (`origin/main`), czyste drzewo robocze.
+
+---
+
+### Faza 20: Kompleksowa Ewaluacja na 100% Datasetu (6 840 tensorów), Rekalibracja Strażników DSP i Rozbudowa Testów Android do 13 Klas (74 Testy Jednostkowe)
+- **Empiryczna weryfikacja hipotezy o 50% wykrywalności awarii:**
+  Opracowano skrypt [tests/test_full_dataset_fault_detection_rate.py](tests/test_full_dataset_fault_detection_rate.py) badający 100% bazy danych (6 840 tensorów `.npy`, w tym 3 765 awarii i 3 075 dysków sprawnych):
+  - **Próg operacyjny ADR-002 ($P \ge 0.70$):** Czułość wykrywania awarii wynosi **80.05%** w całym zbiorze (3 014 / 3 765 wykrytych awarii; per split: Train 80.88%, Validate 73.28%, Test 70.89%).
+  - **Standardowy próg binarny ($P \ge 0.50$):** Czułość wynosi **89.03%** w całym zbiorze (Test 85.92%, Val 86.26%, Train 89.33%).
+  - **Dominująca klasyfikacja ($argmax \neq normal$):** Czułość wynosi **85.92%**.
+  - **Skuteczność per klasa uszkodzenia:** `beeping`: **86.71%**, `scratching`: **81.58%**, `clicking`: **72.54%**.
+  - Zapisano pełne podsumowanie numeryczne w [training_output/full_dataset_fault_detection_summary.json](training_output/full_dataset_fault_detection_summary.json).
+- **Porównanie potoku z DSP vs bez DSP ([tests/evaluate_app_pipeline_on_dataset.py](tests/evaluate_app_pipeline_on_dataset.py)):**
+  - **Odporność na szumy otoczenia:** Na 33 oknach szumu otoczenia surowy model miał **30.3% False Positive Rate (FPR)**, podczas gdy potok z filtrami DSP osiągnął **0.0% FPR**.
+  - **Dyski laboratoryjne (320 okien):** Zarówno surowy model, jak i potok DSP osiągnęły **0.0% FPR** na autentycznych sprawnych dyskach HDD.
+  - Zapisano raport porównawczy w [training_output/evaluation_with_vs_without_dsp.json](training_output/evaluation_with_vs_without_dsp.json).
+- **Rekalibracja fizycznego strażnika adwersarialnego (`DSPAdversarialGuard` & `DspPhysicalGuard`):**
+  - **Aerodynamiczny szum wentylatorów PC:** Prawdziwe wentylatory komputerowe charakteryzują się stromym spadkiem widmowym $1/f$ (`slope <= -1.80`, średnio -2.29), niską kurtozą (`kurtosis < 4.5`) oraz brakiem ostrych transjentów (`crest < 4.2`). Zacieśniono kryteria, zapobiegając błędnemu tłumieniu autentycznego clicking/scratching o łagodniejszym zboczu.
+  - **Szum ruchu miejskiego:** Dodano warunek `crest_val < 4.0` przy wetowaniu clicking, chroniąc silne impulsy mechaniczne pozycjonera głowic HDD przed zgaszeniem przez niskoczęstotliwościowy szum tła.
+- **Rozbudowa zestawu testów Android (Czysta Java 17, 13 klas testowych, 74 testy jednostkowe):**
+  - Dodano `DspEdgeCasesTest.java` (6 testów): weryfikacja sygnałów z DC offsetem, zniekształceń przesterowania (clipping), czystego szumu białego, sygnałów podprogowych i gwałtownych skoków energii.
+  - Dodano `DatasetAudioPipelineTest.java` (4 testy): integracja potoku DSP z przetwarzaniem wycinków datasetu, badanie logiki wetowania i audytu decyzji.
+  - Dodano `OnnxInferenceIntegrationTest.java` (2 testy): pełna integracja sesji ONNX Runtime Mobile z potokiem DSP na syntetycznych przebiegach czasowych.
+  - Wszystkie 74 testy jednostkowe w 13 klasach kończą się pełnym sukcesem (`BUILD SUCCESSFUL`).
 
 ---
 

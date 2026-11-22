@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/background"
+    android:orientation="vertical">
+
+    <!-- Uchwyt przeciągania Bottom Sheet -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="8dp"
+        android:background="@color/card_stroke" />
+
+    <!-- Nagłówek -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="20dp"
+        android:paddingVertical="8dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/faq_title"
+                android:textColor="@color/text_primary"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/faq_subtitle"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/btnFaqClose"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Zamknij FAQ"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            app:tint="@color/text_secondary" />
+    </LinearLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxHeight="540dp"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="24dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- KARTA 1: Jak prawidłowo przyłożyć telefon? -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="@color/surface"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="1dp"
+                app:strokeColor="@color/card_stroke"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="1. Jak prawidłowo przyłożyć telefon do HDD?"
+                        android:textColor="@color/accent"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:lineSpacingExtra="3dp"
+                        android:text="• Odległość pomiaru: Skieruj dolny mikrofon telefonu w odległości 2–5 cm od górnej metalowej pokrywy dysku twardego.\n• Brak bezpośredniego dotyku: Nie dotykaj obudową telefonu metalowego korpusu HDD, aby uniknąć rezonansów kontaktowych i zniekształceń fali dźwiękowej.\n• Ochrona przed wentylatorami: Upewnij się, że mikrofon nie znajduje się bezpośrednio w silnym strumieniu powietrza chłodzenia procesora lub zasilacza.\n• Czysty tor audio RAW: Upewnij się, że przełącznik 'Czysty tor audio RAW' w aplikacji jest włączony (eliminuje tłumienie transjentów przez filtry mowy Androida)."
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- KARTA 2: Co oznaczają poszczególne awarie? -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="@color/surface"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="1dp"
+                app:strokeColor="@color/card_stroke"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="2. Co oznaczają poszczególne awarie HDD?"
+                        android:textColor="@color/accent"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:lineSpacingExtra="3dp"
+                        android:text="• Clicking (Click of Death):\nRytmiczne uderzenia pozycjonera głowic o rampę parkowania lub odbijanie od ogranicznika. Oznacza degradację przedwzmacniacza, uszkodzenie powierzchni serwisowej SA lub uszkodzenie cewki Voice Coil.\n\n• Beeping (Zatarty silnik / Stiction):\nPrzerywany pisk uzwojenia silnika wrzeciona (1000–3000 Hz) próbującego ruszyć przy zablokowanych łożyskach olejowych (FDB) lub gdy głowice 'przykleiły się' do powierzchni talerza.\n\n• Scratching (Tarcie głowic o talerz):\nCiągły szelest i tarcie metal-o-metal. Głowica magnetyczna dotyka wirującego talerza, powodując fizyczne ścieranie warstwy ferromagnetycznej i bezpowrotną utratę danych.\n\n• Normal (Dysk sprawny):\nJednolity szum aerodynamiczny wirujących talerzy i miękkie dźwięki kalibracji termicznej."
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- KARTA 3: Czym jest detekcja obrotów RPM? -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="@color/surface"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="1dp"
+                app:strokeColor="@color/card_stroke"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="3. Czym jest fizyczna detekcja obrotów RPM?"
+                        android:textColor="@color/accent"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:lineSpacingExtra="3dp"
+                        android:text="• Strażnik Fizyczny (DSP RPM Guard):\nKażdy wirujący dysk twardy generuje charakterystyczną częstotliwość akustyczną odpowiadającą jego prędkości obrotowej oraz jej harmoniczne wielokrotności:\n  - 5400 RPM: częstotliwość f0 = 90.0 Hz (harmoniczne 180, 270, 360 Hz)\n  - 7200 RPM: częstotliwość f0 = 120.0 Hz (harmoniczne 240, 360, 480 Hz)\n  - 10000 / 15000 RPM: dyski SAS / Enterprise (166.7 Hz / 250 Hz)\n\n• Interpolacja paraboliczna:\nAlgorytm wyznacza dokładne piki widmowe z precyzją ±0.3 Hz, sprawdzając spójność grzebienia harmonicznego.\n\n• Ochrona przed fałszywymi alarmami:\nBrak wykrycia obrotów RPM i szumów silnika kwalifikuje sygnał jako szum otoczenia (Ambient) lub ciszę, zapobiegając fałszywym diagnozom."
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- KARTA 4: Co robić w przypadku wykrycia awarii? -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="@color/status_fault_bg"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="1dp"
+                app:strokeColor="@color/accent_red"
+                app:strokeWidth="1.5dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="4. Procedura ratunkowa przy wykryciu awarii"
+                        android:textColor="@color/status_fault_text"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:lineSpacingExtra="3dp"
+                        android:text="1. NATYCHMIAST WYŁĄCZ ZASILANIE:\nNie restartuj komputera i nie zamykaj systemu operacyjnego w standardowy sposób — odłącz kabel zasilający od razu.\n\n2. NIE DOKONUJ PONOWNYCH PRÓB URUCHOMIENIA:\nKażdy start dysku ze stukającą lub trącą głowicą bezpowrotnie niszczy powierzchnię talerzy magnetycznych.\n\n3. BEZPIECZNA KOPIA BITOWA:\nJeżeli dysk jest częściowo widoczny w BIOS, wykonaj kopię 1:1 za pomocą dedykowanych narzędzi (np. ddrescue z odwróconym kierunkiem odczytu).\n\n4. LABORATORIUM DATA RECOVERY:\nW przypadku Clicking, Beeping lub Scratching otwarcie dysku może nastąpić wyłącznie w komorze laminarnej klasy 100 (Clean Room)."
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</LinearLayout>

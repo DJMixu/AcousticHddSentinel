@@ -1,0 +1,63 @@
+{
+  "total_dataset_samples": 6840,
+  "total_faults": 3765,
+  "overall_raw_recall_70": 80.34528552456838,
+  "overall_dsp_recall_70": 80.0531208499336,
+  "overall_dsp_recall_50": 89.03054448871181,
+  "overall_dsp_recall_argmax": 85.92297476759629,
+  "splits": {
+    "test": {
+      "total_samples": 516,
+      "faults": 213,
+      "normal": 303,
+      "raw_rec_70": 70.89201877934272,
+      "dsp_rec_70": 70.89201877934272,
+      "dsp_rec_50": 85.91549295774648,
+      "dsp_fpr_70": 9.570957095709572
+    },
+    "validate": {
+      "total_samples": 279,
+      "faults": 131,
+      "normal": 148,
+      "raw_rec_70": 73.2824427480916,
+      "dsp_rec_70": 73.2824427480916,
+      "dsp_rec_50": 86.25954198473282,
+      "dsp_fpr_70": 12.162162162162163
+    },
+    "train": {
+      "total_samples": 6045,
+      "faults": 3421,
+      "normal": 2624,
+      "raw_rec_70": 81.20432622040339,
+      "dsp_rec_70": 80.88278281204326,
+      "dsp_rec_50": 89.3306050862321,
+      "dsp_fpr_70": 8.003048780487806
+    }
+  },
+  "class_breakdown": {
+    "beeping": {
+      "total": 971,
+      "raw_det_70": 846,
+      "dsp_det_70": 842,
+      "dsp_recall_pct": 86.7147270854789
+    },
+    "clicking": {
+      "total": 1187,
+      "raw_det_70": 864,
+      "dsp_det_70": 861,
+      "dsp_recall_pct": 72.53580454928391
+    },
+    "normal": {
+      "total": 3075,
+      "raw_det_70": 0,
+      "dsp_det_70": 0,
+      "dsp_recall_pct": 0.0
+    },
+    "scratching": {
+      "total": 1607,
+      "raw_det_70": 1315,
+      "dsp_det_70": 1311,
+      "dsp_recall_pct": 81.58058494088364
+    }
+  }
+}

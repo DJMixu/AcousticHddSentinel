@@ -11,6 +11,7 @@ import androidx.lifecycle.MutableLiveData;
 
 import com.acoustichddsentinel.audio.AudioChunk;
 import com.acoustichddsentinel.audio.AudioRecorder;
+import com.acoustichddsentinel.audio.WavAudioSaver;
 import com.acoustichddsentinel.data.DiagnosticModel;
 import com.acoustichddsentinel.data.DiagnosticRepository;
 import com.acoustichddsentinel.dsp.AudioPreprocessor;
@@ -135,7 +136,7 @@ public class MainViewModel extends AndroidViewModel {
     }
 
     /**
-     * Uruchamia procedurę diagnozy w adaptacyjnym stylu Shazam:
+     * Uruchamia adaptacyjną procedurę diagnozy strumieniowej:
      * - Strumieniowa rejestracja audio mikrofonem sprzętowym
      * - Wnioskowanie w locie co 1.5 sekundy (od t = 3.0s)
      * - Paradygmat binarny: P(fault) = P(beeping) + P(clicking) + P(scratching) >= 0.70
@@ -258,7 +259,7 @@ public class MainViewModel extends AndroidViewModel {
                     }
 
                     // ===============================================================
-                    // LOGIKA EARLY STOPPING (Jak w Shazam, z twardym wymogiem min. 2 okien dla awarii):
+                    // LOGIKA EARLY STOPPING (Adaptacyjny nasłuch strumieniowy z twardym wymogiem min. 2 okien dla awarii):
                     // ===============================================================
 
                     // 1. Zatrzymanie przy awarii WYŁĄCZNIE po potwierdzeniu w co najmniej 2 oknach!
@@ -308,11 +309,12 @@ public class MainViewModel extends AndroidViewModel {
                     return;
                 }
 
-                if (overallRms < DspConstants.RMS_SILENCE_THRESHOLD) {
+                // Odrzucenie bezwzględnej ciszy cyfrowej / braku kontaktu z mikrofonem
+                if (overallRms < DspConstants.RMS_MIN_BOOSTABLE_THRESHOLD) {
                     uiState.postValue(DiagnosticUiState.error(
                         String.format(java.util.Locale.US,
-                            "Sygnał audio zbyt cichy (RMS: %.4f < %.4f). Przyłóż mikrofon bliżej obudowy dysku HDD.",
-                            overallRms, DspConstants.RMS_SILENCE_THRESHOLD)
+                            "Brak sygnału mikrofonu (RMS: %.5f < %.4f). Upewnij się, że mikrofon nie jest zasłonięty i przyłóż telefon do obudowy HDD.",
+                            overallRms, DspConstants.RMS_MIN_BOOSTABLE_THRESHOLD)
                     ));
                     return;
                 }
@@ -402,6 +404,42 @@ public class MainViewModel extends AndroidViewModel {
                 Bitmap specBitmap = SpectrogramImageSaver.createSpectrogramBitmap(logMel);
                 String specPath = SpectrogramImageSaver.saveSpectrogramPng(getApplication(), specBitmap, "spec_" + finalDominantClass);
 
+                // Zapisanie spektrogramu również bezpośrednio do publicznej Galerii (Pictures/AcousticHddSentinel)
+                SpectrogramImageSaver.saveSpectrogramToGallery(getApplication(), specBitmap, "spec_" + hddName + "_" + finalDominantClass);
+
+                // Zapis reprezentatywnego wycinka audio do pliku WAV
+                String audioPath = WavAudioSaver.saveAudioChunkToWav(getApplication(), representativeChunk, finalDominantClass);
+
+                // Obliczenie metryk telemetrycznych i prawdopodobieństw
+                float probBeeping = avgProbs.getOrDefault("beeping", 0.0f);
+                float probClicking = avgProbs.getOrDefault("clicking", 0.0f);
+                float probNormal = avgProbs.getOrDefault("normal", 0.0f);
+                float probScratching = avgProbs.getOrDefault("scratching", 0.0f);
+
+                float[] repSamples = representativeChunk.getSamples();
+                float peak = 0.0f;
+                if (repSamples != null) {
+                    for (float s : repSamples) {
+                        float abs = Math.abs(s);
+                        if (abs > peak) peak = abs;
+                    }
+                }
+                float repRms = representativeChunk.getRms();
+                float crestFactor = (repRms > 1e-6f) ? (peak / repRms) : 0.0f;
+
+                float peakRms = repRms;
+                if (windowChunks != null) {
+                    for (AudioChunk c : windowChunks) {
+                        if (c != null && c.getRms() > peakRms) {
+                            peakRms = c.getRms();
+                        }
+                    }
+                }
+
+                float scanDurationS = (numWindows > 1)
+                        ? (3.0f + (numWindows - 1) * 1.5f)
+                        : representativeChunk.getDurationSeconds();
+
                 ClassificationResult overallResult = new ClassificationResult(
                     finalDominantClass,
                     finalConfidence,
@@ -418,7 +456,16 @@ public class MainViewModel extends AndroidViewModel {
                     isFinalFault,
                     specPath,
                     finalDominantClass,
-                    finalConfidence
+                    finalConfidence,
+                    audioPath,
+                    probBeeping,
+                    probClicking,
+                    probNormal,
+                    probScratching,
+                    crestFactor,
+                    peakRms,
+                    scanDurationS,
+                    customRecommendation
                 );
 
                 // Zapis do relacyjnej bazy SQLite

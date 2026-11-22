@@ -44,7 +44,7 @@ Twoim zadaniem jest przeanalizowanie załączonego kompletnego kontekstu projekt
    - *Model v3 (Fine-Tuning i Seed Ensembling):* regeneracja bazy, SpecAugment, AdamW, Label Smoothing 0.03, komitet modeli o ziarnach 42, 123, 777. Wynik: Macro F1 = 84.63%, F1 dla scratching = 0.737, beeping = 0.864, clicking = 0.785, normal = 1.000.
    - *Model v4 (Adversarial Lab):* ochrona przed szumem wentylatorów PC ($1/f$, BPF) oraz przesterowaniami mikrofonów smartfona MEMS (Flat-Top Clipping i harmoniczne THD fałszujące scratching).
    - *Model v5 (Silnik Hybrydowy):* analizator harmonicznych RPM metodą Welcha (prążki 90 Hz dla 5400 RPM i 120 Hz dla 7200 RPM) jako fizyczne potwierdzenie obracającego się dysku.
-   - *Model v6 (Android Edge AI):* kwantyzacja wag ONNX INT8 (1.18 MB, redukcja o 74.6%), inferencja w 18–32 ms, implementacja w czystej Javie 17 bez NDK, pętla Shazam.
+   - *Model v6 (Android Edge AI):* kwantyzacja wag ONNX INT8 (1.18 MB, redukcja o 74.6%), inferencja w 18–32 ms, implementacja w czystej Javie 17 bez NDK, pętla adaptacyjna.
    - *Model v7 (Strażnik Fizyczny v2 & Odporność na Głośny Szum Miasta i Przesterowanie):*
       * **Weto przesterowania (`isClipped`) oraz Smart Clipping Bypass:** Obcięcie wierzchołków fali mikrofonu (`clipRatio > 2%`) bezwzględnie wetuje klasę `beeping` (eliminując harmoniczne THD podszywające się pod pisk stojana). Dla awarii mechanicznych (`clicking`, `scratching`) wprowadzono **Smart Clipping Bypass**: jeśli sygnał wykazuje ekstremalną dynamikę impulsową ($CF \ge 4.5$) oraz szerokopasmową energię tarcia w paśmie $>4\text{ kHz}$ ($highFreqFraction > 0.18$), system omija weto clippingu, traktując przesterowanie przetwornika ADC jako dowód potężnego uderzenia mechanicznego głowicy (katastrofalny Crash Stop / Head Slap). W pozostałych przypadkach przesterowanie wetuje klasyfikację awarii, a UI sygnalizuje konieczność odsunięcia mikrofonu.
      * **Filtr głośnego szumu miejskiego i ruchu ulicznego (`isCityTrafficNoise`):** Dominacja pasma basowego $<300\text{ Hz}$ ($>75\%$) przy braku energii tarcia $>4\text{ kHz}$ ($<3.5\%$) skutkuje automatycznym wetem dla awarii mechanicznych.
@@ -9376,7 +9376,7 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * Rejestrator sygnału audio z mikrofonu sprzętowego smartfona (android.media.AudioRecord).
  * Obsługuje:
- * 1. Adaptacyjny nasłuch strumieniowy w stylu Shazam (Early Stopping & Multi-Window Voting).
+ * 1. Adaptacyjny nasłuch strumieniowy (Early Stopping & Multi-Window Voting).
  * 2. Próbkowanie 22050 Hz z antyaliasingową decymacją 2:1 w czasie rzeczywistym przy fallbacku 44100 Hz.
  * 3. Analizę krokową 3-sekundowych okien z 50% zakładką (krok 1.5 s).
  * 4. Płynne raportowanie RMS oraz wczesne przerywanie po uzyskaniu pewnego wyniku.
@@ -9431,7 +9431,7 @@ public class AudioRecorder {
     }
 
     /**
-     * Uruchamia adaptacyjny nasłuch wielookienkowy w stylu Shazam (od 3.0s do maxSeconds z krokiem 1.5s).
+     * Uruchamia adaptacyjny nasłuch wielookienkowy (od 3.0s do maxSeconds z krokiem 1.5s).
      * Wykorzystuje thread-safe mutex oraz Retry & Fallback Handler dla źródeł mikrofonowych.
      *
      * @param maxSeconds maksymalny czas nasłuchu (np. 9 sekund)
@@ -9966,7 +9966,7 @@ public class DiagnosticDbHelper extends SQLiteOpenHelper {
 }
 ```
 
-### Pętla Shazam, Werdykt Binarny i Konsensus Okien (`MainViewModel.java`)
+### Pętla Adaptacyjna, Werdykt Binarny i Konsensus Okien (`MainViewModel.java`)
 ```java
 package com.acoustichddsentinel.ui;
 
@@ -10050,7 +10050,7 @@ public class MainViewModel extends AndroidViewModel {
     }
 
     /**
-     * Uruchamia procedurę diagnozy w adaptacyjnym stylu Shazam:
+     * Uruchamia adaptacyjną procedurę diagnozy strumieniowej:
      * - Strumieniowa rejestracja audio mikrofonem sprzętowym
      * - Wnioskowanie w locie co 1.5 sekundy (od t = 3.0s)
      * - Paradygmat binarny: P(fault) = P(beeping) + P(clicking) + P(scratching) >= 0.70
@@ -10173,7 +10173,7 @@ public class MainViewModel extends AndroidViewModel {
                     }
 
                     // ===============================================================
-                    // LOGIKA EARLY STOPPING (Jak w Shazam, z twardym wymogiem min. 2 okien dla awarii):
+                    // LOGIKA EARLY STOPPING (Adaptacyjny nasłuch strumieniowy z twardym wymogiem min. 2 okien dla awarii):
                     // ===============================================================
 
                     // 1. Zatrzymanie przy awarii WYŁĄCZNIE po potwierdzeniu w co najmniej 2 oknach!

@@ -7,23 +7,29 @@ import android.animation.ValueAnimator;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.GravityCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
 import com.acoustichddsentinel.R;
+import com.acoustichddsentinel.audio.AudioPlaybackHelper;
 import com.acoustichddsentinel.data.DiagnosticModel;
 import com.acoustichddsentinel.databinding.ActivityMainBinding;
+import com.acoustichddsentinel.dsp.DspConstants;
+import com.acoustichddsentinel.dsp.SpectrogramImageSaver;
 import com.acoustichddsentinel.ml.ClassificationResult;
 import com.acoustichddsentinel.ml.ModelType;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -42,6 +48,7 @@ public class MainActivity extends AppCompatActivity {
     private ActivityMainBinding binding;
     private MainViewModel viewModel;
     private DiagnosticAdapter adapter;
+    private AudioPlaybackHelper playbackHelper;
 
     private final ActivityResultLauncher<String> requestPermissionLauncher =
         registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
@@ -58,20 +65,22 @@ public class MainActivity extends AppCompatActivity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
+        playbackHelper = new AudioPlaybackHelper();
         viewModel = new ViewModelProvider(this).get(MainViewModel.class);
 
         setupViews();
+        setupNavigationDrawer();
         observeViewModel();
     }
 
     private void setupViews() {
-        // Czysta interakcja w stylu Shazam - pojedynczy przycisk Hero
-        binding.btnHeroShazam.setOnClickListener(v -> handleHeroClick());
+        // Interakcja jednym dotknięciem - pojedynczy przycisk Hero
+        binding.btnHeroRadar.setOnClickListener(v -> handleHeroClick());
 
         // Przycisk czyszczenia historii
         binding.btnClearHistory.setOnClickListener(v -> showClearHistoryConfirmationDialog());
 
-        // Konfiguracja listy historii (RecyclerView)
+        // Konfiguracja listy historii (RecyclerView) z obsługą odtwarzania audio i rozwijanych detali
         adapter = new DiagnosticAdapter(new DiagnosticAdapter.OnItemActionListener() {
             @Override
             public void onDeleteClick(DiagnosticModel item) {
@@ -81,15 +90,62 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onItemClick(DiagnosticModel item) {
-                showHistoryItemDialog(item);
+                // Kliknięcie elementu rozwija sekcję szczegółów wewnątrz ViewHolder
             }
-        });
+        }, playbackHelper);
 
         binding.rvHistory.setLayoutManager(new LinearLayoutManager(this));
         binding.rvHistory.setAdapter(adapter);
 
         setupModelSelectionToggle();
         setupRawAudioToggle();
+    }
+
+    private void setupNavigationDrawer() {
+        binding.btnOpenDrawer.setOnClickListener(v -> {
+            if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                binding.drawerLayout.closeDrawer(GravityCompat.START);
+            } else {
+                binding.drawerLayout.openDrawer(GravityCompat.START);
+            }
+        });
+
+        binding.navigationView.setNavigationItemSelectedListener(item -> {
+            int itemId = item.getItemId();
+            binding.drawerLayout.closeDrawer(GravityCompat.START);
+
+            if (itemId == R.id.nav_diagnosis) {
+                binding.nestedScrollView.smoothScrollTo(0, 0);
+                return true;
+            } else if (itemId == R.id.nav_archive) {
+                binding.nestedScrollView.post(() -> {
+                    int targetY = binding.rvHistory.getTop() - 80;
+                    binding.nestedScrollView.smoothScrollTo(0, Math.max(0, targetY));
+                });
+                return true;
+            } else if (itemId == R.id.nav_faq) {
+                FaqBottomSheetDialog faqDialog = FaqBottomSheetDialog.newInstance();
+                faqDialog.show(getSupportFragmentManager(), FaqBottomSheetDialog.TAG);
+                return true;
+            } else if (itemId == R.id.nav_specs) {
+                SystemSpecsBottomSheetDialog specsDialog = SystemSpecsBottomSheetDialog.newInstance();
+                specsDialog.show(getSupportFragmentManager(), SystemSpecsBottomSheetDialog.TAG);
+                return true;
+            }
+            return false;
+        });
+
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                    binding.drawerLayout.closeDrawer(GravityCompat.START);
+                } else {
+                    setEnabled(false);
+                    getOnBackPressedDispatcher().onBackPressed();
+                }
+            }
+        });
     }
 
     private void setupModelSelectionToggle() {
@@ -139,7 +195,7 @@ public class MainActivity extends AppCompatActivity {
         String hddName = binding.etHddName.getText() != null
             ? binding.etHddName.getText().toString().trim()
             : "";
-        // Adaptacyjny tryb Shazam (Early Stopping po 3.0s lub do 9.0s z głosowaniem konsensusowym)
+        // Adaptacyjny tryb akustyczny (Early Stopping po 3.0s lub do 9.0s z głosowaniem konsensusowym)
         viewModel.startDiagnosis(hddName);
     }
 
@@ -230,19 +286,19 @@ public class MainActivity extends AppCompatActivity {
         switch (state.getStatus()) {
             case IDLE:
                 stopPulseAnimation();
-                binding.btnHeroShazam.setEnabled(true);
+                binding.btnHeroRadar.setEnabled(true);
                 binding.tvHeroHint.setText("Stuknij, aby zbadać stan HDD");
                 binding.layoutProgressSection.setVisibility(View.GONE);
                 binding.progressBarAudio.setIndeterminate(false);
                 binding.progressBarAudio.setProgress(0);
                 binding.progressBarMicLevel.setProgress(0);
-                binding.tvRecordingStatus.setText("Gotowy do badania (Shazam Mode)");
+                binding.tvRecordingStatus.setText("Gotowy do badania (Tryb Adaptacyjny)");
                 break;
 
             case RECORDING:
                 binding.cardResult.setVisibility(View.GONE);
                 startPulseAnimation();
-                binding.btnHeroShazam.setEnabled(true);
+                binding.btnHeroRadar.setEnabled(true);
                 binding.tvHeroHint.setText("Trwa badanie akustyczne HDD...");
                 binding.layoutProgressSection.setVisibility(View.VISIBLE);
                 binding.progressBarAudio.setIndeterminate(false);
@@ -282,7 +338,7 @@ public class MainActivity extends AppCompatActivity {
                     binding.progressBarMicLevel.setProgress(micPercent);
                 }
 
-                if (rms < 0.0004f) {
+                if (rms < DspConstants.RMS_MIN_BOOSTABLE_THRESHOLD) {
                     binding.tvMicLevelLabel.setText("Zbyt cicho • zbliż telefon do HDD");
                     binding.tvMicLevelLabel.setTextColor(ContextCompat.getColor(this, R.color.status_warning_text));
                 } else if (rms < 0.25f) {
@@ -301,7 +357,7 @@ public class MainActivity extends AppCompatActivity {
             case PROCESSING:
                 binding.cardResult.setVisibility(View.GONE);
                 stopPulseAnimation();
-                binding.btnHeroShazam.setEnabled(false);
+                binding.btnHeroRadar.setEnabled(false);
                 binding.tvHeroHint.setText("Analizowanie sygnatury akustycznej...");
                 binding.layoutProgressSection.setVisibility(View.VISIBLE);
                 binding.tvProgressTime.setText("Przetwarzanie AI...");
@@ -315,7 +371,7 @@ public class MainActivity extends AppCompatActivity {
 
             case SUCCESS:
                 stopPulseAnimation();
-                binding.btnHeroShazam.setEnabled(true);
+                binding.btnHeroRadar.setEnabled(true);
                 binding.tvHeroHint.setText("Stuknij, aby zbadać ponownie");
                 binding.layoutProgressSection.setVisibility(View.GONE);
                 binding.progressBarAudio.setIndeterminate(false);
@@ -326,7 +382,7 @@ public class MainActivity extends AppCompatActivity {
 
             case ERROR:
                 stopPulseAnimation();
-                binding.btnHeroShazam.setEnabled(true);
+                binding.btnHeroRadar.setEnabled(true);
                 binding.tvHeroHint.setText("Stuknij, aby spróbować ponownie");
                 binding.layoutProgressSection.setVisibility(View.GONE);
                 binding.progressBarAudio.setIndeterminate(false);
@@ -402,13 +458,40 @@ public class MainActivity extends AppCompatActivity {
         if (model.getSpectrogramPath() != null) {
             binding.tvSpectrogramPath.setText(model.getSpectrogramPath());
         }
+
+        View.OnClickListener exportSpecListener = v -> {
+            Bitmap bmp = state.getSpectrogramBitmap();
+            Uri uri = null;
+            if (bmp != null) {
+                uri = SpectrogramImageSaver.saveSpectrogramToGallery(
+                        MainActivity.this, bmp, "spec_" + model.getHddName() + "_" + model.getPredictedClass()
+                );
+            } else if (model.getSpectrogramPath() != null) {
+                uri = SpectrogramImageSaver.exportSpectrogramToGalleryFromPath(
+                        MainActivity.this, model.getSpectrogramPath(), "spec_" + model.getHddName() + "_" + model.getPredictedClass()
+                );
+            }
+            if (uri != null) {
+                Toast.makeText(MainActivity.this, "Zapisano spektrogram w Galerii (Pictures/AcousticHddSentinel)", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(MainActivity.this, "Nie udało się zapisać spektrogramu w Galerii", Toast.LENGTH_SHORT).show();
+            }
+        };
+
+        binding.btnExportResultSpectrogram.setOnClickListener(exportSpecListener);
+        binding.ivSpectrogramPreview.setOnClickListener(exportSpecListener);
     }
 
     private void showClearHistoryConfirmationDialog() {
         new MaterialAlertDialogBuilder(this)
             .setTitle("Wyczyścić historię badań?")
-            .setMessage("Spowoduje to trwałe usunięcie wszystkich wpisów z lokalnej bazy SQLite oraz powiązanych plików spektrogramów.")
-            .setPositiveButton("Usuń wszystko", (dialog, which) -> viewModel.clearAllHistory())
+            .setMessage("Spowoduje to trwałe usunięcie wszystkich wpisów z lokalnej bazy SQLite oraz powiązanych plików spektrogramów i nagrań audio.")
+            .setPositiveButton("Usuń wszystko", (dialog, which) -> {
+                if (playbackHelper != null) {
+                    playbackHelper.stop();
+                }
+                viewModel.clearAllHistory();
+            })
             .setNegativeButton("Anuluj", null)
             .show();
     }
@@ -423,16 +506,22 @@ public class MainActivity extends AppCompatActivity {
             statusText = "DYSK SPRAWNY";
         }
 
+        String detailsMsg = String.format(Locale.US,
+            "Data badania: %s\nKlasa: %s\nPewność: %.1f%%\nStatus: %s\nCrest Factor: %.2f • Peak RMS: %.3f\nCzas skanowania: %.1f s\nPlik spektrogramu:\n%s%s",
+            item.getFormattedDate(),
+            item.getPredictedClass().toUpperCase(Locale.US),
+            item.getConfidence() * 100.0f,
+            statusText,
+            item.getCrestFactor(),
+            item.getPeakRms(),
+            item.getScanDurationS(),
+            item.getSpectrogramPath() != null ? item.getSpectrogramPath() : "Brak",
+            item.getAudioPath() != null ? "\nPlik audio: " + item.getAudioPath() : ""
+        );
+
         MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this)
             .setTitle(item.getHddName())
-            .setMessage(String.format(Locale.US,
-                "Data badania: %s\nKlasa: %s\nPewność: %.1f%%\nStatus: %s\nPlik spektrogramu:\n%s",
-                item.getFormattedDate(),
-                item.getPredictedClass().toUpperCase(Locale.US),
-                item.getConfidence() * 100.0f,
-                statusText,
-                item.getSpectrogramPath() != null ? item.getSpectrogramPath() : "Brak"
-            ));
+            .setMessage(detailsMsg);
 
         if (item.getSpectrogramPath() != null) {
             File imgFile = new File(item.getSpectrogramPath());
@@ -443,14 +532,61 @@ public class MainActivity extends AppCompatActivity {
                     iv.setPadding(32, 16, 32, 16);
                     iv.setImageBitmap(bmp);
                     iv.setScaleType(ImageView.ScaleType.FIT_XY);
+                    iv.setOnClickListener(v -> {
+                        Uri uri = SpectrogramImageSaver.exportSpectrogramToGalleryFromPath(
+                                MainActivity.this, item.getSpectrogramPath(), "spec_" + item.getHddName() + "_" + item.getPredictedClass()
+                        );
+                        if (uri != null) {
+                            Toast.makeText(MainActivity.this, "Zapisano spektrogram w Galerii (Pictures/AcousticHddSentinel)", Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(MainActivity.this, "Błąd zapisu w Galerii", Toast.LENGTH_SHORT).show();
+                        }
+                    });
                     builder.setView(iv);
                 }
             }
         }
 
+        if (item.getAudioPath() != null && !item.getAudioPath().trim().isEmpty() && new File(item.getAudioPath()).exists()) {
+            builder.setNeutralButton("Odsłuchaj audio", (dialog, which) -> {
+                if (playbackHelper != null) {
+                    playbackHelper.togglePlayback(item.getAudioPath(), new AudioPlaybackHelper.PlaybackEventListener() {
+                        @Override
+                        public void onPlaybackStarted(String filePath) {
+                            Toast.makeText(MainActivity.this, "Odtwarzanie nagrania dźwięku HDD...", Toast.LENGTH_SHORT).show();
+                        }
+
+                        @Override
+                        public void onPlaybackStopped(String filePath) {}
+
+                        @Override
+                        public void onPlaybackCompleted(String filePath) {}
+
+                        @Override
+                        public void onPlaybackError(String filePath, String errorMessage) {
+                            Toast.makeText(MainActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
+            });
+        }
+
         builder.setPositiveButton("Zamknij", null)
-            .setNeutralButton("Usuń wpis", (dialog, which) -> viewModel.deleteHistoryItem(item))
+            .setNegativeButton("Usuń wpis", (dialog, which) -> {
+                if (playbackHelper != null && playbackHelper.isPlaying(item.getAudioPath())) {
+                    playbackHelper.stop();
+                }
+                viewModel.deleteHistoryItem(item);
+            })
             .show();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (playbackHelper != null) {
+            playbackHelper.stop();
+        }
     }
 
     @Override
@@ -458,6 +594,9 @@ public class MainActivity extends AppCompatActivity {
         super.onStop();
         if (viewModel != null) {
             viewModel.stopRecording();
+        }
+        if (playbackHelper != null) {
+            playbackHelper.stop();
         }
         getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
@@ -469,6 +608,10 @@ public class MainActivity extends AppCompatActivity {
         if (pulseAnimatorSet != null) {
             pulseAnimatorSet.cancel();
             pulseAnimatorSet = null;
+        }
+        if (playbackHelper != null) {
+            playbackHelper.release();
+            playbackHelper = null;
         }
     }
 

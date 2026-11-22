@@ -91,15 +91,15 @@ Natywna aplikacja mobilna na platformę Android, która przy użyciu wbudowanego
 - **Decyzja:** Wykorzystanie natywnego `SQLiteOpenHelper` (klasa `DiagnosticDbHelper` i `DiagnosticRepository`).
 - **Separacja danych:** Obrazy spektrogramów trafiają do katalogu prywatnego aplikacji (`context.getFilesDir() + "/spectrograms/"`). Baza danych przechowuje w kolumnie `spectrogram_path` wyłącznie ścieżkę absolutną do pliku PNG.
 
-### ADR-F: Wzorzec Interfejsu Użytkownika (UI/UX) — Wzorowanie na Shazam
+### ADR-F: Wzorzec Interfejsu Użytkownika (UI/UX) — Hero Radar Interface
 - **Kontekst:** Jak zapewnić maksymalną ergonomię, intuicyjność i profesjonalizm badania akustycznego w warunkach laboratoryjnych i serwerowych?
-- **Decyzja:** Zastosowanie wzorca **Shazam Hero Listening Interface**:
+- **Decyzja:** Zastosowanie wzorca **Hero Radar Listening Interface**:
   1. **Hero Pulse Button (Centralny Przycisk Akustyczny):** Duży, okrągły, centralny przycisk badania z animacją pierścieni (audio ripple) pulsujących w rytm energii RMS w czasie rzeczywistym.
   2. **Single-Screen Focus (Jednoekranowe Płynne Przejścia):**
      - Stan czuwania (IDLE): Czysty, nowoczesny ekran z polem identyfikacji dysku i suwakiem czasu (5–30s).
      - Stan nasłuchiwania (RECORDING): Immersyjny tryb nasłuchiwania dźwięków mechanicznych dysku.
-     - Stan odsłonięcia diagnozy (SUCCESS / REVEAL): Efektowne odsłonięcie karty w stylu Shazam ze spektrogramem termowizyjnym (Acoustic Fingerprint), odznaką stanu (SPRAWNY / AWARIA), pewnością w % i rozkładem klas Softmax.
-  3. **Biblioteka Badań (Shazam Library Shelf):** Elegancka historia badań (RecyclerView) z miniaturkami spektrogramów, datami, odznakami statusu oraz możliwością powiększenia i usuwania wpisów.
+     - Stan odsłonięcia diagnozy (SUCCESS / REVEAL): Efektowne odsłonięcie karty ze spektrogramem termowizyjnym (Acoustic Fingerprint), odznaką stanu (SPRAWNY / AWARIA), pewnością w % i rozkładem klas Softmax.
+  3. **Biblioteka Badań (Acoustic Library Shelf):** Elegancka historia badań (RecyclerView) z miniaturkami spektrogramów, datami, odznakami statusu oraz możliwością powiększenia i usuwania wpisów.
 
 ---
 

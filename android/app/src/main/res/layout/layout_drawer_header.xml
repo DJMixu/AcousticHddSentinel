@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_drawer_header"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <!-- Kontener grafiki fali akustycznej i radaru -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:layout_width="54dp"
+            android:layout_height="54dp"
+            android:background="@drawable/bg_radar_pulse_ring"
+            android:padding="8dp">
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/app_name"
+                android:src="@drawable/ic_mic_radar"
+                app:tint="@color/accent" />
+        </FrameLayout>
+
+        <!-- Dekoracja widmowa / Waveform Art -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:layout_marginStart="14dp"
+            android:gravity="bottom"
+            android:orientation="horizontal">
+
+            <View
+                android:layout_width="3dp"
+                android:layout_height="12dp"
+                android:layout_marginEnd="3dp"
+                android:background="@color/accent_green" />
+            <View
+                android:layout_width="3dp"
+                android:layout_height="22dp"
+                android:layout_marginEnd="3dp"
+                android:background="@color/accent" />
+            <View
+                android:layout_width="3dp"
+                android:layout_height="32dp"
+                android:layout_marginEnd="3dp"
+                android:background="@color/accent_cyan" />
+            <View
+                android:layout_width="3dp"
+                android:layout_height="18dp"
+                android:layout_marginEnd="3dp"
+                android:background="@color/accent" />
+            <View
+                android:layout_width="3dp"
+                android:layout_height="28dp"
+                android:layout_marginEnd="3dp"
+                android:background="@color/accent_green" />
+            <View
+                android:layout_width="3dp"
+                android:layout_height="14dp"
+                android:layout_marginEnd="3dp"
+                android:background="@color/accent" />
+            <View
+                android:layout_width="3dp"
+                android:layout_height="20dp"
+                android:background="@color/accent_cyan" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Nazwa aplikacji i podtytuł techniczny -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="@string/drawer_header_title"
+        android:textColor="@color/text_primary"
+        android:textSize="19sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/drawer_header_subtitle"
+        android:textColor="@color/accent"
+        android:textSize="12sp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="@string/drawer_header_version"
+        android:textColor="@color/text_secondary"
+        android:textSize="11sp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="16dp"
+        android:background="@color/divider" />
+
+</LinearLayout>

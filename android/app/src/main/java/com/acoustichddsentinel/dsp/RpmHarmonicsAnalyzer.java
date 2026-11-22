@@ -3,49 +3,32 @@ package com.acoustichddsentinel.dsp;
 import java.util.Arrays;
 
 /**
- * Analizator widmowy pików częstotliwościowych i grzebienia harmonicznego prędkości obrotowej (RPM) dysków HDD.
- * Zgodny z fizyką akustyczną HDD oraz niezmiennikami ADR-001.
- *
- * Wykrywa:
- * 1. Dynamiczne śledzenie częstotliwości podstawowej i harmonicznych obrotu silnika (Dynamic Harmonic Tracking):
- *    - 5400 RPM: nominalne f0 = 90.0 Hz z dynamicznym oknem śledzenia +/- 4.5 Hz (85.5 - 94.5 Hz)
- *      Harmoniczne stojana i biegunów: 2x, 3x, 4x, 5x, 6x, 8x, 9x, 10x, 12x
- *    - 7200 RPM: nominalne f0 = 120.0 Hz z dynamicznym oknem śledzenia +/- 6.0 Hz (114.0 - 126.0 Hz)
- *      Harmoniczne: 2x, 3x, 4x, 5x, 6x, 12x
- *    Obsługuje spadek prędkości obrotowej w agonalnych dyskach 2.5" z uszkodzonymi łożyskami.
- * 2. Brak rotacji i pisk stojana zablokowanego silnika (Stall Beep w paśmie 1050 - 3500 Hz).
- * 3. Odrzucanie szumu wentylatorów PC i basowego szumu otoczenia.
- *
- * Optymalizacje wydajnościowe (Java 17 / Android):
- * - Prealokacja buforów roboczych FFT, okna Hanna, widma mocy i mediany (Zero GC Allocation).
- * - Okno okresowe Hanna (fftbins=True, dzielenie przez nFft) zgodne z scipy.signal.welch.
- * - Uśrednianie widma mocy PSD z pierwiastkiem kwadratowym (scaling='spectrum').
- * - Obliczanie mediany lokalnego tła odporne na zakłócenia sąsiednich prążków.
+ * Utwardzony analizator widmowy pików częstotliwościowych i grzebienia harmonicznego RPM (Zero GC Churn).
+ * Obsługuje 5400 / 7200 / 10000 / 15000 RPM, interpolację paraboliczną f0, ochronę przed siecią 50/60 Hz
+ * oraz detekcję impulsowych pisków stojana (Max-Hold Stall Beep).
  */
 public class RpmHarmonicsAnalyzer {
 
     private static final int FFT_SIZE = 4096;
-    private static final float FREQ_BIN_WIDTH = (float) DspConstants.SAMPLE_RATE / FFT_SIZE; // ~5.383 Hz
+    private static final float FREQ_BIN_WIDTH = (float) DspConstants.SAMPLE_RATE / FFT_SIZE; // ~5.3833 Hz
 
-    // Mnożniki harmonicznych obrotu dla 5400 RPM (w tym harmoniczne biegunów stojana 8x, 9x, 10x)
     private static final float[] MULTIPLIERS_5400 = {2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 8.0f, 9.0f, 10.0f, 12.0f};
+    private static final float[] MULTIPLIERS_7200 = {2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 9.0f, 12.0f};
+    private static final float[] MULTIPLIERS_10000 = {2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 12.0f};
+    private static final float[] MULTIPLIERS_15000 = {2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
 
-    // Mnożniki harmonicznych obrotu dla 7200 RPM
-    private static final float[] MULTIPLIERS_7200 = {2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 12.0f};
-
-    // Niespójne (incommensurate) przesunięcia czasowe do weryfikacji stacjonarności rotacji
     private static final float[] STATIONARITY_OFFSETS_FRAC = {0.0f, 0.37f, 0.83f, 1.41f, 2.11f};
 
-    // Prealokowane bufory robocze - Zero GC Allocation podczas analizy widmowej
     private final float[] hannWindow = new float[FFT_SIZE];
     private final float[] realBuffer = new float[FFT_SIZE];
     private final float[] imagBuffer = new float[FFT_SIZE];
     private final float[] avgPowerBuffer = new float[FFT_SIZE / 2 + 1];
+    private final float[] maxPowerBuffer = new float[FFT_SIZE / 2 + 1];
     private final float[] avgSpectrumBuffer = new float[FFT_SIZE / 2 + 1];
+    private final float[] maxSpectrumBuffer = new float[FFT_SIZE / 2 + 1];
     private final float[] medianScratchBuffer = new float[256];
 
     public RpmHarmonicsAnalyzer() {
-        // Okno okresowe Hanna (zgodne z scipy.signal.welch, sym=False)
         for (int i = 0; i < FFT_SIZE; i++) {
             hannWindow[i] = (float) (0.5 * (1.0 - Math.cos(2.0 * Math.PI * i / FFT_SIZE)));
         }
@@ -53,9 +36,9 @@ public class RpmHarmonicsAnalyzer {
 
     public static class RpmResult {
         public final boolean hasRotation;
-        public final String detectedRpm;      // "5400_rpm", "7200_rpm" lub null
-        public final int nominalRpm;          // 5400, 7200 lub 0
-        public final float rpmConfidence;     // 0.0 - 1.0
+        public final String detectedRpm;
+        public final int nominalRpm;
+        public final float rpmConfidence;
         public final float f0FoundHz;
         public final boolean hasStallBeep;
         public final float stallBeepFreqHz;
@@ -76,58 +59,70 @@ public class RpmHarmonicsAnalyzer {
 
         public String getSummaryDescription() {
             if (hasRotation) {
-                float expectedF0 = nominalRpm == 5400 ? 90.0f : 120.0f;
+                float expectedF0 = nominalRpm / 60.0f;
                 float drift = f0FoundHz - expectedF0;
                 if (Math.abs(drift) > 1.5f) {
                     return String.format(java.util.Locale.US,
-                        "Wykryto niestabilną rotację wrzeciona HDD (%d RPM, f0=%.1f Hz, dryf=%.1f Hz - degradacja łożysk).",
-                        nominalRpm, f0FoundHz, drift);
+                            "Wykryto niestabilną rotację wrzeciona HDD (%d RPM, f0=%.1f Hz, dryf=%.1f Hz - degradacja łożysk).",
+                            nominalRpm, f0FoundHz, drift);
                 }
                 return String.format(java.util.Locale.US,
-                    "Wykryto prawidłową rotację silnika HDD (%d RPM, f0=%.1f Hz).", nominalRpm, f0FoundHz);
+                        "Wykryto prawidłową rotację silnika HDD (%d RPM, f0=%.1f Hz).", nominalRpm, f0FoundHz);
             }
             if (hasStallBeep) {
                 return String.format(java.util.Locale.US,
-                    "Wykryto pisk stojana zatartego silnika wrzeciona (%.1f Hz). Brak obrotów!", stallBeepFreqHz);
+                        "Wykryto pisk stojana zatartego silnika wrzeciona (%.1f Hz). Brak obrotów!", stallBeepFreqHz);
             }
             return "Brak charakterystycznych sygnatur obrotowych dysku HDD (tło komputera / wentylator).";
         }
     }
 
-    /**
-     * Analizuje 3-sekundowy bufor próbek audio (66150 próbek przy 22050 Hz).
-     */
     public synchronized RpmResult analyzeChunk(float[] samples) {
         if (samples == null || samples.length == 0) {
             return new RpmResult(false, null, 0, 0f, 0f, false, 0f, 0f);
         }
 
-        // 1. Obliczenie RMS
-        float sumSq = 0f;
+        // 1. Usunięcie DC offsetu (obliczenie średniej bez alokacji) i zero-mean RMS
+        double sum = 0.0;
         for (float s : samples) {
-            sumSq += s * s;
+            sum += s;
+        }
+        float dcMean = (float) (sum / samples.length);
+
+        double sumSq = 0.0;
+        for (float s : samples) {
+            float d = s - dcMean;
+            sumSq += d * d;
         }
         float rms = (float) Math.sqrt(sumSq / samples.length);
         if (rms < DspConstants.RMS_SILENCE_THRESHOLD) {
             return new RpmResult(false, null, 0, 0f, 0f, false, 0f, rms);
         }
 
-        // 2. Obliczenie uśrednionego widma Welch z oknem FFT_SIZE=4096 i nakładaniem 50%
-        float[] avgSpectrum = computeWelchSpectrum(samples, FFT_SIZE);
-        int numBins = avgSpectrum.length;
+        // 2. Obliczenie widma średniego Welcha oraz Max-Hold (Zero GC)
+        computeWelchSpectra(samples, dcMean, FFT_SIZE);
+        int numBins = avgSpectrumBuffer.length;
 
-        // Średnia energia widmowa
         float totalEnergy = 0f;
-        for (float v : avgSpectrum) {
+        for (float v : avgSpectrumBuffer) {
             totalEnergy += v;
         }
         float meanEnergy = totalEnergy / Math.max(1, numBins);
 
-        // 3. Dynamiczne śledzenie harmoniczne dla 5400 RPM (zakres f0: 90.0 +/- 4.5 Hz)
-        CombScore score5400 = evaluateCombDynamic(avgSpectrum, 90.0f, 4.5f, MULTIPLIERS_5400, meanEnergy);
+        // 3. Ewaluacja wszystkich 4 profili prędkości obrotowej
+        CombScore[] candidates = new CombScore[]{
+                evaluateCombDynamic(avgSpectrumBuffer, "5400_rpm", 5400, 90.0f, 4.5f, MULTIPLIERS_5400, meanEnergy),
+                evaluateCombDynamic(avgSpectrumBuffer, "7200_rpm", 7200, 120.0f, 6.0f, MULTIPLIERS_7200, meanEnergy),
+                evaluateCombDynamic(avgSpectrumBuffer, "10000_rpm", 10000, 166.67f, 6.0f, MULTIPLIERS_10000, meanEnergy),
+                evaluateCombDynamic(avgSpectrumBuffer, "15000_rpm", 15000, 250.0f, 6.5f, MULTIPLIERS_15000, meanEnergy)
+        };
 
-        // 4. Dynamiczne śledzenie harmoniczne dla 7200 RPM (zakres f0: 120.0 +/- 6.0 Hz)
-        CombScore score7200 = evaluateCombDynamic(avgSpectrum, 120.0f, 6.0f, MULTIPLIERS_7200, meanEnergy);
+        CombScore best = null;
+        for (CombScore c : candidates) {
+            if (c.detected && (best == null || c.score > best.score)) {
+                best = c;
+            }
+        }
 
         boolean hasRotation = false;
         String detectedRpm = null;
@@ -135,126 +130,117 @@ public class RpmHarmonicsAnalyzer {
         float confidence = 0f;
         float f0Found = 0f;
 
-        if (score7200.detected && score7200.score >= score5400.score) {
+        if (best != null && verifyTemporalPitchStationarity(samples, dcMean, best.exactF0Hz)) {
             hasRotation = true;
-            detectedRpm = "7200_rpm";
-            nominalRpm = 7200;
-            confidence = Math.min(1.0f, score7200.score / 10.0f);
-            f0Found = score7200.exactF0Hz;
-        } else if (score5400.detected) {
-            hasRotation = true;
-            detectedRpm = "5400_rpm";
-            nominalRpm = 5400;
-            confidence = Math.min(1.0f, score5400.score / 10.0f);
-            f0Found = score5400.exactF0Hz;
+            detectedRpm = best.rpmKey;
+            nominalRpm = best.nominalRpm;
+            confidence = Math.min(1.0f, best.score / 10.0f);
+            f0Found = best.exactF0Hz;
         }
 
-        // Weryfikacja stacjonarności rotacji wrzeciona (odrzucenie modulacji głosu i syren)
-        if (hasRotation && !verifyTemporalPitchStationarity(samples, f0Found)) {
-            hasRotation = false;
-            detectedRpm = null;
-            nominalRpm = 0;
-            confidence = 0f;
-            f0Found = 0f;
-        }
-
-        // 5. Test pisku zatartego silnika (Stall Beep w paśmie 1050 - 3500 Hz)
+        // 4. Test pisku zatartego silnika (Stall Beep 1050 - 3500 Hz)
+        // Używa maxSpectrumBuffer, aby wychwycić także krótkie, cykliczne piski (np. 150 ms co 1.5 s)
         boolean hasStallBeep = false;
         float stallBeepFreq = 0f;
 
         if (!hasRotation) {
-            int binMin = (int) (1050.0f / FREQ_BIN_WIDTH);
-            int binMax = Math.min(numBins - 1, (int) (3500.0f / FREQ_BIN_WIDTH));
-
-            // Weryfikacja minimalnego udziału energii pasma pisku stojana (min. 0.5% całkowitej energii)
-            double beepBandEnergy = 0.0;
-            double fullSpectrumEnergy = 1e-12;
-            for (int b = 0; b < numBins; b++) {
-                float v = avgSpectrum[b];
-                double pwr = (double) v * v;
-                fullSpectrumEnergy += pwr;
-                if (b >= binMin && b <= binMax) {
-                    beepBandEnergy += pwr;
+            stallBeepFreq = detectStallBeepFreq(avgSpectrumBuffer, meanEnergy, 3.0f);
+            if (stallBeepFreq <= 0f) {
+                float maxMean = 0f;
+                for (float v : maxSpectrumBuffer) {
+                    maxMean += v;
                 }
+                maxMean /= Math.max(1, numBins);
+                // Dla Max-Hold wymagamy nieco wyższej ostrości (>= 4.0x) przeciwko szerokopasmowym klikom
+                stallBeepFreq = detectStallBeepFreq(maxSpectrumBuffer, maxMean, 4.0f);
             }
-
-            if (beepBandEnergy / fullSpectrumEnergy >= 0.005) {
-                float maxPeakVal = 0f;
-                int maxPeakBin = -1;
-
-                for (int b = binMin; b <= binMax; b++) {
-                    float val = avgSpectrum[b];
-                    if (val > maxPeakVal && val > meanEnergy * 5.0f) {
-                        // Sprawdzenie lokalnej dominacji (szczyt lokalny)
-                        if (b > 0 && b < numBins - 1 && val > avgSpectrum[b - 1] && val > avgSpectrum[b + 1]) {
-                            // Weryfikacja wyrazistości piku (prominence) względem mediany lokalnego tła w otoczeniu +/-12 binów
-                            int bgLow = Math.max(0, b - 12);
-                            int bgHigh = Math.min(numBins - 1, b + 12);
-                            int bgCount = 0;
-                            for (int k = bgLow; k <= bgHigh; k++) {
-                                if (Math.abs(k - b) > 2) {
-                                    if (bgCount < medianScratchBuffer.length) {
-                                        medianScratchBuffer[bgCount++] = avgSpectrum[k];
-                                    }
-                                }
-                            }
-                            float localBg = (bgCount > 0) ? computeMedian(medianScratchBuffer, bgCount) : meanEnergy;
-                            float prominenceRatio = val / Math.max(localBg, 1e-12f);
-
-                            // Autentyczny pisk stojana zablokowanego silnika to czysty, wąskopasmowy ton sinusoidalny (prominence >= 3.0x)
-                            if (prominenceRatio >= 3.0f) {
-                                maxPeakVal = val;
-                                maxPeakBin = b;
-                            }
-                        }
-                    }
-                }
-
-                if (maxPeakBin > 0) {
-                    hasStallBeep = true;
-                    stallBeepFreq = maxPeakBin * FREQ_BIN_WIDTH;
-                }
-            }
+            hasStallBeep = (stallBeepFreq > 0f);
         }
 
         return new RpmResult(hasRotation, detectedRpm, nominalRpm, confidence, f0Found, hasStallBeep, stallBeepFreq, rms);
     }
 
+    private float detectStallBeepFreq(float[] spectrum, float meanEnergy, float minProminence) {
+        int numBins = spectrum.length;
+        int binMin = (int) (1050.0f / FREQ_BIN_WIDTH);
+        int binMax = Math.min(numBins - 2, (int) (3500.0f / FREQ_BIN_WIDTH));
+
+        double beepBandEnergy = 0.0;
+        double fullSpectrumEnergy = 1e-12;
+        for (int b = 0; b < numBins; b++) {
+            double pwr = (double) spectrum[b] * spectrum[b];
+            fullSpectrumEnergy += pwr;
+            if (b >= binMin && b <= binMax) {
+                beepBandEnergy += pwr;
+            }
+        }
+        if (beepBandEnergy / fullSpectrumEnergy < 0.005) {
+            return 0f;
+        }
+
+        float maxPeakVal = 0f;
+        int maxPeakBin = -1;
+        for (int b = Math.max(1, binMin); b <= binMax; b++) {
+            float val = spectrum[b];
+            if (val > maxPeakVal && val > meanEnergy * 5.0f && val > spectrum[b - 1] && val > spectrum[b + 1]) {
+                int bgLow = Math.max(0, b - 12);
+                int bgHigh = Math.min(numBins - 1, b + 12);
+                int bgCount = 0;
+                for (int k = bgLow; k <= bgHigh; k++) {
+                    if (Math.abs(k - b) > 2 && bgCount < medianScratchBuffer.length) {
+                        medianScratchBuffer[bgCount++] = spectrum[k];
+                    }
+                }
+                float localBg = (bgCount > 0) ? computeMedian(medianScratchBuffer, bgCount) : meanEnergy;
+                if (val / Math.max(localBg, 1e-12f) >= minProminence) {
+                    maxPeakVal = val;
+                    maxPeakBin = b;
+                }
+            }
+        }
+
+        if (maxPeakBin <= 0) {
+            return 0f;
+        }
+        return interpolatePeakFreqHz(spectrum, maxPeakBin);
+    }
+
     private static class CombScore {
+        final String rpmKey;
+        final int nominalRpm;
         final boolean detected;
         final float score;
         final float exactF0Hz;
-        final int harmonicHits;
-        final float f0Prominence;
 
-        CombScore(boolean detected, float score, float exactF0Hz, int harmonicHits, float f0Prominence) {
+        CombScore(String rpmKey, int nominalRpm, boolean detected, float score, float exactF0Hz) {
+            this.rpmKey = rpmKey;
+            this.nominalRpm = nominalRpm;
             this.detected = detected;
             this.score = score;
             this.exactF0Hz = exactF0Hz;
-            this.harmonicHits = harmonicHits;
-            this.f0Prominence = f0Prominence;
         }
     }
 
-    /**
-     * Dynamic Harmonic Tracking via Pitch Harmonizer.
-     * Znajduje optymalną częstotliwość f0 w tolerancji f0Tolerance, a następnie dynamicznie
-     * śledzi harmoniczne f_k = k * exactF0Hz, uwzględniając spadek prędkości obrotowej wywołany uszkodzeniem łożysk.
-     */
-    private CombScore evaluateCombDynamic(float[] spectrum, float targetF0, float f0Tolerance, float[] multipliers, float meanEnergy) {
-        int binF0Min = Math.max(1, (int) Math.ceil((targetF0 - f0Tolerance) / FREQ_BIN_WIDTH));
-        int binF0Max = Math.min(spectrum.length - 2, (int) Math.floor((targetF0 + f0Tolerance) / FREQ_BIN_WIDTH));
+    private CombScore evaluateCombDynamic(
+            float[] spectrum,
+            String rpmKey,
+            int nominalRpm,
+            float targetF0,
+            float f0Tolerance,
+            float[] multipliers,
+            float meanEnergy
+    ) {
+        int binF0Min = Math.max(1, (int) Math.floor((targetF0 - f0Tolerance) / FREQ_BIN_WIDTH));
+        int binF0Max = Math.min(spectrum.length - 2, (int) Math.ceil((targetF0 + f0Tolerance) / FREQ_BIN_WIDTH));
 
         double totalEnergy = 1e-12;
         for (float v : spectrum) {
-            totalEnergy += v * v;
+            totalEnergy += (double) v * v;
         }
 
-        // 1. Wyszukanie optymalnego f0 w rozszerzonym oknie tolerancji (szczyt lokalny)
         int bestF0Bin = binF0Min;
         float maxF0Val = 0f;
         boolean foundLocalPeak = false;
-
         for (int b = binF0Min; b <= binF0Max; b++) {
             float val = spectrum[b];
             boolean isPeak = (val >= spectrum[b - 1] && val >= spectrum[b + 1]);
@@ -270,32 +256,25 @@ public class RpmHarmonicsAnalyzer {
             }
         }
 
-        float exactF0Hz = bestF0Bin * FREQ_BIN_WIDTH;
+        // Interpolacja paraboliczna usuwa błąd kwantyzacji binu 5.38 Hz przed mnożeniem przez m <= 12
+        float exactF0Hz = interpolatePeakFreqHz(spectrum, bestF0Bin);
+
+        // Odrzucenie przydźwięku sieci energetycznej (60 Hz -> 120 Hz; 50/100 Hz -> 250 Hz)
+        if (isMainsHumConfounder(spectrum, nominalRpm, maxF0Val)) {
+            return new CombScore(rpmKey, nominalRpm, false, 0f, exactF0Hz);
+        }
+
         double harmonicEnergy = (double) maxF0Val * maxF0Val;
 
-        // 2. Szacowanie mediany lokalnego tła wokół targetF0 w promieniu +/- 25.0 Hz (poza pasmem piku)
-        int bgBinMin = Math.max(0, (int) ((targetF0 - 25.0f) / FREQ_BIN_WIDTH));
-        int bgBinMax = Math.min(spectrum.length - 1, (int) ((targetF0 + 25.0f) / FREQ_BIN_WIDTH));
-        int bgCount = 0;
-        for (int b = bgBinMin; b <= bgBinMax; b++) {
-            float freq = b * FREQ_BIN_WIDTH;
-            if (Math.abs(freq - exactF0Hz) > 3.5f) {
-                if (bgCount < medianScratchBuffer.length) {
-                    medianScratchBuffer[bgCount++] = spectrum[b];
-                }
-            }
-        }
-        float localBg = bgCount > 0 ? computeMedian(medianScratchBuffer, bgCount) : 1e-6f;
+        float localBg = computeLocalMedianBackground(spectrum, bestF0Bin, 25.0f, 3.5f);
         float f0Prominence = maxF0Val / Math.max(1e-6f, localBg);
 
-        // Wyznaczenie ostrości piku f0 względem ramion piku (+/- 2 biny widma)
         float f0Sharpness = 1.0f;
         if (bestF0Bin >= 2 && bestF0Bin + 2 < spectrum.length) {
             float skirt = (spectrum[bestF0Bin - 2] + spectrum[bestF0Bin + 2]) * 0.5f;
             f0Sharpness = maxF0Val / Math.max(skirt, 1e-9f);
         }
 
-        // 3. Dynamiczne śledzenie wyższych harmonicznych proporcjonalnie do znalezionego exactF0Hz
         int harmonicHits = 0;
         boolean has2ndHarmonicHit = false;
         for (float m : multipliers) {
@@ -304,8 +283,7 @@ public class RpmHarmonicsAnalyzer {
                 continue;
             }
 
-            // Adaptacyjna tolerancja zależna od rzędu harmonicznej
-            float tol = Math.max(6.0f, hFreq * 0.025f);
+            float tol = Math.max(6.0f, hFreq * 0.02f);
             int hBinMin = Math.max(0, (int) ((hFreq - tol) / FREQ_BIN_WIDTH));
             int hBinMax = Math.min(spectrum.length - 1, (int) ((hFreq + tol) / FREQ_BIN_WIDTH));
 
@@ -316,20 +294,16 @@ public class RpmHarmonicsAnalyzer {
                 }
             }
 
-            // Dynamiczny promień okna tła lokalnego dla harmonicznej (zapobiega wyzerowaniu binów dla hFreq > 1200 Hz)
             float hBgWindow = Math.max(40.0f, tol * 2.0f);
             int hBgMin = Math.max(0, (int) ((hFreq - hBgWindow) / FREQ_BIN_WIDTH));
             int hBgMax = Math.min(spectrum.length - 1, (int) ((hFreq + hBgWindow) / FREQ_BIN_WIDTH));
             int hBgCount = 0;
             for (int b = hBgMin; b <= hBgMax; b++) {
-                if (b < hBinMin || b > hBinMax) {
-                    if (hBgCount < medianScratchBuffer.length) {
-                        medianScratchBuffer[hBgCount++] = spectrum[b];
-                    }
+                if ((b < hBinMin || b > hBinMax) && hBgCount < medianScratchBuffer.length) {
+                    medianScratchBuffer[hBgCount++] = spectrum[b];
                 }
             }
-            float hBg = hBgCount > 0 ? computeMedian(medianScratchBuffer, hBgCount) : 1e-6f;
-            // Wymóg: wyrazistość względem tła (> 1.6x) oraz bezwzględna energia względem średniej widma (> 5%)
+            float hBg = (hBgCount > 0) ? computeMedian(medianScratchBuffer, hBgCount) : 1e-6f;
             if (maxHVal / Math.max(1e-6f, hBg) > 1.6f && maxHVal > meanEnergy * 0.05f) {
                 harmonicHits++;
                 harmonicEnergy += (double) maxHVal * maxHVal;
@@ -339,18 +313,12 @@ public class RpmHarmonicsAnalyzer {
             }
         }
 
-        float score = (f0Prominence * 0.4f) + ((float) harmonicHits / multipliers.length * 6.0f);
+        float score = (Math.min(f0Prominence, 10.0f) * 0.4f) + ((float) harmonicHits / multipliers.length * 6.0f);
         float energyRatio = (float) (harmonicEnergy / totalEnergy);
 
-        // Wymóg rotacji HDD:
-        // 1. Multi-harmonic comb: harmonicHits >= 2 i score >= 3.0f oraz f0Prominence >= 2.2f
-        //    (lub f0Prominence >= 1.8f przy min. 3 harmonicznych i score >= 3.8f)
-        // 2. Silny 2-tonowy rotor z f0 i 2f0 (np. autentyczne silniki FDB): harmonicHits >= 1,
-        //    f0Prominence >= 3.0f, score >= 3.0f, POD WARUNKIEM że trafienie przypada na 2. harmoniczną (m=2.0)
         boolean multiHitComb = harmonicHits >= 2
                 && score >= 3.0f
-                && ((f0Prominence >= 2.2f)
-                || (f0Prominence >= 1.8f && harmonicHits >= 3 && score >= 3.8f));
+                && ((f0Prominence >= 2.2f) || (f0Prominence >= 1.8f && harmonicHits >= 3 && score >= 3.8f));
 
         boolean single2ndHarmonicComb = harmonicHits >= 1
                 && has2ndHarmonicHit
@@ -361,37 +329,81 @@ public class RpmHarmonicsAnalyzer {
         boolean detected = (multiHitComb || single2ndHarmonicComb)
                 && (energyRatio >= 0.005f || harmonicHits >= 4);
 
-        return new CombScore(detected, score, exactF0Hz, harmonicHits, f0Prominence);
+        return new CombScore(rpmKey, nominalRpm, detected, score, exactF0Hz);
     }
 
-    /**
-     * Oblicza medianę z pierwszych 'count' elementów bufora.
-     */
+    private boolean isMainsHumConfounder(float[] spectrum, int nominalRpm, float f0PeakVal) {
+        if (nominalRpm == 7200) {
+            int bin60 = Math.round(60.0f / FREQ_BIN_WIDTH);
+            if (bin60 >= 1 && bin60 < spectrum.length - 1) {
+                float bg60 = computeLocalMedianBackground(spectrum, bin60, 20.0f, 5.5f);
+                if (spectrum[bin60] / Math.max(bg60, 1e-6f) >= 3.0f && spectrum[bin60] >= 0.75f * f0PeakVal) {
+                    return true;
+                }
+            }
+        } else if (nominalRpm == 15000) {
+            int bin50 = Math.round(50.0f / FREQ_BIN_WIDTH);
+            int bin100 = Math.round(100.0f / FREQ_BIN_WIDTH);
+            if (bin50 >= 1 && bin100 < spectrum.length - 1) {
+                float p50 = spectrum[bin50] / Math.max(computeLocalMedianBackground(spectrum, bin50, 20.0f, 5.5f), 1e-6f);
+                float p100 = spectrum[bin100] / Math.max(computeLocalMedianBackground(spectrum, bin100, 20.0f, 5.5f), 1e-6f);
+                if (p50 >= 3.0f && p100 >= 2.5f) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private float computeLocalMedianBackground(float[] spectrum, int centerBin, float radiusHz, float excludeHz) {
+        float centerFreq = centerBin * FREQ_BIN_WIDTH;
+        int minBin = Math.max(0, (int) ((centerFreq - radiusHz) / FREQ_BIN_WIDTH));
+        int maxBin = Math.min(spectrum.length - 1, (int) ((centerFreq + radiusHz) / FREQ_BIN_WIDTH));
+        int count = 0;
+        for (int b = minBin; b <= maxBin; b++) {
+            if (Math.abs(b * FREQ_BIN_WIDTH - centerFreq) > excludeHz && count < medianScratchBuffer.length) {
+                medianScratchBuffer[count++] = spectrum[b];
+            }
+        }
+        return (count > 0) ? computeMedian(medianScratchBuffer, count) : 1e-6f;
+    }
+
+    private static float interpolatePeakFreqHz(float[] spectrum, int peakBin) {
+        if (peakBin <= 0 || peakBin >= spectrum.length - 1) {
+            return peakBin * FREQ_BIN_WIDTH;
+        }
+        float alpha = spectrum[peakBin - 1];
+        float beta = spectrum[peakBin];
+        float gamma = spectrum[peakBin + 1];
+        float denom = 2.0f * (2.0f * beta - alpha - gamma);
+        float delta = (Math.abs(denom) > 1e-12f) ? ((gamma - alpha) / denom) : 0.0f;
+        delta = Math.max(-0.5f, Math.min(0.5f, delta));
+        return (peakBin + delta) * FREQ_BIN_WIDTH;
+    }
+
     private float computeMedian(float[] buf, int count) {
         if (count <= 0) return 1e-6f;
         if (count == 1) return buf[0];
         Arrays.sort(buf, 0, count);
         if ((count & 1) == 1) {
             return buf[count / 2];
-        } else {
-            return 0.5f * (buf[count / 2 - 1] + buf[count / 2]);
         }
+        return 0.5f * (buf[count / 2 - 1] + buf[count / 2]);
     }
 
-    /**
-     * Oblicza uśrednione widmo amplitudowe z oknem Hann (zgodne z scipy.signal.welch, scaling='spectrum').
-     * Wykorzystuje prealokowane tablice w pamięci, eliminując alokację obiektów GC.
-     */
-    private float[] computeWelchSpectrum(float[] samples, int nFft) {
+    private void computeWelchSpectra(float[] samples, float dcMean, int nFft) {
         int halfFft = nFft / 2 + 1;
         Arrays.fill(avgPowerBuffer, 0f);
+        Arrays.fill(maxPowerBuffer, 0f);
         Arrays.fill(avgSpectrumBuffer, 0f);
+        Arrays.fill(maxSpectrumBuffer, 0f);
+
         int hop = nFft / 2;
         int numSegments = 0;
 
         for (int offset = 0; offset + nFft <= samples.length; offset += hop) {
             for (int i = 0; i < nFft; i++) {
-                realBuffer[i] = samples[offset + i] * hannWindow[i];
+                realBuffer[i] = (samples[offset + i] - dcMean) * hannWindow[i];
                 imagBuffer[i] = 0f;
             }
 
@@ -400,6 +412,9 @@ public class RpmHarmonicsAnalyzer {
             for (int k = 0; k < halfFft; k++) {
                 float pwr = realBuffer[k] * realBuffer[k] + imagBuffer[k] * imagBuffer[k];
                 avgPowerBuffer[k] += pwr;
+                if (pwr > maxPowerBuffer[k]) {
+                    maxPowerBuffer[k] = pwr;
+                }
             }
             numSegments++;
         }
@@ -408,74 +423,73 @@ public class RpmHarmonicsAnalyzer {
             float invSeg = 1.0f / numSegments;
             for (int k = 0; k < halfFft; k++) {
                 avgSpectrumBuffer[k] = (float) Math.sqrt(avgPowerBuffer[k] * invSeg);
+                maxSpectrumBuffer[k] = (float) Math.sqrt(maxPowerBuffer[k]);
             }
         }
-        return avgSpectrumBuffer;
     }
 
-    private void radix2Fft(float[] real, float[] imag, int n) {
+    /**
+     * Radix-2 DIT FFT z podwójną precyzją czynników obrotu (eliminacja dryfu fazy dla N=4096).
+     */
+    private static void radix2Fft(float[] real, float[] imag, int n) {
         int j = 0;
         for (int i = 0; i < n - 1; i++) {
             if (i < j) {
                 float tr = real[i]; real[i] = real[j]; real[j] = tr;
                 float ti = imag[i]; imag[i] = imag[j]; imag[j] = ti;
             }
-            int k = n / 2;
+            int k = n >> 1;
             while (k <= j) {
                 j -= k;
-                k /= 2;
+                k >>= 1;
             }
             j += k;
         }
 
         for (int len = 2; len <= n; len <<= 1) {
+            int half = len >> 1;
             double angle = -2.0 * Math.PI / len;
-            float wlen_r = (float) Math.cos(angle);
-            float wlen_i = (float) Math.sin(angle);
+            double wStepR = Math.cos(angle);
+            double wStepI = Math.sin(angle);
 
             for (int i = 0; i < n; i += len) {
-                float w_r = 1.0f;
-                float w_i = 0.0f;
-                int half = len / 2;
+                double wR = 1.0;
+                double wI = 0.0;
 
                 for (int m = 0; m < half; m++) {
                     int u = i + m;
-                    int v = i + m + half;
+                    int v = u + half;
 
-                    float vr = real[v] * w_r - imag[v] * w_i;
-                    float vi = real[v] * w_i + imag[v] * w_r;
+                    float vr = (float) (real[v] * wR - imag[v] * wI);
+                    float vi = (float) (real[v] * wI + imag[v] * wR);
 
-                    real[v] = real[u] - vr;
-                    imag[v] = imag[u] - vi;
-                    real[u] = real[u] + vr;
-                    imag[u] = imag[u] + vi;
+                    float ur = real[u];
+                    float ui = imag[u];
 
-                    float next_w_r = w_r * wlen_r - w_i * wlen_i;
-                    float next_w_i = w_r * wlen_i + w_i * wlen_r;
-                    w_r = next_w_r;
-                    w_i = next_w_i;
+                    real[u] = ur + vr;
+                    imag[u] = ui + vi;
+                    real[v] = ur - vr;
+                    imag[v] = ui - vi;
+
+                    double nextWR = wR * wStepR - wI * wStepI;
+                    double nextWI = wR * wStepI + wI * wStepR;
+                    wR = nextWR;
+                    wI = nextWI;
                 }
             }
         }
     }
 
-    /**
-     * Weryfikacja stacjonarności częstotliwości podstawowej f0 w czasie.
-     * Autentyczny silnik HDD wykazuje sztywną mechaniczną stabilność obrotów (wow & flutter < 0.05%, dryf < 0.2 Hz).
-     * Głos ludzki (wibrato) oraz syreny charakteryzują się dynamiczną modulacją częstotliwości (FM delta >= 3.0 Hz).
-     * Zero-allocation: wykorzystuje prealokowane tablice realBuffer i imagBuffer.
-     */
-    private boolean verifyTemporalPitchStationarity(float[] samples, float f0Found) {
+    private boolean verifyTemporalPitchStationarity(float[] samples, float dcMean, float f0Found) {
         if (samples.length < DspConstants.SAMPLE_RATE * 2.5f) {
             return true;
         }
 
-        int nFft = FFT_SIZE; // 4096
-        int kMin = Math.max(1, (int) Math.ceil((f0Found - 5.0f) / FREQ_BIN_WIDTH));
-        int kMax = Math.min(nFft / 2 - 1, (int) Math.floor((f0Found + 5.0f) / FREQ_BIN_WIDTH));
+        int nFft = FFT_SIZE;
+        int kMin = Math.max(1, (int) Math.floor((f0Found - 5.0f) / FREQ_BIN_WIDTH));
+        int kMax = Math.min(nFft / 2 - 2, (int) Math.ceil((f0Found + 5.0f) / FREQ_BIN_WIDTH));
         if (kMin > kMax) {
-            kMin = Math.max(1, Math.round((f0Found - 5.0f) / FREQ_BIN_WIDTH));
-            kMax = Math.min(nFft / 2 - 1, Math.round((f0Found + 5.0f) / FREQ_BIN_WIDTH));
+            return true;
         }
 
         float minFSub = Float.MAX_VALUE;
@@ -489,7 +503,7 @@ public class RpmHarmonicsAnalyzer {
             }
 
             for (int i = 0; i < nFft; i++) {
-                realBuffer[i] = samples[offset + i] * hannWindow[i];
+                realBuffer[i] = (samples[offset + i] - dcMean) * hannWindow[i];
                 imagBuffer[i] = 0f;
             }
 
@@ -510,7 +524,8 @@ public class RpmHarmonicsAnalyzer {
                 float beta = maxVal;
                 float gamma = (float) Math.sqrt(realBuffer[bestK + 1] * realBuffer[bestK + 1] + imagBuffer[bestK + 1] * imagBuffer[bestK + 1]);
                 float denom = 2.0f * (2.0f * beta - alpha - gamma);
-                float delta = denom != 0.0f ? (gamma - alpha) / denom : 0.0f;
+                float delta = (Math.abs(denom) > 1e-12f) ? ((gamma - alpha) / denom) : 0.0f;
+                delta = Math.max(-0.5f, Math.min(0.5f, delta));
                 float fSub = (bestK + delta) * FREQ_BIN_WIDTH;
 
                 if (fSub < minFSub) minFSub = fSub;
@@ -522,8 +537,6 @@ public class RpmHarmonicsAnalyzer {
         if (validCount < 3) {
             return true;
         }
-
-        float deltaF = maxFSub - minFSub;
-        return deltaF <= 1.5f;
+        return (maxFSub - minFSub) <= 1.5f;
     }
 }

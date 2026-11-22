@@ -1,0 +1,49 @@
+{
+  "test": {
+    "total_chunks": 516,
+    "raw_acc": 0.7073643410852714,
+    "dsp_acc": 0.6627906976744186,
+    "raw_f1": 0.5713477929202866,
+    "dsp_f1": 0.3701895626356058,
+    "raw_bin_fpr": 0.09570957095709572,
+    "dsp_bin_fpr": 0.0627062706270627,
+    "dsp_bin_recall": 0.49295774647887325,
+    "dsp_corrections": 23,
+    "rpm_detection_rate": 42.244224422442244,
+    "per_class_f1_dsp": {
+      "beeping": 0.11904761904761904,
+      "clicking": 0.5,
+      "normal": 0.8172661870503597,
+      "scratching": 0.044444444444444446
+    }
+  },
+  "train": {
+    "total_chunks": 567,
+    "raw_acc": 0.5855379188712522,
+    "dsp_acc": 0.3562610229276896,
+    "raw_f1": 0.5766412121328665,
+    "dsp_f1": 0.3467806073243977,
+    "raw_bin_fpr": 0.05970149253731343,
+    "dsp_bin_fpr": 0.029850746268656716,
+    "dsp_bin_recall": 0.544,
+    "dsp_corrections": 5,
+    "rpm_detection_rate": 50.74626865671642,
+    "per_class_f1_dsp": {
+      "beeping": 0.4824120603015075,
+      "clicking": 0.5272727272727272,
+      "normal": 0.3611111111111111,
+      "scratching": 0.0163265306122449
+    }
+  },
+  "real_drives_study": {
+    "total_windows": 320,
+    "raw_fpr": 0.0,
+    "dsp_fpr": 0.0,
+    "rpm_detection_rate": 41.25
+  },
+  "ambient_noise_study": {
+    "total_windows": 33,
+    "raw_fpr": 30.303030303030305,
+    "dsp_fpr": 0.0
+  }
+}

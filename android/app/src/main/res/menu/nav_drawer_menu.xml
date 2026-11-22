@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_diagnosis"
+            android:icon="@drawable/ic_diagnosis"
+            android:title="@string/nav_item_diagnosis" />
+
+        <item
+            android:id="@+id/nav_archive"
+            android:icon="@drawable/ic_archive"
+            android:title="@string/nav_item_archive" />
+    </group>
+
+    <item android:title="@string/nav_section_support">
+        <menu>
+            <item
+                android:id="@+id/nav_faq"
+                android:icon="@drawable/ic_faq"
+                android:title="@string/nav_item_faq" />
+
+            <item
+                android:id="@+id/nav_specs"
+                android:icon="@drawable/ic_specs"
+                android:title="@string/nav_item_specs" />
+        </menu>
+    </item>
+
+</menu>

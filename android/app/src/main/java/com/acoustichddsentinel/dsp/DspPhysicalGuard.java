@@ -30,6 +30,16 @@ public class DspPhysicalGuard {
     private final float[] fftReal2048;
     private final float[] fftImag2048;
 
+    private static final int TRANSIENT_FRAME_LEN = 256;
+    private static final int TRANSIENT_HOP = 128;
+    private static final int STANDARD_TRANSIENT_FRAMES =
+            (DspConstants.CHUNK_SAMPLES - TRANSIENT_FRAME_LEN) / TRANSIENT_HOP + 1; // 515
+
+    private final float[] zeroMeanBuffer = new float[DspConstants.CHUNK_SAMPLES];
+    private final float[] frameRmsBuffer = new float[STANDARD_TRANSIENT_FRAMES];
+    private final float[] sortedRmsBuffer = new float[STANDARD_TRANSIENT_FRAMES];
+    private final float[] absDevBuffer = new float[STANDARD_TRANSIENT_FRAMES];
+
     public DspPhysicalGuard() {
         this.hannWindow2048 = new float[FFT_BAND_SIZE];
         for (int i = 0; i < FFT_BAND_SIZE; i++) {
@@ -116,18 +126,20 @@ public class DspPhysicalGuard {
      * @param rpmRes wynik analizy harmonicznej RPM z RpmHarmonicsAnalyzer
      * @return wynik sanityzacji z przefiltrowanymi prawdopodobieństwami i logiem audytowym
      */
-    public SanitizationResult sanitizeProbabilities(
+    public synchronized SanitizationResult sanitizeProbabilities(
             float[] rawProbs,
             float[] rawSamples,
             float[][] zNormLogMel,
             RpmHarmonicsAnalyzer.RpmResult rpmRes
     ) {
-        if (rawProbs == null || rawProbs.length < 4) {
+        if (rawProbs == null || rawProbs.length < 4 || rawSamples == null || rawSamples.length == 0) {
             return new SanitizationResult(rawProbs, 0f, 0, false, false, false, false, false, false, "Brak danych");
         }
 
-        // 1. Usunięcie DC offsetu z sygnału fali
-        float[] samples = removeDcOffset(rawSamples);
+        // 1. Usunięcie DC offsetu in-place do prealokowanego bufora (0 B alokacji dla 66150 próbek)
+        float[] samples = (rawSamples.length == DspConstants.CHUNK_SAMPLES)
+                ? removeDcOffsetInto(rawSamples, zeroMeanBuffer)
+                : removeDcOffset(rawSamples);
 
         // 2. Obliczenie cech fizycznych
         float rms = computeRms(samples);
@@ -153,7 +165,8 @@ public class DspPhysicalGuard {
         float peak = computePeak(samples);
         float crestFactor = peak / Math.max(rms, EPSILON);
 
-        int transientCount = countTransientPeaks(samples, SR);
+        // 2. Odporne zliczanie transjentów (MAD zamiast std, Zero GC dla 66150 próbek)
+        int transientCount = countTransientPeaksInternal(samples, SR);
 
         // Zoptymalizowana pojedyncza transformata FFT Radix-2 dla wszystkich pasm widmowych
         SpectralBands bands = computeSpectralBands(samples);
@@ -182,10 +195,17 @@ public class DspPhysicalGuard {
         // Indeksy klas: 0: beeping, 1: clicking, 2: normal, 3: scratching
 
         // WETO 1: CLICKING (indeks 1)
-        // Autentyczny Click of Death wymaga wyrazistych uderzeń (transientCount >= 2) oraz wysokiego Crest Factor (>= 3.5).
-        // Jednostajny szum wentylatora ani basowy szum miasta NIE mogą generować clicking!
-        // Przesterowanie mikrofonu wetuje klikanie, chyba że aktywny jest Smart Clipping Bypass (katastrofalny Crash Stop).
-        if (crestFactor < 3.5f || transientCount < 2 || isFanOrPurifier || effectiveClippingVeto || isCityTrafficNoise) {
+        // Autentyczny Click of Death wymaga wyrazistych uderzeń mechanicznych:
+        // - Dla silnych uderzeń (CF >= 4.2) dopuszczamy nawet pojedyncze uderzenie w oknie 3.0s (transientCount >= 1, np. rzadki odbojnik)
+        // - Dla umiarkowanych uderzeń (CF < 4.2) wymagamy co najmniej 2 transjentów (transientCount >= 2)
+        boolean hasClickingTransients = (crestFactor >= 4.2f && transientCount >= 1)
+                || (crestFactor >= 3.2f && transientCount >= 2);
+        boolean vetoClickingCondition = (!hasClickingTransients)
+                || isFanOrPurifier
+                || effectiveClippingVeto
+                || (isCityTrafficNoise && crestFactor < 4.0f);
+
+        if (vetoClickingCondition) {
             if (probs[1] > 0.05f) {
                 vetoClicking = true;
                 float confiscated = probs[1] - 0.01f;
@@ -202,9 +222,14 @@ public class DspPhysicalGuard {
         }
 
         // WETO 2: SCRATCHING (indeks 3)
-        // Fałszywe tarcie głowic powstaje przy nieuszkodzonym przesterowaniu mikrofonu, szumie miasta lub szumie powietrza.
-        // Jeśli sygnał posiada cechy katastrofalnego tarcia głowic o talerz (CF >= 4.5 i highFreq > 18%), omijamy weto clippingu.
-        if (effectiveClippingVeto || isCityTrafficNoise || (isFanOrPurifier && highFreqFraction < 0.15f)) {
+        // Fałszywe tarcie głowic powstaje przy nieuszkodzonym przesterowaniu mikrofonu lub szumie powietrza.
+        // Jeśli model wykazuje wysoką pewność tarcia (probs[3] >= 0.40f) i sygnał nie jest wentylatorem,
+        // basowy rezonans obudowy silnika HDD (isCityTrafficNoise) nie blokuje autentycznej katastrofy głowic.
+        boolean vetoScratchingCondition = effectiveClippingVeto
+                || (isCityTrafficNoise && probs[3] < 0.40f)
+                || (isFanOrPurifier && highFreqFraction < 0.15f);
+
+        if (vetoScratchingCondition) {
             if (probs[3] > 0.05f) {
                 vetoScratching = true;
                 float confiscated = probs[3] - 0.01f;
@@ -343,20 +368,28 @@ public class DspPhysicalGuard {
     }
 
     /**
+     * Usuwa składową stałą DC offset z sygnału do wskazanego bufora docelowego.
+     */
+    public static float[] removeDcOffsetInto(float[] raw, float[] dst) {
+        if (raw == null || raw.length == 0 || dst == null) return dst;
+        double sum = 0.0;
+        for (int i = 0; i < raw.length; i++) {
+            sum += raw[i];
+        }
+        float mean = (float) (sum / raw.length);
+        for (int i = 0; i < raw.length; i++) {
+            dst[i] = raw[i] - mean;
+        }
+        return dst;
+    }
+
+    /**
      * Usuwa składową stałą DC offset z sygnału.
      */
     public static float[] removeDcOffset(float[] raw) {
         if (raw == null || raw.length == 0) return new float[0];
-        double sum = 0.0;
-        for (float v : raw) {
-            sum += v;
-        }
-        float mean = (float) (sum / raw.length);
         float[] out = new float[raw.length];
-        for (int i = 0; i < raw.length; i++) {
-            out[i] = raw[i] - mean;
-        }
-        return out;
+        return removeDcOffsetInto(raw, out);
     }
 
     private static float computeRms(float[] samples) {
@@ -376,42 +409,64 @@ public class DspPhysicalGuard {
         return peak;
     }
 
-    /**
-     * Liczy wyraźne impulsy mechaniczne (transjenty) o separacji min. 80 ms,
-     * przekraczające próg median + 2.2 * std w obwiedni krótkoczasowej.
-     */
-    public static int countTransientPeaks(float[] zeroMeanSamples, int sr) {
-        int frameLen = 256; // ~11.6 ms
-        int hop = 128;      // ~5.8 ms
-        int nFrames = (zeroMeanSamples.length - frameLen) / hop + 1;
+    private int countTransientPeaksInternal(float[] zeroMeanSamples, int sr) {
+        int nFrames = (zeroMeanSamples.length - TRANSIENT_FRAME_LEN) / TRANSIENT_HOP + 1;
         if (nFrames < 4) return 0;
 
-        float[] frameRms = new float[nFrames];
+        boolean usePrealloc = (nFrames <= STANDARD_TRANSIENT_FRAMES);
+        float[] frameRms = usePrealloc ? frameRmsBuffer : new float[nFrames];
+        float[] sorted = usePrealloc ? sortedRmsBuffer : new float[nFrames];
+        float[] absDev = usePrealloc ? absDevBuffer : new float[nFrames];
+
+        return countTransientPeaksCore(zeroMeanSamples, sr, nFrames, frameRms, sorted, absDev);
+    }
+
+    /**
+     * Wstecznie kompatybilna metoda statyczna (wykorzystująca odporny estymator MAD).
+     */
+    public static int countTransientPeaks(float[] zeroMeanSamples, int sr) {
+        if (zeroMeanSamples == null || zeroMeanSamples.length < TRANSIENT_FRAME_LEN) return 0;
+        int nFrames = (zeroMeanSamples.length - TRANSIENT_FRAME_LEN) / TRANSIENT_HOP + 1;
+        if (nFrames < 4) return 0;
+        return countTransientPeaksCore(
+                zeroMeanSamples, sr, nFrames,
+                new float[nFrames], new float[nFrames], new float[nFrames]
+        );
+    }
+
+    private static int countTransientPeaksCore(
+            float[] zeroMeanSamples,
+            int sr,
+            int nFrames,
+            float[] frameRms,
+            float[] sorted,
+            float[] absDev
+    ) {
         for (int f = 0; f < nFrames; f++) {
-            int offset = f * hop;
+            int offset = f * TRANSIENT_HOP;
             double sumSq = 0.0;
-            for (int i = 0; i < frameLen; i++) {
+            for (int i = 0; i < TRANSIENT_FRAME_LEN; i++) {
                 float s = zeroMeanSamples[offset + i];
                 sumSq += s * s;
             }
-            frameRms[f] = (float) Math.sqrt(sumSq / frameLen);
+            float val = (float) Math.sqrt(sumSq / TRANSIENT_FRAME_LEN);
+            frameRms[f] = val;
+            sorted[f] = val;
         }
 
-        // Obliczenie mediany i odchylenia standardowego energii
-        float[] sorted = Arrays.copyOf(frameRms, frameRms.length);
-        Arrays.sort(sorted);
-        float median = sorted[sorted.length / 2];
+        Arrays.sort(sorted, 0, nFrames);
+        float median = sorted[nFrames / 2];
 
-        double sumDiffSq = 0.0;
-        for (float v : frameRms) {
-            float diff = v - median;
-            sumDiffSq += diff * diff;
+        for (int f = 0; f < nFrames; f++) {
+            absDev[f] = Math.abs(frameRms[f] - median);
         }
-        float std = (float) Math.sqrt(sumDiffSq / frameRms.length);
-        float threshold = median + 2.2f * std;
+        Arrays.sort(absDev, 0, nFrames);
+        float madSigma = 1.4826f * absDev[nFrames / 2];
 
-        // Min separacja 80 ms w ramkach (80 ms / 5.8 ms ≈ 14 ramek)
-        int minFrameDistance = (int) (0.080f * sr / hop);
+        // Próg odporny na gęste, głośne klikanie (MAD) + ochrona przed mikrowahaniami tła (1.6x median)
+        float threshold = Math.max(median * 1.6f, median + 3.5f * madSigma);
+
+        int minFrameDistance = (int) (0.080f * sr / TRANSIENT_HOP);
         int transientCount = 0;
         int lastPeakFrame = -minFrameDistance;
 
@@ -423,7 +478,6 @@ public class DspPhysicalGuard {
                 }
             }
         }
-
         return transientCount;
     }
 
@@ -432,7 +486,7 @@ public class DspPhysicalGuard {
      * z wykorzystaniem prealokowanych energii pasmowych SpectralBands.
      */
     public static boolean isAerodynamicFanOrPurifier(float[] zeroMeanSamples, float crestFactor, int transientCount, SpectralBands bands) {
-        if (crestFactor >= 6.2f || transientCount >= 4) {
+        if (crestFactor >= 4.2f || transientCount >= 1) {
             return false;
         }
         if (bands == null || bands.totalEnergy < EPSILON) {
@@ -442,21 +496,17 @@ public class DspPhysicalGuard {
         float highRatio = bands.getHighFreqFraction();
         float lowMidRatio = bands.getLowMidRatio();
 
-        // Szum turbulentny powietrza / otoczenia: wysokie pasmo >4 kHz jest znikome (< 4%),
-        // a energia skupiona jest w dolnym i średnim paśmie.
-        if (highRatio < 0.04f && (lowMidRatio > 0.50f || crestFactor < 5.5f)) {
-            return true;
-        }
-
-        // Standardowy wentylator/oczyszczacz
-        return (lowMidRatio > 0.60f && highRatio < 0.12f && crestFactor < 4.5f && transientCount < 2);
+        // Szum turbulentny wentylatora / oczyszczacza:
+        // Brak transjentów mechanicznych (CF < 4.2, tc = 0), znikome wysokie pasmo (>4 kHz < 4%)
+        // oraz wyraźna dominacja pasma aerodynamicznego 100-1500 Hz (lowMidRatio > 0.70).
+        return (lowMidRatio > 0.70f && highRatio < 0.04f && crestFactor < 4.0f);
     }
 
     /**
      * Przeciążenie zachowujące kompatybilność wsteczną.
      */
     public static boolean isAerodynamicFanOrPurifier(float[] zeroMeanSamples, float crestFactor, int transientCount) {
-        if (crestFactor >= 6.2f || transientCount >= 4) {
+        if (crestFactor >= 4.2f || transientCount >= 1) {
             return false;
         }
         float lowMidEnergy = computeBandEnergy(zeroMeanSamples, SR, 100.0f, 1500.0f);
@@ -468,11 +518,7 @@ public class DspPhysicalGuard {
         float highRatio = highEnergy / totalEnergy;
         float lowMidRatio = lowMidEnergy / totalEnergy;
 
-        if (highRatio < 0.04f && (lowMidRatio > 0.50f || crestFactor < 5.5f)) {
-            return true;
-        }
-
-        return (lowMidRatio > 0.60f && highRatio < 0.12f && crestFactor < 4.5f && transientCount < 2);
+        return (lowMidRatio > 0.70f && highRatio < 0.04f && crestFactor < 4.0f);
     }
 
     /**
@@ -558,7 +604,7 @@ public class DspPhysicalGuard {
     }
 
     /**
-     * Szybka transformata Fouriera Radix-2 Cooley-Tukey (in-place).
+     * Szybka transformata Fouriera Radix-2 Cooley-Tukey (in-place) z czynnikami obrotu o podwójnej precyzji.
      */
     private static void fftRadix2(float[] real, float[] imag, int n) {
         int j = 0;
@@ -567,43 +613,43 @@ public class DspPhysicalGuard {
                 float tr = real[i]; real[i] = real[j]; real[j] = tr;
                 float ti = imag[i]; imag[i] = imag[j]; imag[j] = ti;
             }
-            int k = n / 2;
+            int k = n >> 1;
             while (k <= j) {
                 j -= k;
-                k /= 2;
+                k >>= 1;
             }
             j += k;
         }
 
         for (int len = 2; len <= n; len <<= 1) {
+            int half = len >> 1;
             double angle = -2.0 * Math.PI / len;
-            float wlen_r = (float) Math.cos(angle);
-            float wlen_i = (float) Math.sin(angle);
+            double wStepR = Math.cos(angle);
+            double wStepI = Math.sin(angle);
 
             for (int i = 0; i < n; i += len) {
-                float w_r = 1.0f;
-                float w_i = 0.0f;
-                int half = len / 2;
+                double wR = 1.0;
+                double wI = 0.0;
 
                 for (int k = 0; k < half; k++) {
                     int pos = i + k;
                     int pair = pos + half;
 
-                    float v_r = real[pair] * w_r - imag[pair] * w_i;
-                    float v_i = real[pair] * w_i + imag[pair] * w_r;
+                    float vr = (float) (real[pair] * wR - imag[pair] * wI);
+                    float vi = (float) (real[pair] * wI + imag[pair] * wR);
 
-                    float u_r = real[pos];
-                    float u_i = imag[pos];
+                    float ur = real[pos];
+                    float ui = imag[pos];
 
-                    real[pos] = u_r + v_r;
-                    imag[pos] = u_i + v_i;
-                    real[pair] = u_r - v_r;
-                    imag[pair] = u_i - v_i;
+                    real[pos] = ur + vr;
+                    imag[pos] = ui + vi;
+                    real[pair] = ur - vr;
+                    imag[pair] = ui - vi;
 
-                    float next_w_r = w_r * wlen_r - w_i * wlen_i;
-                    float next_w_i = w_r * wlen_i + w_i * wlen_r;
-                    w_r = next_w_r;
-                    w_i = next_w_i;
+                    double nextWR = wR * wStepR - wI * wStepI;
+                    double nextWI = wR * wStepI + wI * wStepR;
+                    wR = nextWR;
+                    wI = nextWI;
                 }
             }
         }

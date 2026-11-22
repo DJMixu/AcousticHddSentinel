@@ -83,13 +83,13 @@ Wymagania inżynieryjne i wyzwania:
 
 ---
 
-### Obszar E: Interfejs Użytkownika (UI/UX) — Wzorzec Shazam Hero Interface
+### Obszar E: Interfejs Użytkownika (UI/UX) — Wzorzec Hero Radar Interface
 
 - **Koncepcja wizualna i ergonomia:**
-  - **Hero Pulse Button:** Duży, centralny przycisk badania wzorowany na ikonie Shazam. W trakcie nagrywania mikrofonem (5–30s) wokół przycisku generowane są pulsujące pierścienie (ripple animation) reagujące na bieżący poziom energii RMS dźwięku dysku.
+  - **Hero Pulse Button:** Duży, centralny przycisk badania z pulsującym radarem. W trakcie nagrywania mikrofonem (5–30s) wokół przycisku generowane są pulsujące pierścienie (ripple animation) reagujące na bieżący poziom energii RMS dźwięku dysku.
   - **Acoustic Fingerprint (Akustyczny Odcisk Palca):** Wizualizacja spektrogramu Mel w termowizyjnej palecie Inferno (259 x 128 pikseli), prezentująca unikalny podpis częstotliwościowy pracy badanego napędu.
-  - **Shazam Reveal Transition:** Płynne przejście ze stanu nasłuchiwania do karty wyniku diagnozy (duża odznaka stanu SPRAWNY / AWARIA, pewność %, rozkład prawdopodobieństw klas i laboratoryjna rekomendacja techniczna).
-  - **Biblioteka Badań (Shazam Library Shelf):** Elegancka lista RecyclerView z zaokrąglonymi kartami poprzednich diagnoz, podglądem spektrogramów i szybkim usuwaniem wpisów.
+  - **Reveal Transition:** Płynne przejście ze stanu nasłuchiwania do karty wyniku diagnozy (duża odznaka stanu SPRAWNY / AWARIA, pewność %, rozkład prawdopodobieństw klas i laboratoryjna rekomendacja techniczna).
+  - **Biblioteka Badań (Acoustic Library Shelf):** Elegancka lista RecyclerView z zaokrąglonymi kartami poprzednich diagnoz, podglądem spektrogramów i szybkim usuwaniem wpisów.
 
 ---
 
@@ -130,19 +130,26 @@ android/
    `beeping`, `clicking`, `normal`, `scratching`.
 6. **Polityka prywatności (Privacy-First):** Brak deklaracji `<uses-permission android:name="android.permission.INTERNET" />` w `AndroidManifest.xml` — aplikacja nie ma fizycznej możliwości transmisji danych przez sieć.
 
-### 3.2. Schemat bazy danych Room (Tabela `diagnostics`)
-```kotlin
-@Entity(tableName = "diagnostics")
-data class DiagnosticEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    @ColumnInfo(name = "hdd_name") val hddName: String,
-    @ColumnInfo(name = "timestamp") val timestamp: Long,
-    @ColumnInfo(name = "predicted_class") val predictedClass: String,
-    @ColumnInfo(name = "confidence") val confidence: Float,
-    @ColumnInfo(name = "has_anomaly") val hasAnomaly: Boolean,
-    @ColumnInfo(name = "spectrogram_path") val spectrogramPath: String? = null,
-    @ColumnInfo(name = "audio_path") val audioPath: String? = null
-)
+### 3.2. Schemat relacyjnej bazy danych SQLite (Wersja 2, Tabela `Diagnostics`)
+```sql
+CREATE TABLE Diagnostics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hdd_name TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    has_anomaly INTEGER NOT NULL,
+    spectrogram_path TEXT,
+    predicted_class TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    audio_path TEXT,
+    prob_beeping REAL DEFAULT 0.0,
+    prob_clicking REAL DEFAULT 0.0,
+    prob_normal REAL DEFAULT 0.0,
+    prob_scratching REAL DEFAULT 0.0,
+    crest_factor REAL DEFAULT 0.0,
+    peak_rms REAL DEFAULT 0.0,
+    scan_duration_s REAL DEFAULT 0.0,
+    recommendation TEXT
+);
 ```
 
 ### 3.3. Diagram architektury komponentów i przepływu danych

@@ -1,7 +1,7 @@
 # Acoustic HDD Sentinel 🛡️💽
-> **Produkcyjny system wibroakustycznej detekcji i wieloklasowej klasyfikacji uszkodzeń mechanicznych dysków twardych (HDD) przy użyciu głębokich sieci konwolucyjnych (2D CNN w PyTorch z architekturą SMPC Option A), fizycznych strażników DSP (RPM Harmonics Analyzer) oraz natywnej aplikacji mobilnej Android (100% Czysta Java 17, Material 3 Shazam UI, Wzorzec Strategii z podwójnym modelem i trybem RAW Audio).**
+> **Produkcyjny system wibroakustycznej detekcji i wieloklasowej klasyfikacji uszkodzeń mechanicznych dysków twardych (HDD) przy użyciu głębokich sieci konwolucyjnych (2D CNN w PyTorch z architekturą SMPC Option A), fizycznych strażników DSP (RPM Harmonics Analyzer) oraz natywnej aplikacji mobilnej Android (100% Czysta Java 17, Material 3 UI, Wzorzec Strategii z podwójnym modelem i trybem RAW Audio).**
 
-[![Tests](https://img.shields.io/badge/Tests-5%2F5%20Suites%20Passed%20(100%25)-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-7%2F7%20Suites%20Passed%20(100%25)-brightgreen.svg)]()
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![PyTorch 2.x](https://img.shields.io/badge/PyTorch-2.x-red.svg)](https://pytorch.org/)
 [![Android Pure Java 17](https://img.shields.io/badge/Android-Pure%20Java%2017%20(0%25%20Kotlin)-orange.svg)]()
@@ -11,7 +11,7 @@
 
 > [!NOTE]
 > **Główna Architektura Produkcyjna:**
-> System produkcyjny realizuje pełną 4-klasową klasyfikację akustyczną (`normal`, `clicking`, `beeping`, `scratching`) łącząc sieć 2D CNN z wielomodalną przestrzenią podcentrów **SMPC Option A**, fizycznym strażnikiem obrotów **RPM Harmonics Analyzer** (weryfikacja stacjonarności pitch, filtracja wibrato mowy), bramkowaniem **Open-Set OOD** oraz natywną aplikacją Android w **100% czystej Javie 17** (Zero Kotlin runtime, interfejs Material 3 w stylu Shazam, animacja radaru, przełącznik wzorca Strategii dla podwójnego modelu oraz tryb RAW Audio).
+> System produkcyjny realizuje pełną 4-klasową klasyfikację akustyczną (`normal`, `clicking`, `beeping`, `scratching`) łącząc sieć 2D CNN z wielomodalną przestrzenią podcentrów **SMPC Option A**, fizycznym strażnikiem obrotów **RPM Harmonics Analyzer** (weryfikacja stacjonarności pitch, filtracja wibrato mowy), bramkowaniem **Open-Set OOD** oraz natywną aplikacją Android w **100% czystej Javie 17** (Zero Kotlin runtime, interfejs Material 3, animacja radaru, przełącznik wzorca Strategii dla podwójnego modelu oraz tryb RAW Audio).
 > 
 > *Równolegle w repozytorium prowadzona jest badawcza gałąź eksperymentalna `feature/prototype-bez-normal` (badająca alternatywny paradygmat Fault-Only Learning z estymatorem GMM bez klasy normal w zbiorze uczącym — zobacz [PrototypBezNormal/README.md](PrototypBezNormal/README.md)).*
 
@@ -21,7 +21,7 @@
 1. [🎯 O projekcie](#-o-projekcie)
 2. [🔬 Architektura przetwarzania audio (ADR-001) – Tensor 3-kanałowy i potok DSP](#-architektura-przetwarzania-audio-adr-001--tensor-3-kanałowy-i-potok-dsp)
 3. [🧠 Architektura 2D CNN, wbudowane OOD SMPC Option A i Fuzja Decyzyjna](#-architektura-2d-cnn-wbudowane-ood-smpc-option-a-i-fuzja-decyzyjna)
-4. [📱 Aplikacja Mobilna Android (100% Czysta Java 17, Shazam UI, Wzorzec Strategii i RAW Audio)](#-aplikacja-mobilna-android-100-czysta-java-17-shazam-ui-wzorzec-strategii-i-raw-audio)
+4. [📱 Aplikacja Mobilna Android (100% Czysta Java 17, Material 3 UI, Wzorzec Strategii i RAW Audio)](#-aplikacja-mobilna-android-100-czysta-java-17-material-3-ui-wzorzec-strategii-i-raw-audio)
 5. [🎙️ Niezmiennik Sprzętowy Mikrofonu (Single Source of Truth)](#️-niezmiennik-sprzętowy-mikrofonu-single-source-of-truth)
 6. [📈 Ewolucja Projektu i Kamienie Milowe (Progress & Evolution)](#-ewolucja-projektu-i-kamienie-milowe-progress--evolution)
 7. [🔍 Jak model wyłapuje poszczególne awarie mechaniczne](#-jak-model-wyłapuje-poszczególne-awarie-mechaniczne)
@@ -125,7 +125,7 @@ Szczegółowy opis matematyczny i analizę warstw znajdziesz w dokumencie techni
 
 ---
 
-## 📱 Aplikacja Mobilna Android (100% Czysta Java 17, Shazam UI, Wzorzec Strategii i RAW Audio)
+## 📱 Aplikacja Mobilna Android (100% Czysta Java 17, Material 3 UI, Wzorzec Strategii i RAW Audio)
 
 Natywny moduł mobilny w katalogu [android/](android/) został zaprojektowany zgodnie ze standardem **ADR-002** ([docx/adr/adr-002-mobile-architecture.md](docx/adr/adr-002-mobile-architecture.md)):
 
@@ -167,7 +167,7 @@ android/app/src/main/java/com/acoustichddsentinel/
     └── DiagnosticUiState.java         # Reaktywne stany UI (IDLE, RECORDING, PROCESSING, RESULT, ERROR)
 ```
 
-### 1. Interfejs Material 3 w stylu Shazam z animacją radaru:
+### 1. Nowoczesny interfejs Material 3 z animacją radaru:
 - **Centralny przycisk nasłuchu:** Wyposażony w pulsujący radar pomiarowy z wielowarstwowymi rozchodzącymi się pierścieniami (`PulsingRingAnimation`) oraz obracającą się linią omiatania radaru (`RadarWaveLineAnimation`), która eliminuje clipping ramek na krawędziach ekranu.
 - **Wizualizacja fali dźwiękowej:** Dynamiczny wskaźnik amplitudy reagujący na żywo na energię docierającą do mikrofonu.
 - **Karty diagnostyczne Material 3:** Błyskawiczny werdykt kolorystyczny (zielony dla `normal`, żółty dla `beeping`, pomarańczowy dla `clicking`, czerwony dla `scratching`) wraz ze wskaźnikiem pewności, wyliczonym RPM i zaleceniem serwisowym (np. *„Natychmiast wyłącz zasilanie – ryzyko uszkodzenia talerzy”*).
@@ -248,7 +248,7 @@ Projekt przeszedł gruntowną ewolucję inżynierską — od wstępnego prototyp
 | **Bramka Open-Set OOD** | Brak (Fałszywe alarmy na mowie) | Brak | **Wielomodalne podcentra SMPC w grafie** |
 | **Odporność na szum miasta** | Niebadana (Częste fałszywe alarmy) | Niebadana | **0 / 5 fałszywych alarmów (P $\le 5.9\%$)** |
 | **Rozmiar modelu** | ~4.83 MB (PyTorch FP32) | 4.61 MB (PyTorch FP32) | **1.17 MB (Skwantyzowany ONNX INT8)** |
-| **Wdrożenie docelowe** | Wyłącznie skrypty Python | Eksport ONNX | **Aplikacja Android (100% Czysta Java 17, Shazam UI, 122 testy)** |
+| **Wdrożenie docelowe** | Wyłącznie skrypty Python | Eksport ONNX | **Aplikacja Android (100% Czysta Java 17, Material 3 UI, 122 testy)** |
 
 ---
 
@@ -369,7 +369,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Uruchomienie 5 oficjalnych zestawów testowych systemu:
+### 2. Uruchomienie oficjalnych zestawów testowych systemu:
 ```bash
 # 1. Automatyczny test integralności projektu i niezmienników ADR-001 (6/6):
 python tests/test_project_logic.py
@@ -383,7 +383,13 @@ python tests/test_rpm_harmonics_analyzer.py
 # 4. Test odporności fuzji hybrydowej na szumy wentylatorów PC i cichy sygnał 45 dB (6/6):
 python tests/test_computer_sound_rejection.py
 
-# 5. Zestaw testów jednostkowych aplikacji mobilnej Android (Czysta Java 17, 122 testy):
+# 5. Weryfikacja wykrywalności awarii na 100% całego datasetu (6 840 tensorów, >80% recall):
+python tests/test_full_dataset_fault_detection_rate.py
+
+# 6. Pełna ewaluacja potoku aplikacji (z DSP vs bez DSP, 0% FPR na dyskach laboratoryjnych):
+python tests/evaluate_app_pipeline_on_dataset.py
+
+# 7. Zestaw testów jednostkowych aplikacji mobilnej Android (Czysta Java 17, 13 klas, 74 testy):
 cd android && ./gradlew test && cd ..
 ```
 
@@ -438,6 +444,8 @@ AcousticHddSentinel/
 │   ├── test_smpc_architecture.py      # Testy architektury Sub-Center Multi-Prototype Cosine (7/7)
 │   ├── test_rpm_harmonics_analyzer.py # Testy analizatora harmonicznych RPM i odrzucania głosu (9/9)
 │   ├── test_computer_sound_rejection.py # Testy odporności fuzji hybrydowej na szumy PC (6/6)
+│   ├── test_full_dataset_fault_detection_rate.py # Weryfikacja wykrywalności awarii na 100% datasetu (6 840 tensorów, >80% recall)
+│   ├── evaluate_app_pipeline_on_dataset.py # Ewaluacja potoku aplikacji (z DSP vs bez DSP, 0% FPR na dyskach)
 │   ├── verify_cnn_model.py            # 6-etapowa weryfikacja wag modelu i bramki OOD
 │   ├── verify_binary_verdict_and_real_drives.py # Test 320 okien rzeczywistych dysków i wentylatorów
 │   ├── verify_dsp_parity_python_java.py # Weryfikacja parzystości numerycznej DSP (Java vs Python)
@@ -454,11 +462,11 @@ AcousticHddSentinel/
 │   ├── start_services.sh              # Uruchomienie usług Ollama i Open WebUI
 │   └── stop_services.sh               # Zatrzymanie usług Ollama i Open WebUI
 │
-├── android/                           # 📱 Natywna aplikacja mobilna (Android Studio / Java 17 / Shazam UI)
+├── android/                           # 📱 Natywna aplikacja mobilna (Android Studio / Java 17 / Material 3 UI)
 │   ├── app/src/main/assets/           # Skwantyzowany model ONNX INT8, classes.json, model_card.json
 │   ├── app/src/main/java/             # Pakiety: audio, data (SQLite), dsp (Zero GC Churn), ml, ui (MVVM)
 │   ├── app/src/main/res/              # Zasoby UI (układ radarowy, motywy Material 3, ikony)
-│   ├── app/src/test/java/             # Zestaw 10 klas testowych (122 testy jednostkowe w czystej Javie 17)
+│   ├── app/src/test/java/             # Zestaw 13 klas testowych (74 testy jednostkowe w czystej Javie 17)
 │   └── build.gradle.kts               # Konfiguracja projektu Gradle 8.4 (Czysta Java 17, 0 Kotlina)
 │
 ├── data/raw/                          # Baza 353 surowych nagrań audio (rejestr MD5)

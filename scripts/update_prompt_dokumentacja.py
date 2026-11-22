@@ -49,7 +49,7 @@ def main():
    - *Model v3 (Fine-Tuning i Seed Ensembling):* regeneracja bazy, SpecAugment, AdamW, Label Smoothing 0.03, komitet modeli o ziarnach 42, 123, 777. Wynik: Macro F1 = 84.63%, F1 dla scratching = 0.737, beeping = 0.864, clicking = 0.785, normal = 1.000.
    - *Model v4 (Adversarial Lab):* ochrona przed szumem wentylatorów PC ($1/f$, BPF) oraz przesterowaniami mikrofonów smartfona MEMS (Flat-Top Clipping i harmoniczne THD fałszujące scratching).
    - *Model v5 (Silnik Hybrydowy):* analizator harmonicznych RPM metodą Welcha (prążki 90 Hz dla 5400 RPM i 120 Hz dla 7200 RPM) jako fizyczne potwierdzenie obracającego się dysku.
-   - *Model v6 (Android Edge AI):* kwantyzacja wag ONNX INT8 (1.18 MB, redukcja o 74.6%), inferencja w 18–32 ms, implementacja w czystej Javie 17 bez NDK, pętla Shazam.
+   - *Model v6 (Android Edge AI):* kwantyzacja wag ONNX INT8 (1.18 MB, redukcja o 74.6%), inferencja w 18–32 ms, implementacja w czystej Javie 17 bez NDK, pętla adaptacyjna.
    - *Model v7 (Strażnik Fizyczny v2 & Odporność na Głośny Szum Miasta i Przesterowanie):*
      * **Pełne weto przesterowania (`isClipped`):** Obcięcie wierzchołków fali mikrofonu (`clipRatio > 2%`) bezwzględnie wetuje wszystkie klasy uszkodzeń (`clicking`, `beeping`, `scratching`), eliminując sztuczne transjenty i harmoniczne THD.
      * **Filtr głośnego szumu miejskiego i ruchu ulicznego (`isCityTrafficNoise`):** Dominacja pasma basowego $<300\\text{ Hz}$ ($>75\\%$) przy braku energii tarcia $>4\\text{ kHz}$ ($<3.5\\%$) skutkuje automatycznym wetem dla awarii mechanicznych.
@@ -133,12 +133,15 @@ Przeprowadź dogłębną inspekcję załączonego poniżej kodu pod kątem:
         content = content[:pos_recorder] + dsp_guard_java_section + content[pos_recorder:]
 
     # 7. Aktualizacja MainViewModel.java
-    vm_java_header = "### Pętla Shazam z Early Stopping i Crest Factor Guard (`MainViewModel.java`)\n```java\n"
+    vm_java_header = "### Pętla Adaptacyjna, Werdykt Binarny i Konsensus Okien (`MainViewModel.java`)\n```java\n"
     pos_vm_java = content.find(vm_java_header)
+    if pos_vm_java == -1:
+        vm_java_header = "### Pętla Adaptacyjna z Early Stopping i Crest Factor Guard (`MainViewModel.java`)\n```java\n"
+        pos_vm_java = content.find(vm_java_header)
     if pos_vm_java != -1:
         end_vm_java = content.find("```\n\n## KOMPENDIUM KODU 8: AUTOMATYCZNY TESTER NIEZMIENNIKÓW", pos_vm_java)
         if end_vm_java != -1:
-            new_vm_header = "### Pętla Shazam, Werdykt Binarny i Konsensus Okien (`MainViewModel.java`)\n```java\n"
+            new_vm_header = "### Pętla Adaptacyjna, Werdykt Binarny i Konsensus Okien (`MainViewModel.java`)\n```java\n"
             content = content[:pos_vm_java] + new_vm_header + main_viewmodel_java + "\n" + content[end_vm_java:]
 
     with open(PROMPT_FILE, "w", encoding="utf-8") as f:

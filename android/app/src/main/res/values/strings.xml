@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Acoustic HDD Sentinel</string>
     <string name="title_diagnostic">Diagnostyka Akustyczna HDD</string>
-    <string name="subtitle_diagnostic">Detekcja i klasyfikacja uszkodzeń głowic, silnika i talerzy (2D CNN)</string>
+    <string name="subtitle_diagnostic">Detekcja i klasyfikacja uszkodzeń głowic, silnika i talerzy (2D CNN &amp; DSP)</string>
     <string name="hint_hdd_name">Oznaczenie / Model dysku (np. Seagate Barracuda 2TB)</string>
     <string name="btn_start_diagnosis">Rozpocznij diagnozę HDD</string>
     <string name="btn_stop_diagnosis">Zatrzymaj nagrywanie</string>
@@ -25,4 +25,26 @@
     <string name="label_raw_audio_mode">Czysty tor audio RAW (Omiń filtry systemowe)</string>
     <string name="toast_raw_audio_enabled">Włączono czysty tor audio RAW (Unprocessed, filtry systemowe wyłączone).</string>
     <string name="toast_raw_audio_disabled">Przełączono na standardowy tor audio.</string>
+
+    <!-- Navigation Drawer & Nagłówek -->
+    <string name="nav_diagnosis">Diagnoza HDD</string>
+    <string name="nav_archive">Archiwum Nagrań i Badań</string>
+    <string name="nav_faq">Baza Wiedzy &amp; FAQ</string>
+    <string name="nav_specs">Specyfikacja Systemu</string>
+    <string name="nav_item_diagnosis">Diagnoza HDD</string>
+    <string name="nav_item_archive">Archiwum Nagrań i Badań</string>
+    <string name="nav_section_support">Wsparcie i Wiedza</string>
+    <string name="nav_item_faq">Baza Wiedzy &amp; FAQ</string>
+    <string name="nav_item_specs">Specyfikacja Systemu</string>
+    <string name="faq_title">Baza Wiedzy &amp; FAQ</string>
+    <string name="faq_subtitle">Instrukcja badania akustycznego i diagnostyki uszkodzeń</string>
+    <string name="specs_title">Specyfikacja Techniczna</string>
+    <string name="drawer_header_title">Acoustic HDD Sentinel</string>
+    <string name="drawer_header_subtitle">Deep Audio Spectrogram AI &amp; RPM Sentinel</string>
+    <string name="drawer_header_version">v5.2.0 • Pure Java 17 / ONNX INT8</string>
+
+    <!-- Dostępność i opisy -->
+    <string name="desc_open_drawer">Otwórz menu nawigacyjne</string>
+    <string name="desc_audio_play">Odtwórz nagranie</string>
+    <string name="desc_audio_stop">Zatrzymaj odtwarzanie</string>
 </resources>

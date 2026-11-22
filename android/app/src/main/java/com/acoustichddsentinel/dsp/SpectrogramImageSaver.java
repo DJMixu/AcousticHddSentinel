@@ -1,23 +1,33 @@
 package com.acoustichddsentinel.dsp;
 
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.util.Log;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 
 /**
  * Konwerter spektrogramu Mel do obrazu graficznego Bitmap i pliku PNG.
- * Zapisuje wygenerowane obrazy w pamięci wewnętrznej aplikacji (Internal Storage).
+ * Zapisuje wygenerowane obrazy w pamięci wewnętrznej aplikacji (Internal Storage)
+ * oraz umożliwia eksport bezpośrednio do publicznej Galerii zdjęć (Pictures/AcousticHddSentinel).
  * Zgodność z ADR-002 i NFR-04.
  */
 public final class SpectrogramImageSaver {
 
     private static final String TAG = "SpectrogramImageSaver";
     private static final String SPECTROGRAMS_SUBDIR = "spectrograms";
+    public static final String GALLERY_SUBDIR = "Pictures/AcousticHddSentinel";
 
     private SpectrogramImageSaver() {
     }
@@ -91,6 +101,85 @@ public final class SpectrogramImageSaver {
                 }
             }
         }
+    }
+
+    /**
+     * Zapisuje wygenerowany spektrogram bezpośrednio do publicznej Galerii zdjęć urządzenia
+     * (Pictures/AcousticHddSentinel) za pomocą interfejsu MediaStore Androida.
+     *
+     * @param context kontekst aplikacji Android
+     * @param bitmap  obiekt Bitmap spektrogramu
+     * @param title   tytuł lub prefiks nazwy pliku
+     * @return Uri zapisanego obrazu w pamięci publicznej lub null przy błędzie
+     */
+    public static Uri saveSpectrogramToGallery(Context context, Bitmap bitmap, String title) {
+        if (context == null || bitmap == null) return null;
+        try {
+            ContentResolver resolver = context.getContentResolver();
+            String cleanTitle = (title != null && !title.trim().isEmpty())
+                    ? title.replaceAll("[^a-zA-Z0-9_-]", "_")
+                    : "spectrogram";
+            String fileName = cleanTitle + "_" + System.currentTimeMillis() + ".png";
+
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Images.Media.DISPLAY_NAME, fileName);
+            values.put(MediaStore.Images.Media.MIME_TYPE, "image/png");
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                values.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/AcousticHddSentinel");
+                values.put(MediaStore.Images.Media.IS_PENDING, 1);
+            }
+
+            Uri collection = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+                    ? MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                    : MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+
+            Uri imageUri = resolver.insert(collection, values);
+            if (imageUri != null) {
+                try (OutputStream out = resolver.openOutputStream(imageUri)) {
+                    if (out != null) {
+                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+                        out.flush();
+                    }
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    values.clear();
+                    values.put(MediaStore.Images.Media.IS_PENDING, 0);
+                    resolver.update(imageUri, values, null, null);
+                }
+                Log.i(TAG, "Spektrogram pomyślnie wyeksportowany do Galerii: " + imageUri);
+                return imageUri;
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "Nie udało się zapisać spektrogramu do Galerii MediaStore: " + t.getMessage(), t);
+        }
+        return null;
+    }
+
+    /**
+     * Kopiuje istniejący plik spektrogramu z pamięci prywatnej do publicznej Galerii zdjęć.
+     *
+     * @param context      kontekst aplikacji Android
+     * @param internalPath ścieżka bezwzględna do pliku PNG w pamięci aplikacji
+     * @param title        tytuł lub nazwa badania
+     * @return Uri zapisanego obrazu w Galerii lub null przy błędzie
+     */
+    public static Uri exportSpectrogramToGalleryFromPath(Context context, String internalPath, String title) {
+        if (context == null || internalPath == null || internalPath.trim().isEmpty()) return null;
+        File file = new File(internalPath);
+        if (!file.exists() || !file.canRead()) {
+            Log.w(TAG, "Plik spektrogramu nie istnieje lub brak uprawnień odczytu: " + internalPath);
+            return null;
+        }
+        try {
+            Bitmap bitmap = BitmapFactory.decodeFile(internalPath);
+            if (bitmap != null) {
+                return saveSpectrogramToGallery(context, bitmap, title);
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "Błąd podczas dekodowania i eksportu spektrogramu z pliku: " + t.getMessage());
+        }
+        return null;
     }
 
     /**

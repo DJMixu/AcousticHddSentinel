@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_diagnosis"
+            android:icon="@drawable/ic_mic_radar"
+            android:title="@string/nav_diagnosis"
+            android:checked="true" />
+        <item
+            android:id="@+id/nav_archive"
+            android:icon="@drawable/ic_archive_records"
+            android:title="@string/nav_archive" />
+        <item
+            android:id="@+id/nav_faq"
+            android:icon="@drawable/ic_faq_help"
+            android:title="@string/nav_faq" />
+        <item
+            android:id="@+id/nav_specs"
+            android:icon="@drawable/ic_info"
+            android:title="@string/nav_specs" />
+    </group>
+</menu>

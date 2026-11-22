@@ -77,7 +77,7 @@ flowchart TD
     end
 
     subgraph OUTPUT ["6. Warstwa Wyjściowa i Raportowanie"]
-        UiVerdict["Interfejs Shazam Hero (Verdict & Confidence)"]
+        UiVerdict["Interfejs Hero Radar (Verdict & Confidence)"]
         PdfReport["Raport Laboratoryjny PDF (A4 Vector + Spectrogram + FFT)"]
         JsonBundle["Baza Diagnostyczna JSON (Schema v1.0)"]
         CsvFleet["Eksport Flotowy CSV (Asset Management)"]

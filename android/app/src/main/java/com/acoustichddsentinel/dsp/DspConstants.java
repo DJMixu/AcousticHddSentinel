@@ -61,6 +61,9 @@ public final class DspConstants {
     /** Mnożnik cyfrowej kompensacji czułości (+18.06 dB) dla sprzętowych źródeł UNPROCESSED pozbawionych analogowego przedwzmacniacza. */
     public static final float UNPROCESSED_HARDWARE_PREGAIN = 8.0f;
 
+    /** Mnożnik wzmocnienia kompensacyjnego (+12.04 dB) dla toru VOICE_RECOGNITION / MIC przy wyłączonym systemowym AGC. */
+    public static final float RAW_MIC_HARDWARE_PREGAIN = 4.0f;
+
     /** Próg energii, poniżej którego aktywowane jest programowe podbicie cichych nagrań. */
     public static final float RMS_QUIET_BOOST_THRESHOLD = 0.005f;
 

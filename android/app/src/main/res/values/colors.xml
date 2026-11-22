@@ -1,27 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#1E293B</color>
-    <color name="primary_dark">#0F172A</color>
-    <color name="accent">#3B82F6</color>
-    <color name="background">#F8FAFC</color>
-    <color name="surface">#FFFFFF</color>
-    <color name="text_primary">#0F172A</color>
-    <color name="text_secondary">#64748B</color>
+    <!-- Główne tła - Dark Obsidian & Slate -->
+    <color name="background">#0B0F17</color>
+    <color name="background_secondary">#131A28</color>
+    <color name="surface">#182234</color>
+    <color name="surface_variant">#1E293B</color>
+    <color name="surface_card">#182234</color>
+    <color name="surface_card_stroke">#334155</color>
+    <color name="card_stroke">#334155</color>
+    <color name="divider">#334155</color>
 
-    <!-- Kolory statusów -->
-    <color name="status_normal_bg">#DCFCE7</color>
-    <color name="status_normal_text">#15803D</color>
-    <color name="status_danger_bg">#FEE2E2</color>
-    <color name="status_danger_text">#B91C1C</color>
-    <color name="status_fault_bg">#FEE2E2</color>
-    <color name="status_fault_text">#B91C1C</color>
-    <color name="status_warning_bg">#FEF3C7</color>
-    <color name="status_warning_text">#B45309</color>
-    <color name="status_ambient_bg">#E2E8F0</color>
-    <color name="status_ambient_text">#475569</color>
+    <!-- Kolory podstawowe i systemowe -->
+    <color name="primary">#131A28</color>
+    <color name="primary_dark">#0B0F17</color>
 
-    <!-- Kolory wykresów klas -->
-    <color name="color_normal">#22C55E</color>
-    <color name="color_clicking">#EF4444</color>
-    <color name="color_beeping">#F59E0B</color>
-    <color name="color_scratching">#7C3AED</color>
+    <!-- Glowing Accents (High-Tech Theme) -->
+    <color name="accent">#00E5FF</color>       <!-- Glowing Cyan -->
+    <color name="accent_cyan">#00E5FF</color>  <!-- Cyan Accent -->
+    <color name="accent_green">#00E676</color> <!-- Radar Green -->
+    <color name="accent_amber">#FFB300</color> <!-- Warning Amber -->
+    <color name="accent_red">#FF1744</color>   <!-- Alert Red -->
+    <color name="accent_purple">#A855F7</color><!-- Purple Accent -->
+
+    <!-- Typografia -->
+    <color name="text_primary">#F8FAFC</color>
+    <color name="text_secondary">#94A3B8</color>
+    <color name="text_tertiary">#64748B</color>
+
+    <!-- Kolory statusów (Ciemne tło + żywy tekst) -->
+    <color name="status_normal_bg">#132E22</color>
+    <color name="status_normal_text">#00E676</color>
+    <color name="status_danger_bg">#35151D</color>
+    <color name="status_danger_text">#FF1744</color>
+    <color name="status_fault_bg">#35151D</color>
+    <color name="status_fault_text">#FF1744</color>
+    <color name="status_warning_bg">#33240F</color>
+    <color name="status_warning_text">#FFB300</color>
+    <color name="status_ambient_bg">#1E293B</color>
+    <color name="status_ambient_text">#94A3B8</color>
+
+    <!-- Kolory wykresów klas (DSP / AI Softmax) -->
+    <color name="color_normal">#00E676</color>
+    <color name="color_clicking">#FF1744</color>
+    <color name="color_beeping">#FFB300</color>
+    <color name="color_scratching">#A855F7</color>
+
+    <!-- Radar i paski postępu -->
+    <color name="radar_pulse">#3300E5FF</color>
+    <color name="progress_track">#1E293B</color>
 </resources>

@@ -17,7 +17,7 @@ Zainstalowane i w pełni zintegrowane są dwa wyspecjalizowane modele open-weigh
    ```bash
    ./scripts/start_services.sh
    ```
-   (Skrypt podnosi `ollama.service` oraz bezhasłowy kontener `podman start open-webui`).
+   (Skrypt podnosi `ollama.service` oraz kontener `podman start open-webui`).
 
 2. **Automatyczne delegowanie złożonych zadań (Pipeline Tandemu i Profile Presets):**
    Gdy użytkownik zleca projektowanie nowych modułów, implementację zaawansowanych algorytmów (np. eksport do ONNX/Android, rozszerzone testy jednostkowe, refaktoring), agent powinien **automatycznie** wykorzystywać tandem modeli za pomocą skryptu orkiestrującego:
@@ -58,3 +58,12 @@ Zainstalowane i w pełni zintegrowane są dwa wyspecjalizowane modele open-weigh
 6. **Zasada Wczesnego Uruchamiania (Front-Loaded Execution — ZAKAZ OPÓŹNIANIA):**
    Lokalne modele generują z fizyczną prędkością GPU (Qwen 3.8: ~19 tok/s, Qwen 2.5 Coder: ~40 tok/s), przez co są kluczowym komponentem czasowym potoku.
    - **Bezwzględna reguła kolejkowania:** Zadania dla modeli Qwen (`architect`, `coder`, `smpc-arch`, `code-review`) **MUSZĄ być zlecane w pierwszej kolejności**, natychmiast na początku iteracji/etapu, a nie odkładane po długich dyskusjach.
+
+7. **Weryfikacja zmian po implementacji (Kompletny Suite Testowy):**
+   Po wdrożeniu zmian przez workerów swarma lub programistę wykonawczego, należy uruchomić testy weryfikacyjne:
+   - `python tests/test_project_logic.py` (6/6)
+   - `python tests/test_smpc_architecture.py` (7/7)
+   - `python tests/test_rpm_harmonics_analyzer.py` (9/9)
+   - `python tests/test_computer_sound_rejection.py` (6/6)
+   - `python tests/test_full_dataset_fault_detection_rate.py` (100% datasetu)
+   - `cd android && ./gradlew test && cd ..` (13 klas, 74 testy)

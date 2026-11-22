@@ -56,13 +56,18 @@ flowchart TD
 
 1. **Do not do the work (Zakaz pisania kodu przez koordynatora i chmurowe workery):**
    Koordynator AGY ani chmurowy worker **nigdy nie piszą kodu produkcyjnego z głowy**. Ich rolą jest sformułowanie precyzyjnego briefu i wywołanie lokalnego modelu poprzez `local_llm_bridge.py`. Modele chmurowe jedynie weryfikują wyjście, scalają pliki i uruchamiają testy.
-2. **Front-Loaded Execution (Wczesne uruchamianie zapytań GPU):**
+2. **Front-Loaded Execution (Wczesne uruchamianie zapytań GPU — ZAKAZ OPÓŹNIANIA):**
    Generowanie na lokalnym GPU osiąga ~19 tok/s (Qwen 3.8) i ~40 tok/s (Qwen Coder). Aby nie blokować zespołu, **zadania dla modeli Qwen MUSZĄ być zlecane w pierwszej kolejności na samym początku etapu**, a nie po wieloetapowych dyskusjach.
 3. **Sekwencyjność VRAM:**
    Tylko jedno zapytanie do GPU może być wykonywane w danym momencie. Kolejność potoku:
-   `Architect (Qwen 3.8)` $\to$ `Coder (Qwen 2.5 Coder)` $\to$ `Verifier / Tester (AGY & PyTest)`.
+   `Architect (Qwen 3.8)` $\to$ `Coder (Qwen 2.5 Coder)` $\to$ `Verifier / Tester (AGY & PyTest/Gradle)`.
 4. **Czysty VRAM przed treningiem:**
    Przed uruchomieniem skryptów treningowych PyTorch (`train_cnn.py`, `train_ensemble.py`), pamięć karty **musi być w 100% pusta** (`python scripts/local_llm_bridge.py --free-vram`).
+5. **Niezmienniki Domenowe:**
+   - **Zero Data Leakage:** Podział na poziomie całych nagrań źródłowych (ADR-001).
+   - **Czysta Java 17 na Androidzie:** Zero kodu Kotlin, Zero GC Churn w pętli audio (ADR-002).
+   - **Podwójny model:** Wzorzec Strategii (`LegacyCnnDetector` vs `AlternativeCnnDetector`).
+   - **RAW Audio & Hardware Pre-gain:** Dynamic Auto-gain do $RMS = 0.025$ i kompensacja +18.06 dB.
 
 ---
 
@@ -107,7 +112,7 @@ swarm{action:"add", name:"coder", workspace:"share",
       Gdy pliki są zapisane: @verifier zweryfikuj zmiany. @coordinator [done]"}
 ```
 
-### C. Worker: `verifier` / `reviewer` (Audyt i Testy)
+### C. Worker: `verifier` / `reviewer` (Audyt i Pełny Zestaw Testów)
 ```
 swarm{action:"add", name:"verifier",
       brief:"Jesteś Audytorem Kodu i Testerem. Twoje zadanie: zweryfikować kod od @coder.
@@ -118,10 +123,12 @@ swarm{action:"add", name:"verifier",
            --preset code-review \
            --output /tmp/review_report.md
 
-      2. Uruchom oficjalne testy systemu:
+      2. Uruchom oficjalne testy systemu (wszystkie muszą zakończyć się sukcesem):
          python tests/test_project_logic.py
          python tests/test_smpc_architecture.py
-         cd android && ./gradlew test
+         python tests/test_rpm_harmonics_analyzer.py
+         python tests/test_computer_sound_rejection.py
+         cd android && ./gradlew test && cd ..
 
       Jeśli testy przechodzą: @coordinator [done] kod w pełni sprawny i zweryfikowany.
       Jeśli są błędy: @coder popraw <lista_błędów>."}
@@ -137,6 +144,42 @@ swarm{action:"add", name:"implementer", workspace:"share",
       Wdróż wygenerowany kod, uruchom testy jednostkowe i zaraportuj: @coordinator [done]"}
 ```
 
+### E. Worker: `dsp-translator` (Translacja Python DSP do Czystej Javy 17)
+```
+swarm{action:"add", name:"dsp-translator", workspace:"share",
+      brief:"Jesteś Inżynierem Przekładu DSP. Twoje zadanie: przenieść logikę DSP z Pythona do 100% Czystej Javy 17 (ADR-002, Zero GC Churn, 0 Kotlina).
+      Uruchom lokalny profil:
+      python scripts/local_llm_bridge.py \
+        --task 'Przenieś logikę z <plik.py> do Javy 17 z zachowaniem tablic wstępnie zaalokowanych' \
+        --preset dsp-translate \
+        --output /tmp/dsp_translated.java
+      Wdróż do android/app/src/main/java/com/acoustichddsentinel/dsp/ i uruchom 'cd android && ./gradlew test'. @coordinator [done]"}
+```
+
+### F. Worker: `adversarial-gen` (Generowanie Testów Adwersarialnych i Szumów)
+```
+swarm{action:"add", name:"adversarial-gen", workspace:"share",
+      brief:"Jesteś Inżynierem ds. Badań Adwersarialnych Audio. Twoje zadanie: <OPIS>.
+      Uruchom lokalny profil:
+      python scripts/local_llm_bridge.py \
+        --task 'Zaprojektuj matematyczną syntezę zakłóceń audio: wentylatory BPF, modulacja vibrato mowy, clipping MEMS' \
+        --preset adversarial-gen \
+        --output /tmp/adversarial_gen.py
+      Uruchom wygenerowany skrypt i sprawdź odporność potoku hybrydowego: @coordinator [done]"}
+```
+
+### G. Worker: `android-opt` (Optymalizacja Android Zero-Allocation & Low Latency)
+```
+swarm{action:"add", name:"android-opt", workspace:"share",
+      brief:"Jesteś Ekspertem ds. Wydajności Androida. Twoje zadanie: optymalizacja Zero GC Churn w potoku audio.
+      Uruchom lokalny profil:
+      python scripts/local_llm_bridge.py \
+        --task 'Zoptymalizuj pętlę przetwarzania audio pod kątem Zero-Allocation i minimalnej latencji' \
+        --preset android-opt \
+        --output /tmp/android_opt.java
+      Zintegruj zmiany i zweryfikuj testy w 'cd android && ./gradlew test'. @coordinator [done]"}
+```
+
 ---
 
 ## 5. Profile Zadaniowe (`--preset`) dla Wyspecjalizowanych Workerów
@@ -145,17 +188,46 @@ Gdy zadanie dotyczy specyficznej dziedziny, worker używa dedykowanego profilu w
 
 | Profil (`--preset`) | Model docelowy | Zastosowanie w projekcie |
 |:---|:---|:---|
-| `code-review` | Qwen 2.5 Coder 14B | Rygorystyczny audyt bezpieczeństwa, bug hunting, wyścigi wątkowe |
-| `dsp-translate` | Qwen 2.5 Coder 14B | Translacja DSP z Pythona do 100% czystej Javy 17 (ADR-002, 0 Kotlina) |
-| `adversarial-gen` | Qwen 3.8 27B | Matematyczna synteza zakłóceń audio, vibrato głosu, szumu wentylatorów |
-| `android-opt` | Qwen 2.5 Coder 14B | Optymalizacja Zero-Allocation, unikanie GC pauses na telefonie |
-| `smpc-arch` | Qwen 3.8 27B | Architektura wielomodalnych podcentrów Sub-Center ArcFace i metryk |
+| `code-review` | Qwen 2.5 Coder 14B | Rygorystyczny audyt bezpieczeństwa, bug hunting, wyścigi wątkowe, clean code |
+| `dsp-translate` | Qwen 2.5 Coder 14B | Translacja DSP z Pythona do 100% czystej Javy 17 (ADR-002, 0 Kotlina, Zero GC) |
+| `adversarial-gen` | Qwen 3.8 27B | Matematyczna synteza fal adwersarialnych, vibrato głosu, szumu wentylatorów BPF |
+| `android-opt` | Qwen 2.5 Coder 14B | Optymalizacja Zero-Allocation, wyeliminowanie GC pauses na telefonie Android |
+| `smpc-arch` | Qwen 3.8 27B | Architektura wielomodalnych podcentrów Sub-Center ArcFace i metryk sferycznych |
 | `num-audit` | Qwen 2.5 Coder 14B | Weryfikacja numeryczna IEEE 754 (zabezpieczenia przed NaN, log(0), clipping) |
-| `smart-telemetry` | Qwen 3.8 27B (128k) | Korelacja telemetrii SMART dysków z sygnaturami widmowymi FFT |
+| `smart-telemetry` | Qwen 3.8 27B (128k) | Korelacja telemetrii SMART dysków z sygnaturami widmowymi FFT w oknie 128k |
 
 ---
 
-## 6. Procedura Rozpoczęcia Sesji Swarm (Krok po Kroku)
+## 6. Oficjalne Zestawy Testowe Systemu (Kompletny Suite Walidacyjny)
+
+Każdy worker przed zaraportowaniem ukończenia zadania (`[done]`) weryfikuje integralność systemu:
+
+```bash
+# 1. Integralność projektu i niezmienniki ADR-001 (6/6):
+python tests/test_project_logic.py
+
+# 2. Architektura wielomodalnych podcentrów SMPC Option A (7/7):
+python tests/test_smpc_architecture.py
+
+# 3. Analizator harmonicznych obrotowych RPM i odrzucanie wibrato mowy (9/9):
+python tests/test_rpm_harmonics_analyzer.py
+
+# 4. Odporność fuzji hybrydowej na szumy wentylatorów PC i cichy sygnał 45 dB (6/6):
+python tests/test_computer_sound_rejection.py
+
+# 5. Weryfikacja wykrywalności awarii na 100% całego datasetu (6 840 tensorów, >80% recall):
+python tests/test_full_dataset_fault_detection_rate.py
+
+# 6. Ewaluacja potoku aplikacji (z DSP vs bez DSP, 0% FPR na sprawnych dyskach):
+python tests/evaluate_app_pipeline_on_dataset.py
+
+# 7. Zestaw testów jednostkowych aplikacji mobilnej Android (Czysta Java 17, 13 klas, 74 testy):
+cd android && ./gradlew test && cd ..
+```
+
+---
+
+## 7. Procedura Rozpoczęcia Sesji Swarm (Krok po Kroku)
 
 Gdy użytkownik wydaje polecenie zespołowe (np. `swarm`, `/teamwork`, "uruchom zespół"):
 
@@ -170,5 +242,6 @@ Gdy użytkownik wydaje polecenie zespołowe (np. `swarm`, `/teamwork`, "uruchom 
 3. **Powołanie workerów:**
    - Jeśli zadanie wymaga analizy i nowego modułu: powołaj `architect` i `coder`.
    - Jeśli zadanie jest czysto wdrożeniowe: powołaj `coder` i `verifier`.
+   - Jeśli dotyczy DSP lub Androida: powołaj `dsp-translator` lub `android-opt`.
 4. **Nadzór i przejście do stanu uśpienia (`swarm_wait`):**
-   Koordynator publikuje briefy i przechodzi w tryb reaktywny (`swarm_wait`), czekając na powiadomienia na tablicy.
+   Koordynator publikuje briefy i przechodzi w tryb reaktywny, oczekując na powiadomienia z tablicy.

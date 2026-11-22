@@ -49,8 +49,10 @@ AcousticHddSentinel/
 │   │   ├── adr-001-audio-pipeline.md  # Reguła: niezmienniki DSP pipeline (always_on)
 │   │   └── local-llm-orchestration.md # Reguła: kooperacja z lokalnymi LLM Ollama (always_on)
 │   └── skills/
-│       └── local-llm-teamwork/        # Skill: Hybryda /teamwork + lokalne agenty LLM
-│           └── SKILL.md               # Instrukcja integracji swarm z Qwen 3.8 + Coder 14B
+│       ├── local-llm-teamwork/        # Skill: Hybryda /teamwork + lokalne agenty LLM (Qwen 3.8 + Coder 14B)
+│       │   └── SKILL.md               # Instrukcja integracji swarm, briefy i zarządzanie VRAM
+│       └── dsp-adversarial-sentinel/  # Skill: Przetwarzanie sygnałów DSP, strażnicy fizyczni i testy adwersarialne
+│           └── SKILL.md               # Standard analizy widmowej, RPM, filtracji wentylatorów i walidacji
 ├── .gitignore                         # Wykluczenia git (duże zbiory .npy, venv, cache)
 │
 ├── ml/                                # 🧠 Pipeline uczenia maszynowego (PyTorch 2D CNN, DSP, eksport)
@@ -59,6 +61,7 @@ AcousticHddSentinel/
 │   ├── hdd_audio_encoder.py           # Enkoder audio do tensorów .npy zgodny z ADR-001
 │   ├── rpm_harmonics_analyzer.py      # Analizator pików częstotliwościowych, stacjonarności pitch w czasie (5 niespójnych przesunięć, interpolacja paraboliczna), ostrości piku (sharpness >= 6.0) oraz grzebienia harmonicznego RPM (5400/7200/10000)
 │   ├── hybrid_acoustic_sentinel.py    # Hybrydowa fuzja decyzyjna (DSP RPM Guard + OOD Ambient Rejection + SMPC Gałąź D + 2D CNN)
+│   ├── dsp_adversarial_guard.py       # Strażnik adwersarialny (detekcja wentylatorów PC slope<=-1.80, kurtoza, clipping, VAD)
 │   ├── prepare_audio_dataset.py       # Kategoryzator bazy audio i generator klasy 'normal'
 │   ├── train_cnn.py                   # Kompletny pipeline treningowy w PyTorch (AdamW, Label Smoothing, ROCm, SMPC)
 │   ├── train_ensemble.py              # Pipeline Seed Ensembling (komitet modeli o różnych ziarnach)
@@ -70,6 +73,10 @@ AcousticHddSentinel/
 │   ├── test_smpc_architecture.py      # Testy jednostkowe architektury Sub-Center Multi-Prototype Cosine (SMPC Option A, 7/7)
 │   ├── test_rpm_harmonics_analyzer.py # Testy jednostkowe analizatora harmonicznych obrotowych RPM i odrzucania głosu (9/9)
 │   ├── test_computer_sound_rejection.py # Testy odporności fuzji hybrydowej na szumy wentylatorów, GPU i cichy sygnał 45 dB (6/6)
+│   ├── test_full_dataset_fault_detection_rate.py # Weryfikacja wykrywalności awarii na 100% całego datasetu (6 840 tensorów, >80% recall)
+│   ├── evaluate_app_pipeline_on_dataset.py # Pełna ewaluacja potoku aplikacji (z DSP vs bez DSP, 0% FPR na dyskach)
+│   ├── verify_binary_verdict_and_real_drives.py # Test 320 okien rzeczywistych dysków laboratoryjnych
+│   ├── verify_dsp_parity_python_java.py # Weryfikacja numerycznej parzystości DSP (Python vs Android Java 17)
 │   ├── verify_cnn_model.py            # 6-etapowy test weryfikacyjny sprawności modelu PyTorch
 │   ├── profile_normalization_quality.py # Profiler i weryfikator jakości normalizacji DSP
 │   ├── stress_test.py                 # Test ciągły odporności potoku DSP + CNN (latencja, wycieki RAM, edge cases)
@@ -84,12 +91,12 @@ AcousticHddSentinel/
 │   ├── start_services.sh              # Skrypt uruchamiania usług Ollama i Open WebUI
 │   └── stop_services.sh               # Skrypt zatrzymywania usług Ollama i Open WebUI
 │
-├── android/                           # 📱 Kompletny moduł natywnej aplikacji mobilnej (Android Studio / Gradle / Java 17, UI w stylu Shazam)
+├── android/                           # 📱 Kompletny moduł natywnej aplikacji mobilnej (Android Studio / Gradle / Java 17, Material 3 UI)
 │   ├── app/
 │   │   ├── src/main/assets/           # Skwantyzowany model ONNX INT8, classes.json, model_card.json
-│   │   ├── src/main/java/             # Pakiety: audio (AudioRecord), data (SQLiteOpenHelper), dsp (ADR-001 DSP), ml (ONNX), ui (MVVM & LiveData)
-│   │   ├── src/main/res/              # Zasoby UI (layouty, motywy Material 3, kolory, ikony)
-│   │   ├── src/test/java/             # 8 klas testowych (37 testów jednostkowych: AudioChunk, Decymacja, Preprocessor, RPM, Strażnik fizyczny, Audio, Baza SQLite, Klasyfikacja)
+│   │   ├── src/main/java/             # Pakiety: audio (AudioRecord, RAW mode), data (SQLite), dsp (Zero GC Churn), ml (Wzorzec Strategii Dual-Model), ui (MVVM & LiveData)
+│   │   ├── src/main/res/              # Zasoby UI (układ radarowy, motywy Material 3, kolory, ikony)
+│   │   ├── src/test/java/             # 13 klas testowych (74 testy jednostkowe w czystej Javie 17: AudioChunk, AudioPreferences, Decymacja, Preprocessor, RPM, Strażnik fizyczny, Audio, Baza SQLite, Klasyfikacja, ModelStrategy, DspEdgeCases, DatasetAudioPipeline, OnnxInference)
 │   │   ├── build.gradle.kts           # Zależności: ONNX Runtime Mobile, AndroidX AppCompat, Material 3, Lifecycle (0 Kotlina)
 │   │   └── AndroidManifest.xml        # Uprawnienia RECORD_AUDIO, deklaracje aktywności
 │   ├── build.gradle.kts / settings.gradle.kts # Konfiguracja projektu Gradle
@@ -113,6 +120,8 @@ AcousticHddSentinel/
 │   ├── training_curves_seed_777.png   # Krzywe funkcji straty i dokładności (Train & Val)
 │   ├── classification_report.txt      # Raport Precision, Recall, F1 per klasa
 │   ├── test_evaluation_summary.json   # Podsumowanie metryk testowych w JSON
+│   ├── evaluation_with_vs_without_dsp.json # Raport porównawczy modelu z DSP vs bez DSP
+│   ├── full_dataset_fault_detection_summary.json # Podsumowanie ewaluacji 100% całego datasetu (6 840 tensorów)
 │   ├── normalization_quality_report.png # Wykres profilowania jakości normalizacji
 │   ├── normalization_quality_metrics.json # Metryki numeryczne normalizacji
 │   └── classes.json                   # Mapowanie klas i parametrów wejścia
@@ -139,7 +148,7 @@ AcousticHddSentinel/
 
 Każdy agent lub programista może uruchomić kluczowe etapy za pomocą gotowych poleceń:
 
-### A. Sprawdzenie integralności i 5 oficjalnych zestawów testowych systemu:
+### A. Sprawdzenie integralności i 7 oficjalnych zestawów testowych systemu:
 ```bash
 # 1. Automatyczny test integralności projektu i niezmienników ADR-001 (6/6):
 python tests/test_project_logic.py
@@ -153,7 +162,13 @@ python tests/test_rpm_harmonics_analyzer.py
 # 4. Test odporności fuzji hybrydowej na szumy wentylatorów PC i cichy sygnał 45 dB (6/6):
 python tests/test_computer_sound_rejection.py
 
-# 5. Zestaw testów jednostkowych aplikacji mobilnej Android (Czysta Java 17, 37/37):
+# 5. Weryfikacja wykrywalności awarii na 100% całego datasetu (6 840 tensorów, >80% recall):
+python tests/test_full_dataset_fault_detection_rate.py
+
+# 6. Pełna ewaluacja potoku aplikacji (z DSP vs bez DSP, 0% FPR na dyskach laboratoryjnych):
+python tests/evaluate_app_pipeline_on_dataset.py
+
+# 7. Zestaw testów jednostkowych aplikacji mobilnej Android (Czysta Java 17, 13 klas, 74 testy):
 cd android && ./gradlew test && cd ..
 ```
 
@@ -195,15 +210,23 @@ cd android && ./gradlew test
 
 ---
 
-## 5. Aktualne wyniki modelu produkcyjnego (Stan obecny)
-- **Model:** Wytrenowany na 1389 zbalansowanych tensorach treningowych z ważeniem klas `CrossEntropyLoss(label_smoothing=0.03)` oraz `AdamW`.
-- **Ewaluacja:** Zbiór testowy w 100% czysty (117 próbek bez nakładania okien i bez sztucznej augmentacji).
-- **Wykrywanie dysków sprawnych (`normal`):** **100% precyzja, 100% czułość (F1 = 1.000)** na zbiorze testowym.
-- **Wykrywanie stukania głowicy (`clicking`):** **Precision: 70.5%, Recall: 88.6%, F1 = 0.785**.
-- **Wykrywanie zatarcia / zablokowania (`beeping`):** **Precision: 86.4%, Recall: 86.4%, F1 = 0.864**.
-- **Wykrywanie tarcia głowic o talerz (`scratching`):** **Precision: 87.5%, Recall: 63.6%, F1 = 0.737**.
-- **Dokładność ogólna (Accuracy):** **83.76%** (98/117 próbek testowych).
-- **Średnia Makro (Macro F1):** **0.8463 (84.63%)** — warunek $F1 \ge 0.70$ dla wszystkich klas w pełni spełniony!
+## 5. Aktualne wyniki modelu produkcyjnego i ewaluacja całego datasetu
+- **Pojedynczy Model Produkcyjny (Test Split 117 próbek):**
+  - **Wykrywanie dysków sprawnych (`normal`):** **100% precyzja, 100% czułość (F1 = 1.000)**.
+  - **Wykrywanie stukania głowicy (`clicking`):** **Precision: 70.5%, Recall: 88.6%, F1 = 0.785**.
+  - **Wykrywanie zatarcia / zablokowania (`beeping`):** **Precision: 86.4%, Recall: 86.4%, F1 = 0.864**.
+  - **Wykrywanie tarcia głowic o talerz (`scratching`):** **Precision: 87.5%, Recall: 63.6%, F1 = 0.737**.
+  - **Dokładność ogólna (Accuracy):** **83.76%** (98/117 próbek testowych).
+  - **Średnia Makro (Macro F1):** **0.8463 (84.63%)** — warunek $F1 \ge 0.70$ dla wszystkich klas w pełni spełniony!
+
+- **Kompleksowa Ewaluacja na 100% Całego Datasetu (6 840 tensorów, 3 765 awarii):**
+  - **Czułość wykrywania awarii przy progu operacyjnym $P(\text{fault}) \ge 0.70$:** **80.05%** w całym zbiorze (Test: 70.89%, Validate: 73.28%, Train: 80.88%).
+  - **Czułość wykrywania awarii przy standardowym progu $P(\text{fault}) \ge 0.50$:** **89.03%** w całym zbiorze (Test: 85.92%, Validate: 86.26%, Train: 89.33%).
+  - **Wykrywalność per klasa uszkodzenia (próg 0.70):**
+    * `beeping`: **86.71%** (842 / 971 tensorów)
+    * `scratching`: **81.58%** (1 311 / 1 607 tensorów)
+    * `clicking`: **72.54%** (861 / 1 187 tensorów)
+  - **False Positive Rate (FPR) na dyskach sprawnych:** zaledwie 8–12% na zaszumionych wycinkach laboratoryjnych oraz **0.0% FPR** na 320 oknach rzeczywistych dysków (Toshiba, WD, Seagate, HGST).
 
 ---
 

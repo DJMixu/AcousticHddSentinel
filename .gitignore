@@ -54,12 +54,13 @@ runs/
 wandb/
 .neptune/
 
-# Jawne wyjątki dla produkcyjnych modeli i komitetów (ZAKAZ IGNOROWANIA)
-!training_output/best_hdd_cnn_model.pt
-!training_output/ensemble_model_*.pt
-!training_output/fused_ensemble_model.pt
-!exported_models/*.pt
-!PrototypBezNormal/output*/*.pt
+# Modele i wagi lokalne (nie śledzić na GitHubie - odtwarzalne treningiem/eksportem)
+training_output/*.pt
+training_output/*.png
+training_output/stress_test_gpu/
+exported_models/*.onnx
+exported_models/*.pt
+exported_models/AcousticClassifierAndroid.java
 
 # ------------------------------------------------------------------------------
 # 3. Android & Gradle: Pliki kompilacji, pamięć podręczna i pakiety
@@ -152,13 +153,26 @@ Desktop.ini
 dataset_categorized/
 dataset_encoded/
 
-# Artefakty testów obciążeniowych i syntetycznych próbek adversarial
+# Artefakty testów obciążeniowych, próbek adversarial i tymczasowe wyjścia parity
 stress_test_output/
 tests/adversarial_lab/samples/
+tests/tmp_parity/
 
-# Tymczasowe wyjście testu parzystości DSP Java
-tests/tmp_parity/java_tensor_out.raw
-!tests/tmp_parity/test_signal_in.raw
+# Lokalne surowce audio i nagrania studyjne (trzymane lokalnie na dysku, poza GitHubem)
+data/raw/*
+!data/raw/PROCESSED_SOURCES_REGISTRY.json
+tests/recordings_4min_study/**/*.wav
+tests/noise_experiment/*.wav
+
+# Dokumentacja wewnętrzna agentów AI, raporty lokalne i narzędzia pomocnicze
+AGENTS.md
+.agents/
+kontekst.md
+docx/Projekt_AM.pdf
+docx/STRATEGIC_ROADMAP.md
+docx/RAPORT_STRESS_TEST_GPU_VRAM.md
+docx/RAPORT_SYMULACJI_POTOKU_MIKROFONU.md
+scripts/create_notebooklm_bundle.py
 
 # ------------------------------------------------------------------------------
 # 7. Archiwa historyczne i paczki ewaluacyjne

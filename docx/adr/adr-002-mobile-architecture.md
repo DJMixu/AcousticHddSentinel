@@ -3,7 +3,7 @@
 - **Status:** Zaakceptowany (Accepted)
 - **Data:** 12 listopada 2026 r.
 - **Kontekst projektu:** System akustycznej detekcji i wieloklasowej klasyfikacji uszkodzeń mechanicznych dysków twardych (HDD) na urządzeniu brzegowym / mobilnym.
-- **Powiązane dokumenty:** [ADR-001](adr.md) (Architektura DSP i enkodowania), [AGENTS.md](../../AGENTS.md), [specs.txt](../specs.txt).
+- **Powiązane dokumenty:** [ADR-001](adr.md) (Architektura DSP i enkodowania).
 
 ---
 

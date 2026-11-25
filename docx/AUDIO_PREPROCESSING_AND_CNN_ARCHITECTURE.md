@@ -3,7 +3,7 @@
 **Autorzy:** Zespół Inżynierii Akustycznej i Uczenia Maszynowego AcousticHddSentinel  
 **Wersja:** 2.4.0 (Stan Produkcyjny)  
 **Data publikacji:** 18 listopada 2026  
-**Dokumenty nadrzędne:** [ADR-001 (DSP & Data Pipeline)](file:///home/DJMixu/Pulpit/AcousticHddSentinel/docx/adr/adr.md), [ADR-002 (Mobile Architecture)](file:///home/DJMixu/Pulpit/AcousticHddSentinel/docx/adr/adr-002-mobile-architecture.md), [AGENTS.md](file:///home/DJMixu/Pulpit/AcousticHddSentinel/AGENTS.md)
+**Dokumenty nadrzędne:** [ADR-001 (DSP & Data Pipeline)](adr/adr.md), [ADR-002 (Mobile Architecture)](adr/adr-002-mobile-architecture.md)
 
 ---
 
@@ -90,7 +90,7 @@ Dzięki temu 2D CNN nie analizuje "surowego dźwięku", lecz **przestrzenno-czas
 
 ## 2. Matematyka i Etapy Potoku Preprocessingu Audio (DSP)
 
-Transformacja surowego sygnału fonicznego z mikrofonu do tensora tensora $(3, 128, 259)$ odbywa się w 8 ściśle zdefiniowanych, deterministycznych krokach, zaimplementowanych w sposób w 100% tożsamy w środowisku Python ([ml/hdd_audio_encoder.py](file:///home/DJMixu/Pulpit/AcousticHddSentinel/ml/hdd_audio_encoder.py)) oraz Java 17 na Androidzie ([com.acoustichddsentinel.dsp](file:///home/DJMixu/Pulpit/AcousticHddSentinel/android/app/src/main/java/com/acoustichddsentinel/dsp/AudioPreprocessor.java)).
+Transformacja surowego sygnału fonicznego z mikrofonu do tensora tensora $(3, 128, 259)$ odbywa się w 8 ściśle zdefiniowanych, deterministycznych krokach, zaimplementowanych w sposób w 100% tożsamy w środowisku Python ([ml/hdd_audio_encoder.py](../ml/hdd_audio_encoder.py)) oraz Java 17 na Androidzie ([com.acoustichddsentinel.dsp](../android/app/src/main/java/com/acoustichddsentinel/dsp/AudioPreprocessor.java)).
 
 ```mermaid
 flowchart TD
@@ -360,7 +360,7 @@ W projekcie zastosowano wariant **Option A (MatMul + view + ReduceMax)**:
 
 ## 5. Hybrydowy System Fuzji Akustycznej (Hybrid Sentinel)
 
-Sieć 2D CNN nie działa w próżni. W architekturze produkcyjnej zintegrowana jest w wielopoziomowy komitet decyzyjny łączący głębokie uczenie z twardymi prawami fizyki mechanicznej dysków twardych ([ml/hybrid_acoustic_sentinel.py](file:///home/DJMixu/Pulpit/AcousticHddSentinel/ml/hybrid_acoustic_sentinel.py)):
+Sieć 2D CNN nie działa w próżni. W architekturze produkcyjnej zintegrowana jest w wielopoziomowy komitet decyzyjny łączący głębokie uczenie z twardymi prawami fizyki mechanicznej dysków twardych ([ml/hybrid_acoustic_sentinel.py](../ml/hybrid_acoustic_sentinel.py)):
 
 ```
                         SYGNAŁ AUDIO (3.0s)
@@ -394,7 +394,7 @@ Każdy sprawny dysk HDD musi obracać się ze ściśle określoną prędkością
 - **7200 RPM:** Częstotliwość podstawowa $f_0 = \frac{7200}{60} = 120.0\text{ Hz}$ ($\pm 6.0\text{ Hz}$).
 - **10000 RPM:** Częstotliwość podstawowa $f_0 = \frac{10000}{60} = 166.67\text{ Hz}$ ($\pm 6.5\text{ Hz}$).
 
-Moduł [ml/rpm_harmonics_analyzer.py](file:///home/DJMixu/Pulpit/AcousticHddSentinel/ml/rpm_harmonics_analyzer.py) oblicza widmo gęstości mocy Welch o wysokiej rozdzielczości ($N_{FFT} = 8192$, krok $\Delta f \approx 2.69\text{ Hz}$) i analizuje:
+Moduł [ml/rpm_harmonics_analyzer.py](../ml/rpm_harmonics_analyzer.py) oblicza widmo gęstości mocy Welch o wysokiej rozdzielczości ($N_{FFT} = 8192$, krok $\Delta f \approx 2.69\text{ Hz}$) i analizuje:
 1. **Grzebień harmoniczny (Harmonic Comb):** Sprawdza obecność wielokrotności $k \cdot f_0$ (dla $k \in \{2, 3, 4, 6, 8, 12\}$). Prawdziwy dysk HDD generuje charakterystyczny grzebień rezonansowy pochodzący z drgań łożysk hydrodynamicznych (FDB).
 2. **Stacjonarność wysokości tonu (Pitch Stationarity Test):** Sygnał dzielony jest na 5 podokien czasowych. Silnik dysku zachowuje częstotliwość z dokładnością do $\pm 0.3\text{ Hz}$. Z kolei ludzki głos, śpiew czy gwizd wykazuje naturalne wibrato i intonację z ciągłym dryfem częstotliwości rzędu $\pm 5\text{--}15\text{ Hz}$. Jeśli wykryty pik dryfuje w czasie, strażnik natychmiast klasyfikuje dźwięk jako głos i blokuje fałszywy alarm.
 3. **Ostrość piku (Peak Sharpness):** Piki rezonansowe metalowych komponentów dysku mają wysoki współczynnik dobroci $Q \ge 6.0$, podczas gdy szum aerodynamiczny wentylatorów komputerowych ma charakter szerokopasmowy ($Q < 3.0$).
@@ -412,7 +412,7 @@ Reguły fuzji gwarantują bezwzględną odporność:
 
 ## 6. Implementacja w Czystej Javie 17 na Androidzie (Zero GC Churn)
 
-Zgodnie z wymaganiami [ADR-002](file:///home/DJMixu/Pulpit/AcousticHddSentinel/docx/adr/adr-002-mobile-architecture.md), cały potok DSP oraz inferencja sieci zaimplementowane są w **czystej Javie 17 (dokładnie 0 plików Kotlina, 0 narzutu pamięciowego)**.
+Zgodnie z wymaganiami [ADR-002](../docx/adr/adr-002-mobile-architecture.md), cały potok DSP oraz inferencja sieci zaimplementowane są w **czystej Javie 17 (dokładnie 0 plików Kotlina, 0 narzutu pamięciowego)**.
 
 Kluczowe innowacje inżynieryjne w module Androida:
 1. **Prealokacja buforów (Zero GC Allocation):**
@@ -456,4 +456,4 @@ Poniższa tabela stanowi ostateczne zestawienie parametrów technicznych całego
 1. **To nie jest prosty spektrogram:** Na wejście sieci neuronowej trafia zaawansowany, 3-kanałowy tensor czasowo-częstotliwościowy $\mathbb{R}^{3 \times 128 \times 259}$, który łączy informację o stanie widmowym dysku (Log-Mel) z dynamiką transjentów uderzeniowych (Delta) i przyspieszeń mechanicznych (Delta-Delta).
 2. **Fizyka poparta matematyką:** Parametry potoku DSP ($N_{FFT}=1024$, $H=256$, $\sigma_{min}$, $N_w=9$) zostały precyzyjnie dobrane do fizycznych właściwości dysków twardych, umożliwiając niezawodną detekcję mikrosekundowych zderzeń głowicy z odbojnikiem.
 3. **Odporność na świat rzeczywisty:** Dzięki wbudowanemu w graf sieci mechanizmowi **SMPC Option A** oraz zewnętrznemu **strażnikowi fizyki RPM**, model nie ulega zwiedzeniu przez mowę ludzką, muzykę czy szum wentylatorów komputerowych, zachowując **0.00% fałszywych alarmów (FPR)** na rzeczywistych dyskach.
-4. **Idealna symetria kodu:** Wszystkie transformacje matematyczne w Pythonie ([ml/hdd_audio_encoder.py](file:///home/DJMixu/Pulpit/AcousticHddSentinel/ml/hdd_audio_encoder.py)) i w Javie 17 na Androidzie ([com.acoustichddsentinel.dsp](file:///home/DJMixu/Pulpit/AcousticHddSentinel/android/app/src/main/java/com/acoustichddsentinel/dsp/AudioPreprocessor.java)) wykazują bitową zgodność, co gwarantuje, że model na telefonie zachowuje identyczną skuteczność diagnostyczną jak w środowisku laboratoryjnym.
+4. **Idealna symetria kodu:** Wszystkie transformacje matematyczne w Pythonie ([ml/hdd_audio_encoder.py](../ml/hdd_audio_encoder.py)) i w Javie 17 na Androidzie ([com.acoustichddsentinel.dsp](../android/app/src/main/java/com/acoustichddsentinel/dsp/AudioPreprocessor.java)) wykazują bitową zgodność, co gwarantuje, że model na telefonie zachowuje identyczną skuteczność diagnostyczną jak w środowisku laboratoryjnym.

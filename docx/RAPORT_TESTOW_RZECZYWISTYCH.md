@@ -11,18 +11,18 @@
 
 Każdy z badanych dysków został poddany pełnemu odczytowi rejestrów sprzętowych SMART przed przystąpieniem do testów akustycznych. Wszystkie 4 dyski uzyskały oficjalny status sprzętowy **PASSED (100% Sprawne)** – zero uszkodzonych sektorów (`Reallocated Sectors = 0`), zero sektorów niestabilnych (`Current Pending = 0`), zero błędów niekorygowalnych offline.
 
-| Dysk / Oznaczenie | Format / Pojemność | Numer Seryjny | Prędkość obrotowa | Czas pracy (POH) | Cykle parkowania | Raport SMART |
+| Dysk / Oznaczenie | Format / Pojemność | Numer Seryjny | Prędkość obrotowa | Czas pracy (POH) | Cykle parkowania | Status SMART |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Toshiba P300** (`HDWD260`) | **3.5"** / 6.0 TB | `X481S3JNS5FH` | 5400 RPM | 2 525 h | 10 202 | [smart.txt](file:///home/DJMixu/Pulpit/AcousticHddSentinel/tests/toshiba_HDWD260_smart.txt) |
-| **WD Blue** (`WD5000LPVX`) | **2.5"** / 500 GB | `WD-WXD1A24C7866` | 5400 RPM | 14 360 h | 890 464 | [smart.txt](file:///home/DJMixu/Pulpit/AcousticHddSentinel/tests/wd_WD5000LPVX_smart.txt) |
-| **Seagate Momentus** (`ST9500325AS`) | **2.5"** / 500 GB | `5VEL6G17` | 5400 RPM | 3 866 h | 66 671 | [smart.txt](file:///home/DJMixu/Pulpit/AcousticHddSentinel/tests/seagate_ST9500325AS_smart.txt) |
-| **HGST Travelstar** (`HTS545050A7E680`) | **2.5"** / 500 GB | `TEA55C4N2P3AHR` | 5400 RPM | 6 098 h | 106 303 | [smart.txt](file:///home/DJMixu/Pulpit/AcousticHddSentinel/tests/hgst_HTS545050A7E680_smart.txt) |
+| **Toshiba P300** (`HDWD260`) | **3.5"** / 6.0 TB | `X481S3JNS5FH` | 5400 RPM | 2 525 h | 10 202 | PASSED (0 błędów) |
+| **WD Blue** (`WD5000LPVX`) | **2.5"** / 500 GB | `WD-WXD1A24C7866` | 5400 RPM | 14 360 h | 890 464 | PASSED (0 błędów) |
+| **Seagate Momentus** (`ST9500325AS`) | **2.5"** / 500 GB | `5VEL6G17` | 5400 RPM | 3 866 h | 66 671 | PASSED (0 błędów) |
+| **HGST Travelstar** (`HTS545050A7E680`) | **2.5"** / 500 GB | `TEA55C4N2P3AHR` | 5400 RPM | 6 098 h | 106 303 | PASSED (0 błędów) |
 
 ---
 
 ## 2. Metodologia Badań i Struktura Rejestracji
 
-Badanie każdego dysku zorganizowano w **4 izolowane fazy po 60 sekund** (łącznie 240 sekund na dysk, 80 okien ewaluacyjnych po 3.0 s zgodnie z [ADR-001](file:///home/DJMixu/Pulpit/AcousticHddSentinel/docx/adr/adr.md)):
+Badanie każdego dysku zorganizowano w **4 izolowane fazy po 60 sekund** (łącznie 240 sekund na dysk, 80 okien ewaluacyjnych po 3.0 s zgodnie z [ADR-001](adr/adr.md)):
 
 ```mermaid
 flowchart LR
@@ -33,11 +33,8 @@ flowchart LR
     E --> F["Podwójna Ewaluacja\nPyTorch vs ONNX FP32"]
 ```
 
-### Zarejestrowane pliki audio i raporty w projekcie:
-* **Toshiba P300:** [Katalog nagrań](file:///home/DJMixu/Pulpit/AcousticHddSentinel/tests/recordings_4min_study/Toshiba/) | [Wykres 4 faz](file:///home/DJMixu/Pulpit/AcousticHddSentinel/tests/recordings_4min_study/Toshiba/toshiba_acoustic_study_report.png) | [Raport JSON](file:///home/DJMixu/Pulpit/AcousticHddSentinel/tests/recordings_4min_study/Toshiba/evaluation_report.json)
-* **WD Blue:** [Katalog nagrań](file:///home/DJMixu/Pulpit/AcousticHddSentinel/tests/recordings_4min_study/WD/) | [Wykres 4 faz](file:///home/DJMixu/Pulpit/AcousticHddSentinel/tests/recordings_4min_study/WD/wd_acoustic_study_report.png) | [Raport JSON](file:///home/DJMixu/Pulpit/AcousticHddSentinel/tests/recordings_4min_study/WD/evaluation_report.json)
-* **Seagate Momentus:** [Katalog nagrań](file:///home/DJMixu/Pulpit/AcousticHddSentinel/tests/recordings_4min_study/Seagate/) | [Wykres 4 faz](file:///home/DJMixu/Pulpit/AcousticHddSentinel/tests/recordings_4min_study/Seagate/seagate_acoustic_study_report.png) | [Raport JSON](file:///home/DJMixu/Pulpit/AcousticHddSentinel/tests/recordings_4min_study/Seagate/evaluation_report.json)
-* **HGST Travelstar:** [Katalog nagrań](file:///home/DJMixu/Pulpit/AcousticHddSentinel/tests/recordings_4min_study/HGST/) | [Wykres 4 faz](file:///home/DJMixu/Pulpit/AcousticHddSentinel/tests/recordings_4min_study/HGST/hgst_acoustic_study_report.png) | [Raport JSON](file:///home/DJMixu/Pulpit/AcousticHddSentinel/tests/recordings_4min_study/HGST/evaluation_report.json)
+### Badane jednostki w sesji 4-fazowej (`tests/recordings_4min_study/` lokalnie):
+* **Toshiba P300** (`HDWD260`), **WD Blue** (`WD5000LPVX`), **Seagate Momentus** (`ST9500325AS`), **HGST Travelstar** (`HTS545050A7E680`) — po 4 pliki 60s (IDLE, WRITE, READ, MIXED), łącznie 320 okien po 3.0 s.
 
 ---
 

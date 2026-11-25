@@ -2,7 +2,7 @@
 
 Moduł natywnej aplikacji mobilnej na platformę **Android** zaimplementowany w czystej **Javie** (OpenJDK 17 / API 26+), służący do akustycznej detekcji i wieloklasowej klasyfikacji uszkodzeń mechanicznych dysków twardych (HDD) w czasie rzeczywistym.
 
-Projekt zrealizowany w ramach przedmiotu **Projekt - Aplikacje Mobilne** (prowadzący: inż. Dominik Ciura) w oparciu o specyfikację `docx/ADR APLIKACJI MOBILNEJ.md` oraz `docx/adr/adr.md` (ADR-001).
+Projekt zrealizowany w ramach przedmiotu **Projekt - Aplikacje Mobilne** (prowadzący: inż. Dominik Ciura) w oparciu o specyfikację [ADR-002 (Architektura Mobilna)](../docx/adr/adr-002-mobile-architecture.md) oraz [ADR-001 (DSP i Audio)](../docx/adr/adr.md).
 
 ---
 
